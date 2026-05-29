@@ -2,6 +2,31 @@ export type GenerationStatus = "pending" | "generating" | "completed" | "failed"
 
 export type ImageType = "product" | "logo" | "reference";
 
+export type Aggressiveness = "less" | "average" | "more" | "maximum";
+export type Tone = "professional" | "casual" | "edgy" | "playful";
+export type VisualStyle = "clean" | "bold" | "organic";
+export type Platform = "meta" | "tiktok" | "linkedin";
+
+export interface StyleSettings {
+  aggressiveness: Aggressiveness;
+  tone: Tone;
+  visual_style: VisualStyle;
+  platform: Platform;
+}
+
+export const DEFAULT_STYLE_SETTINGS: StyleSettings = {
+  aggressiveness: "average",
+  tone: "professional",
+  visual_style: "clean",
+  platform: "meta",
+};
+
+export const PLATFORM_DIMENSIONS: Record<Platform, { width: number; height: number; aspect: string }> = {
+  meta: { width: 1080, height: 1080, aspect: "1:1" },
+  tiktok: { width: 1080, height: 1920, aspect: "9:16" },
+  linkedin: { width: 1200, height: 627, aspect: "1.91:1" },
+};
+
 export interface ProductData {
   name?: string;
   price?: string;
@@ -20,6 +45,14 @@ export interface Project {
   product_url: string | null;
   product_data: ProductData | null;
   logo_url: string | null;
+  brand_name: string | null;
+  product_name: string | null;
+  product_description: string | null;
+  key_selling_points: string | null;
+  target_audience: string | null;
+  price_point: string | null;
+  proof_points: string | null;
+  style_settings: StyleSettings;
   created_at: string;
 }
 
@@ -32,6 +65,15 @@ export interface Concept {
   is_default: boolean;
   user_id: string | null;
   created_at: string;
+}
+
+export interface Brief {
+  id: string;
+  project_id: string;
+  concept_id: string;
+  brief_text: string;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface Generation {

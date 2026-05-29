@@ -1,39 +1,43 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
+import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import { GenerationCard } from "@/components/gallery/generation-card";
-import { fillTemplate } from "@/lib/prompt";
-import type { Concept, Generation, Project } from "@/lib/types";
+import { ProductDetailsForm } from "./product-details-form";
+import { BriefCard } from "./brief-card";
+import type { Brief, Concept, Generation, Project } from "@/lib/types";
 
 interface Props {
   project: Project;
   concepts: Concept[];
   initialGenerations: Generation[];
+  initialBriefs: Brief[];
   enabledConceptIds: Set<string>;
+}
+
+let tempCounter = 0;
+function makeTempId(conceptId: string): string {
+  tempCounter += 1;
+  return `tmp-${conceptId}-${tempCounter}`;
 }
 
 export function ProjectWorkspace({
   project: initialProject,
   concepts,
   initialGenerations,
+  initialBriefs,
   enabledConceptIds: initialEnabled,
 }: Props) {
-  const router = useRouter();
   const [project, setProject] = useState(initialProject);
   const [generations, setGenerations] = useState(initialGenerations);
+  const [briefs, setBriefs] = useState(initialBriefs);
   const [enabled, setEnabled] = useState(initialEnabled);
-  const [batchLoading, setBatchLoading] = useState(false);
-  const [, startTransition] = useTransition();
+  const [batchBriefsLoading, setBatchBriefsLoading] = useState(false);
+  const [batchImagesLoading, setBatchImagesLoading] = useState(false);
 
   const conceptsById = useMemo(
     () => new Map(concepts.map((c) => [c.id, c])),
@@ -45,6 +49,12 @@ export function ProjectWorkspace({
     [concepts, enabled],
   );
 
+  const briefByConcept = useMemo(() => {
+    const m = new Map<string, Brief>();
+    for (const b of briefs) m.set(b.concept_id, b);
+    return m;
+  }, [briefs]);
+
   const latestByConcept = useMemo(() => {
     const map = new Map<string, Generation>();
     for (const g of generations) {
@@ -54,17 +64,79 @@ export function ProjectWorkspace({
     return map;
   }, [generations]);
 
-  async function generateOne(conceptId: string) {
-    const concept = conceptsById.get(conceptId);
-    if (!concept) return;
-    const prompt_text = fillTemplate(concept.prompt_template, project);
+  function applyBriefs(newBriefs: Brief[]) {
+    if (newBriefs.length === 0) return;
+    const map = new Map(briefs.map((b) => [b.concept_id, b]));
+    for (const b of newBriefs) map.set(b.concept_id, b);
+    setBriefs(Array.from(map.values()));
+  }
 
-    const tempId = `tmp-${conceptId}-${Date.now()}`;
+  function replaceBrief(updated: Brief) {
+    setBriefs((arr) => {
+      const i = arr.findIndex((b) => b.id === updated.id);
+      if (i === -1) return [...arr, updated];
+      const next = arr.slice();
+      next[i] = updated;
+      return next;
+    });
+  }
+
+  async function generateBriefs(conceptIds: string[]) {
+    if (conceptIds.length === 0) return;
+    const res = await fetch("/api/generate-briefs", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        project_id: project.id,
+        concept_ids: conceptIds,
+      }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.message ?? err.error ?? "Brief generation failed");
+    }
+    const json = await res.json();
+    applyBriefs(json.briefs as Brief[]);
+    const failures = (json.failures ?? []) as { concept_id: string; message: string }[];
+    if (failures.length > 0) {
+      toast.error(
+        `${failures.length} brief${failures.length === 1 ? "" : "s"} failed`,
+      );
+    }
+  }
+
+  async function generateAllBriefs() {
+    setBatchBriefsLoading(true);
+    try {
+      await generateBriefs(enabledConcepts.map((c) => c.id));
+      toast.success("Briefs ready");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Brief generation failed");
+    } finally {
+      setBatchBriefsLoading(false);
+    }
+  }
+
+  async function regenerateBrief(conceptId: string) {
+    try {
+      await generateBriefs([conceptId]);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Regenerate failed");
+    }
+  }
+
+  async function generateImageForConcept(conceptId: string) {
+    const brief = briefByConcept.get(conceptId);
+    if (!brief) {
+      toast.error("Generate the brief first");
+      return;
+    }
+    const tempId = makeTempId(conceptId);
     const placeholder: Generation = {
       id: tempId,
       project_id: project.id,
       concept_id: conceptId,
-      prompt_text,
+      prompt_text: brief.brief_text,
       image_url: null,
       status: "generating",
       version: (latestByConcept.get(conceptId)?.version ?? 0) + 1,
@@ -79,7 +151,7 @@ export function ProjectWorkspace({
         body: JSON.stringify({
           project_id: project.id,
           concept_id: conceptId,
-          prompt_text,
+          prompt_text: brief.brief_text,
         }),
       });
       const json = await res.json();
@@ -106,15 +178,17 @@ export function ProjectWorkspace({
     }
   }
 
-  async function generateAll() {
-    setBatchLoading(true);
+  async function generateAllImages() {
+    setBatchImagesLoading(true);
     try {
       for (const c of enabledConcepts) {
-        if (!latestByConcept.get(c.id)) await generateOne(c.id);
+        if (briefByConcept.get(c.id)) {
+          await generateImageForConcept(c.id);
+        }
       }
       toast.success("Batch complete");
     } finally {
-      setBatchLoading(false);
+      setBatchImagesLoading(false);
     }
   }
 
@@ -128,25 +202,6 @@ export function ProjectWorkspace({
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ concept_id: conceptId, enabled: on }),
     });
-  }
-
-  async function rescrape() {
-    if (!project.product_url) return;
-    const res = await fetch("/api/scrape", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        url: project.product_url,
-        project_id: project.id,
-      }),
-    });
-    if (res.ok) {
-      const { data } = await res.json();
-      setProject({ ...project, product_data: data });
-      toast.success("Product data refreshed");
-    } else {
-      toast.error("Refresh failed");
-    }
   }
 
   async function downloadAll() {
@@ -165,76 +220,69 @@ export function ProjectWorkspace({
     }
   }
 
-  async function updateProductMeta(patch: Partial<Project>) {
-    setProject((p) => ({ ...p, ...patch }));
-    startTransition(async () => {
-      await fetch(`/api/projects/${project.id}`, {
-        method: "PATCH",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify(patch),
-      });
-      router.refresh();
-    });
-  }
-
-  const productData = project.product_data ?? {};
+  const briefsCount = enabledConcepts.filter((c) =>
+    briefByConcept.has(c.id),
+  ).length;
 
   return (
     <div className="space-y-6">
-      <div className="flex items-start justify-between gap-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">
             {project.name}
           </h1>
-          {project.client_name && (
-            <p className="text-sm text-muted-foreground">{project.client_name}</p>
+          {(project.brand_name || project.client_name) && (
+            <p className="text-sm text-muted-foreground">
+              {project.brand_name ?? project.client_name}
+            </p>
           )}
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={downloadAll} disabled={generations.length === 0}>
-            Download all
+        <div className="flex flex-wrap gap-2">
+          <Button
+            variant="outline"
+            onClick={generateAllBriefs}
+            disabled={batchBriefsLoading || enabledConcepts.length === 0}
+          >
+            {batchBriefsLoading
+              ? "Writing briefs..."
+              : `Generate briefs (${enabledConcepts.length})`}
           </Button>
-          <Button onClick={generateAll} disabled={batchLoading || enabledConcepts.length === 0}>
-            {batchLoading ? "Generating..." : `Generate ${enabledConcepts.length}`}
+          <Button
+            onClick={generateAllImages}
+            disabled={batchImagesLoading || briefsCount === 0}
+          >
+            {batchImagesLoading
+              ? "Generating..."
+              : `Generate images (${briefsCount})`}
+          </Button>
+          <Button
+            variant="outline"
+            onClick={downloadAll}
+            disabled={generations.filter((g) => g.image_url).length === 0}
+          >
+            Download all
           </Button>
         </div>
       </div>
 
-      <Tabs defaultValue="gallery">
+      <Tabs defaultValue="product">
         <TabsList>
-          <TabsTrigger value="gallery">Gallery</TabsTrigger>
-          <TabsTrigger value="concepts">Concepts</TabsTrigger>
           <TabsTrigger value="product">Product</TabsTrigger>
+          <TabsTrigger value="concepts">Concepts</TabsTrigger>
+          <TabsTrigger value="briefs">Briefs</TabsTrigger>
+          <TabsTrigger value="gallery">Gallery</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="gallery" className="space-y-4 pt-4">
-          {generations.length === 0 ? (
-            <Card>
-              <CardContent className="py-16 text-center text-sm text-muted-foreground">
-                No images yet. Enable concepts and hit Generate.
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-              {generations.map((g) => {
-                const concept = conceptsById.get(g.concept_id);
-                if (!concept) return null;
-                return (
-                  <GenerationCard
-                    key={g.id}
-                    generation={g}
-                    conceptName={concept.name}
-                    onRegenerate={() => generateOne(g.concept_id)}
-                  />
-                );
-              })}
-            </div>
-          )}
+        <TabsContent value="product" className="pt-4">
+          <ProductDetailsForm
+            project={project}
+            onProjectChange={setProject}
+          />
         </TabsContent>
 
         <TabsContent value="concepts" className="space-y-3 pt-4">
           <div className="text-sm text-muted-foreground">
-            Toggle the concepts you want to include in this project.
+            Toggle the concepts you want briefs and images for.
           </div>
           <div className="grid gap-2 sm:grid-cols-2">
             {concepts.map((c) => {
@@ -263,108 +311,55 @@ export function ProjectWorkspace({
           </div>
         </TabsContent>
 
-        <TabsContent value="product" className="space-y-4 pt-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Product source</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="space-y-1.5">
-                <Label htmlFor="prod-url">Product URL</Label>
-                <div className="flex gap-2">
-                  <Input
-                    id="prod-url"
-                    value={project.product_url ?? ""}
-                    onChange={(e) =>
-                      setProject({ ...project, product_url: e.target.value })
-                    }
+        <TabsContent value="briefs" className="space-y-4 pt-4">
+          {enabledConcepts.length === 0 ? (
+            <Card>
+              <CardContent className="py-16 text-center text-sm text-muted-foreground">
+                Enable at least one concept to start writing briefs.
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="grid gap-4 lg:grid-cols-2">
+              {enabledConcepts.map((c) => (
+                <BriefCard
+                  key={c.id}
+                  concept={c}
+                  brief={briefByConcept.get(c.id) ?? null}
+                  latestGeneration={latestByConcept.get(c.id) ?? null}
+                  onBriefChange={replaceBrief}
+                  onRegenerate={() => regenerateBrief(c.id)}
+                  onGenerateImage={() => generateImageForConcept(c.id)}
+                />
+              ))}
+            </div>
+          )}
+        </TabsContent>
+
+        <TabsContent value="gallery" className="space-y-4 pt-4">
+          {generations.length === 0 ? (
+            <Card>
+              <CardContent className="py-16 text-center text-sm text-muted-foreground">
+                No images yet. Generate briefs, then images, to see them here.
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              {generations.map((g) => {
+                const concept = conceptsById.get(g.concept_id);
+                if (!concept) return null;
+                return (
+                  <GenerationCard
+                    key={g.id}
+                    generation={g}
+                    conceptName={concept.name}
+                    onRegenerate={() => generateImageForConcept(g.concept_id)}
                   />
-                  <Button
-                    variant="outline"
-                    onClick={() =>
-                      updateProductMeta({ product_url: project.product_url })
-                    }
-                  >
-                    Save
-                  </Button>
-                  <Button variant="outline" onClick={rescrape} disabled={!project.product_url}>
-                    Rescrape
-                  </Button>
-                </div>
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="logo-url">Logo URL</Label>
-                <div className="flex gap-2">
-                  <Input
-                    id="logo-url"
-                    value={project.logo_url ?? ""}
-                    onChange={(e) =>
-                      setProject({ ...project, logo_url: e.target.value })
-                    }
-                  />
-                  <Button
-                    variant="outline"
-                    onClick={() =>
-                      updateProductMeta({ logo_url: project.logo_url })
-                    }
-                  >
-                    Save
-                  </Button>
-                </div>
-              </div>
-              <Separator />
-              <div className="grid gap-3 sm:grid-cols-2 text-sm">
-                <Field label="Name" value={productData.name} />
-                <Field label="Price" value={productData.price} />
-                <Field
-                  label="Description"
-                  value={productData.description}
-                  className="sm:col-span-2"
-                />
-                <Field
-                  label="Features"
-                  value={(productData.features ?? []).join(", ")}
-                  className="sm:col-span-2"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Manual notes</Label>
-                <Textarea
-                  rows={3}
-                  defaultValue={productData.description ?? ""}
-                  onBlur={(e) =>
-                    updateProductMeta({
-                      product_data: {
-                        ...productData,
-                        description: e.target.value,
-                      },
-                    })
-                  }
-                />
-              </div>
-            </CardContent>
-          </Card>
+                );
+              })}
+            </div>
+          )}
         </TabsContent>
       </Tabs>
-    </div>
-  );
-}
-
-function Field({
-  label,
-  value,
-  className = "",
-}: {
-  label: string;
-  value?: string | null;
-  className?: string;
-}) {
-  return (
-    <div className={className}>
-      <div className="text-xs uppercase tracking-wide text-muted-foreground">
-        {label}
-      </div>
-      <div className="text-sm">{value || "—"}</div>
     </div>
   );
 }

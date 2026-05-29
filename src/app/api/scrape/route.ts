@@ -27,9 +27,17 @@ export async function POST(request: Request) {
     const data = await scrapeProduct(url);
 
     if (project_id) {
+      const updates: Record<string, unknown> = {
+        product_url: url,
+        product_data: data,
+      };
+      if (data.name) updates.product_name = data.name;
+      if (data.description) updates.product_description = data.description;
+      if (data.price) updates.price_point = data.price;
+
       const { error } = await supabase
         .from("projects")
-        .update({ product_url: url, product_data: data })
+        .update(updates)
         .eq("id", project_id)
         .eq("user_id", user.id);
       if (error) {

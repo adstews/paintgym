@@ -36,9 +36,19 @@ export async function POST(request: Request) {
     );
   }
 
+  const product_url =
+    parsed.data.product_url && parsed.data.product_url.length > 0
+      ? parsed.data.product_url
+      : null;
+
   const { data, error } = await supabase
     .from("projects")
-    .insert({ ...parsed.data, user_id: user.id })
+    .insert({
+      name: parsed.data.name,
+      client_name: parsed.data.client_name ?? null,
+      product_url,
+      user_id: user.id,
+    })
     .select("id")
     .single();
   if (error || !data) {
@@ -48,14 +58,19 @@ export async function POST(request: Request) {
     );
   }
 
-  if (parsed.data.product_url) {
+  if (product_url) {
     void (async () => {
       try {
         const { scrapeProduct } = await import("@/lib/scrape");
-        const product_data = await scrapeProduct(parsed.data.product_url!);
+        const product_data = await scrapeProduct(product_url);
         await supabase
           .from("projects")
-          .update({ product_data })
+          .update({
+            product_data,
+            product_name: product_data.name ?? null,
+            product_description: product_data.description ?? null,
+            price_point: product_data.price ?? null,
+          })
           .eq("id", data.id)
           .eq("user_id", user.id);
       } catch {
