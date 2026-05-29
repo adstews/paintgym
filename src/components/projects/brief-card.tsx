@@ -81,7 +81,8 @@ export function BriefCard({
 
   const hasBrief = brief !== null;
   const isGenerating = latestGeneration?.status === "generating";
-  const status = latestGeneration?.status;
+  const qaStatus = latestGeneration?.qa_status;
+  const isReviewing = qaStatus === "reviewing" || qaStatus === "rewriting";
 
   return (
     <Card>
@@ -96,9 +97,24 @@ export function BriefCard({
           <div className="flex shrink-0 items-center gap-2">
             {!hasBrief && <Badge variant="outline">No brief yet</Badge>}
             {hasBrief && dirty && <Badge variant="secondary">Unsaved</Badge>}
-            {status === "completed" && <Badge>Image ready</Badge>}
-            {status === "failed" && <Badge variant="destructive">Failed</Badge>}
             {isGenerating && <Badge variant="secondary">Generating</Badge>}
+            {!isGenerating && qaStatus === "reviewing" && (
+              <Badge variant="secondary">Reviewing</Badge>
+            )}
+            {!isGenerating && qaStatus === "rewriting" && (
+              <Badge variant="secondary">Rewriting</Badge>
+            )}
+            {!isGenerating && qaStatus === "passed" && <Badge>Approved</Badge>}
+            {!isGenerating && qaStatus === "overridden" && <Badge>Accepted</Badge>}
+            {!isGenerating && qaStatus === "minor" && (
+              <Badge variant="secondary">Minor issues</Badge>
+            )}
+            {!isGenerating && qaStatus === "major" && (
+              <Badge variant="destructive">Flagged</Badge>
+            )}
+            {latestGeneration?.status === "failed" && (
+              <Badge variant="destructive">Failed</Badge>
+            )}
           </div>
         </div>
       </CardHeader>
@@ -153,9 +169,13 @@ export function BriefCard({
             type="button"
             size="sm"
             onClick={handleGenerate}
-            disabled={!hasBrief || dirty || gen || isGenerating}
+            disabled={!hasBrief || dirty || gen || isGenerating || isReviewing}
           >
-            {gen || isGenerating ? "Generating..." : "Generate image"}
+            {gen || isGenerating
+              ? "Generating..."
+              : isReviewing
+                ? "Reviewing..."
+                : "Generate image"}
           </Button>
         </div>
       </CardFooter>

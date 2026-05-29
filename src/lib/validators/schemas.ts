@@ -73,6 +73,10 @@ export const briefRegenerateSchema = z.object({
   concept_id: z.string().uuid(),
 });
 
+export const reviewImageSchema = z.object({
+  generation_id: z.string().uuid(),
+});
+
 export const authEmailSchema = z.object({
   email: z.string().email(),
   password: z.string().min(8).max(128),

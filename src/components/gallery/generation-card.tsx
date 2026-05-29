@@ -2,6 +2,12 @@
 
 import { useState } from "react";
 import Image from "next/image";
+import {
+  CircleCheckIcon,
+  TriangleAlertIcon,
+  OctagonXIcon,
+  Loader2Icon,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -12,35 +18,107 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
-import type { Generation } from "@/lib/types";
+import { cn } from "@/lib/utils";
+import type { Generation, QaStatus } from "@/lib/types";
 
 interface Props {
-  generation: Generation;
   conceptName: string;
+  latest: Generation;
+  attempts: Generation[];
   onRegenerate: () => Promise<void>;
+  onReReview: () => Promise<void>;
+  onOverride: () => Promise<void>;
 }
 
-export function GenerationCard({ generation, conceptName, onRegenerate }: Props) {
-  const [loading, setLoading] = useState(false);
-  const [open, setOpen] = useState(false);
+interface QaPresentation {
+  label: string;
+  Icon: typeof CircleCheckIcon;
+  tone: "pass" | "warn" | "fail" | "neutral";
+}
 
-  async function handleRegen() {
-    setLoading(true);
+const QA_PRESENTATION: Record<QaStatus, QaPresentation> = {
+  passed: { label: "QA passed", Icon: CircleCheckIcon, tone: "pass" },
+  minor: { label: "Minor issues", Icon: TriangleAlertIcon, tone: "warn" },
+  major: { label: "Major issues", Icon: OctagonXIcon, tone: "fail" },
+  overridden: { label: "Accepted by you", Icon: CircleCheckIcon, tone: "pass" },
+  pending: { label: "QA pending", Icon: Loader2Icon, tone: "neutral" },
+  reviewing: { label: "Reviewing...", Icon: Loader2Icon, tone: "neutral" },
+  rewriting: { label: "Rewriting...", Icon: Loader2Icon, tone: "neutral" },
+};
+
+const TONE_CLASSES: Record<QaPresentation["tone"], string> = {
+  pass: "bg-emerald-500/90 text-white",
+  warn: "bg-amber-500/90 text-white",
+  fail: "bg-red-600/90 text-white",
+  neutral: "bg-foreground/70 text-background",
+};
+
+export function GenerationCard({
+  conceptName,
+  latest,
+  attempts,
+  onRegenerate,
+  onReReview,
+  onOverride,
+}: Props) {
+  const [regenLoading, setRegenLoading] = useState(false);
+  const [reviewLoading, setReviewLoading] = useState(false);
+  const [overrideLoading, setOverrideLoading] = useState(false);
+  const [pinnedId, setPinnedId] = useState<string | null>(null);
+  const [showAttempts, setShowAttempts] = useState(false);
+  const [open, setOpen] = useState(false);
+  const [issuesOpen, setIssuesOpen] = useState(false);
+
+  // Show the user-pinned attempt if they explicitly clicked one and it still
+  // exists; otherwise show the latest. This avoids an effect-driven setState.
+  const pinned =
+    pinnedId !== null ? attempts.find((a) => a.id === pinnedId) : undefined;
+  const selected = pinned ?? latest;
+  const isInFlight =
+    selected.status === "generating" ||
+    selected.qa_status === "reviewing" ||
+    selected.qa_status === "rewriting";
+  const presentation = QA_PRESENTATION[selected.qa_status];
+  const hasIssues = selected.qa_issues && selected.qa_issues.length > 0;
+  const isFlagged =
+    selected.qa_status === "minor" || selected.qa_status === "major";
+
+  async function handleRegenerate() {
+    setRegenLoading(true);
     try {
       await onRegenerate();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Regenerate failed");
     } finally {
-      setLoading(false);
+      setRegenLoading(false);
+    }
+  }
+
+  async function handleReReview() {
+    setReviewLoading(true);
+    try {
+      await onReReview();
+    } finally {
+      setReviewLoading(false);
+    }
+  }
+
+  async function handleOverride() {
+    setOverrideLoading(true);
+    try {
+      await onOverride();
+    } finally {
+      setOverrideLoading(false);
     }
   }
 
   function handleDownload() {
-    if (!generation.image_url) return;
+    if (!selected.image_url) return;
     const a = document.createElement("a");
-    a.href = generation.image_url;
-    a.download = `${conceptName.toLowerCase().replace(/\s+/g, "-")}-v${generation.version}.png`;
+    a.href = selected.image_url;
+    a.download = `${conceptName.toLowerCase().replace(/\s+/g, "-")}-v${selected.version}.png`;
     document.body.appendChild(a);
     a.click();
     a.remove();
@@ -52,21 +130,30 @@ export function GenerationCard({ generation, conceptName, onRegenerate }: Props)
         <CardContent className="p-0">
           <button
             type="button"
-            onClick={() => generation.image_url && setOpen(true)}
+            onClick={() => selected.image_url && setOpen(true)}
             className="block w-full aspect-[4/5] bg-muted relative group"
           >
-            {generation.status === "generating" || loading ? (
-              <Skeleton className="absolute inset-0" />
-            ) : generation.image_url ? (
+            {isInFlight ? (
+              <>
+                <Skeleton className="absolute inset-0" />
+                <span className="absolute inset-0 flex items-center justify-center text-xs text-muted-foreground">
+                  {selected.status === "generating"
+                    ? "Generating..."
+                    : selected.qa_status === "reviewing"
+                      ? "Reviewing..."
+                      : "Rewriting..."}
+                </span>
+              </>
+            ) : selected.image_url ? (
               <Image
-                src={generation.image_url}
+                src={selected.image_url}
                 alt={conceptName}
                 fill
                 sizes="(min-width:1024px) 320px, (min-width:640px) 50vw, 100vw"
                 className="object-cover group-hover:scale-[1.02] transition"
                 unoptimized
               />
-            ) : generation.status === "failed" ? (
+            ) : selected.status === "failed" ? (
               <div className="absolute inset-0 flex items-center justify-center text-sm text-destructive">
                 Generation failed
               </div>
@@ -75,54 +162,220 @@ export function GenerationCard({ generation, conceptName, onRegenerate }: Props)
                 Pending
               </div>
             )}
+
+            <div
+              className={cn(
+                "absolute right-2 top-2 inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs font-medium shadow-sm backdrop-blur-sm",
+                TONE_CLASSES[presentation.tone],
+              )}
+            >
+              <presentation.Icon
+                className={cn(
+                  "size-3.5",
+                  presentation.Icon === Loader2Icon && "animate-spin",
+                )}
+              />
+              <span>{presentation.label}</span>
+            </div>
+            {selected.is_auto_rewrite && (
+              <div className="absolute left-2 top-2 rounded-full bg-background/90 px-2 py-1 text-xs font-medium text-foreground shadow-sm">
+                Auto-rewrite #{selected.auto_rewrite_count}
+              </div>
+            )}
           </button>
         </CardContent>
-        <CardFooter className="flex items-center justify-between gap-2 p-3">
-          <div className="flex items-center gap-2 min-w-0">
-            <span className="text-sm font-medium truncate">{conceptName}</span>
-            <Badge variant="outline" className="shrink-0">
-              v{generation.version}
-            </Badge>
+
+        <CardFooter className="flex flex-col gap-2 p-3">
+          <div className="flex w-full items-center justify-between gap-2">
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="text-sm font-medium truncate">{conceptName}</span>
+              <Badge variant="outline" className="shrink-0">
+                v{selected.version}
+              </Badge>
+              {attempts.length > 1 && (
+                <Badge variant="secondary" className="shrink-0">
+                  {attempts.length} attempts
+                </Badge>
+              )}
+            </div>
           </div>
-          <div className="flex gap-1">
+
+          {hasIssues && (
+            <div className="w-full space-y-1">
+              <button
+                type="button"
+                onClick={() => setIssuesOpen((v) => !v)}
+                className="text-left text-xs font-medium text-muted-foreground underline decoration-dotted"
+              >
+                {issuesOpen ? "Hide issues" : `Show issues (${selected.qa_issues.length})`}
+              </button>
+              {issuesOpen && (
+                <ul className="space-y-1 rounded-md border bg-muted/50 p-2 text-xs">
+                  {selected.qa_issues.map((issue, i) => (
+                    <li key={i} className="leading-snug">
+                      {issue}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
+
+          <div className="flex w-full flex-wrap gap-1">
             <Button
               size="sm"
               variant="ghost"
               onClick={handleDownload}
-              disabled={!generation.image_url}
+              disabled={!selected.image_url}
             >
               Download
             </Button>
             <Button
               size="sm"
               variant="outline"
-              onClick={handleRegen}
-              disabled={loading || generation.status === "generating"}
+              onClick={handleRegenerate}
+              disabled={regenLoading || isInFlight}
             >
-              {loading ? "..." : "Regenerate"}
+              {regenLoading ? "..." : "Regenerate"}
             </Button>
+            {isFlagged && selected.image_url && (
+              <>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleReReview}
+                  disabled={reviewLoading || isInFlight}
+                >
+                  {reviewLoading ? "..." : "Re-review"}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleOverride}
+                  disabled={overrideLoading || isInFlight}
+                >
+                  {overrideLoading ? "..." : "Override"}
+                </Button>
+              </>
+            )}
           </div>
+
+          {attempts.length > 1 && (
+            <div className="w-full">
+              <button
+                type="button"
+                onClick={() => setShowAttempts((v) => !v)}
+                className="text-xs font-medium text-muted-foreground underline decoration-dotted"
+              >
+                {showAttempts ? "Hide attempts" : "All attempts"}
+              </button>
+              {showAttempts && (
+                <div className="mt-2 flex gap-2 overflow-x-auto pb-1">
+                  {attempts.map((a) => (
+                    <AttemptThumb
+                      key={a.id}
+                      attempt={a}
+                      isSelected={a.id === selected.id}
+                      onClick={() =>
+                        setPinnedId(a.id === latest.id ? null : a.id)
+                      }
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </CardFooter>
       </Card>
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-w-3xl">
           <DialogHeader>
-            <DialogTitle>{conceptName} (v{generation.version})</DialogTitle>
+            <DialogTitle>
+              {conceptName} (v{selected.version}
+              {selected.is_auto_rewrite ? `, auto-rewrite ${selected.auto_rewrite_count}` : ""})
+            </DialogTitle>
           </DialogHeader>
-          {generation.image_url && (
-            <div className="relative w-full aspect-[4/5] bg-muted rounded-md overflow-hidden">
-              <Image
-                src={generation.image_url}
-                alt={conceptName}
-                fill
-                className="object-contain"
-                unoptimized
-              />
+          {selected.image_url && (
+            <div className="space-y-3">
+              <div className="relative w-full aspect-[4/5] bg-muted rounded-md overflow-hidden">
+                <Image
+                  src={selected.image_url}
+                  alt={conceptName}
+                  fill
+                  className="object-contain"
+                  unoptimized
+                />
+              </div>
+              {hasIssues && (
+                <div className="space-y-1 rounded-md border bg-muted/50 p-2 text-xs">
+                  <div className="font-medium text-muted-foreground">
+                    QA issues
+                  </div>
+                  <ul className="space-y-1">
+                    {selected.qa_issues.map((issue, i) => (
+                      <li key={i}>{issue}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              <Separator />
+              <div>
+                <div className="text-xs font-medium text-muted-foreground">
+                  Brief used for this attempt
+                </div>
+                <pre className="mt-1 max-h-48 overflow-auto whitespace-pre-wrap rounded-md border bg-muted/30 p-2 text-xs">
+                  {selected.prompt_text}
+                </pre>
+              </div>
             </div>
           )}
         </DialogContent>
       </Dialog>
     </>
+  );
+}
+
+interface ThumbProps {
+  attempt: Generation;
+  isSelected: boolean;
+  onClick: () => void;
+}
+
+function AttemptThumb({ attempt, isSelected, onClick }: ThumbProps) {
+  const presentation = QA_PRESENTATION[attempt.qa_status];
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        "relative h-16 w-16 shrink-0 overflow-hidden rounded-md border bg-muted",
+        isSelected
+          ? "border-foreground ring-2 ring-foreground/60"
+          : "border-border hover:border-foreground/40",
+      )}
+      title={`v${attempt.version} - ${presentation.label}`}
+    >
+      {attempt.image_url ? (
+        <Image
+          src={attempt.image_url}
+          alt={`v${attempt.version}`}
+          fill
+          sizes="64px"
+          className="object-cover"
+          unoptimized
+        />
+      ) : (
+        <Skeleton className="absolute inset-0" />
+      )}
+      <span
+        className={cn(
+          "absolute bottom-0 left-0 right-0 px-1 text-[10px] font-medium leading-tight",
+          TONE_CLASSES[presentation.tone],
+        )}
+      >
+        v{attempt.version}
+      </span>
+    </button>
   );
 }

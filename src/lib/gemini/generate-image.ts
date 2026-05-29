@@ -1,4 +1,5 @@
 import { getGeminiClient, IMAGE_MODEL } from "./client";
+import { applyHardRules } from "./hard-rules";
 
 export interface GenerateImageOptions {
   prompt: string;
@@ -17,9 +18,11 @@ export async function generateImage({
   const genAI = getGeminiClient();
   const model = genAI.getGenerativeModel({ model: IMAGE_MODEL });
 
+  const finalPrompt = applyHardRules(prompt);
+
   const parts: Array<
     { text: string } | { inlineData: { mimeType: string; data: string } }
-  > = [{ text: prompt }];
+  > = [{ text: finalPrompt }];
 
   for (const ref of referenceImages) {
     parts.push({ inlineData: { mimeType: ref.mimeType, data: ref.data } });

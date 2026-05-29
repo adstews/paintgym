@@ -25,6 +25,10 @@ function makeTempId(conceptId: string): string {
   return `tmp-${conceptId}-${tempCounter}`;
 }
 
+function newerFirst(a: Generation, b: Generation): number {
+  return b.version - a.version;
+}
+
 export function ProjectWorkspace({
   project: initialProject,
   concepts,
@@ -55,14 +59,28 @@ export function ProjectWorkspace({
     return m;
   }, [briefs]);
 
-  const latestByConcept = useMemo(() => {
-    const map = new Map<string, Generation>();
+  const attemptsByConcept = useMemo(() => {
+    const map = new Map<string, Generation[]>();
     for (const g of generations) {
-      const existing = map.get(g.concept_id);
-      if (!existing || g.version > existing.version) map.set(g.concept_id, g);
+      const arr = map.get(g.concept_id) ?? [];
+      arr.push(g);
+      map.set(g.concept_id, arr);
     }
+    for (const arr of map.values()) arr.sort(newerFirst);
     return map;
   }, [generations]);
+
+  const latestByConcept = useMemo(() => {
+    const map = new Map<string, Generation>();
+    for (const [conceptId, arr] of attemptsByConcept) {
+      if (arr.length > 0) map.set(conceptId, arr[0]);
+    }
+    return map;
+  }, [attemptsByConcept]);
+
+  const galleryConcepts = useMemo(() => {
+    return concepts.filter((c) => attemptsByConcept.has(c.id));
+  }, [concepts, attemptsByConcept]);
 
   function applyBriefs(newBriefs: Brief[]) {
     if (newBriefs.length === 0) return;
@@ -81,6 +99,24 @@ export function ProjectWorkspace({
     });
   }
 
+  function mergeGenerations(incoming: Generation[]) {
+    if (incoming.length === 0) return;
+    setGenerations((arr) => {
+      const byId = new Map(arr.map((g) => [g.id, g]));
+      for (const g of incoming) byId.set(g.id, g);
+      return Array.from(byId.values());
+    });
+  }
+
+  function updateGeneration(
+    matchId: string,
+    patch: Partial<Generation> & { id?: string },
+  ) {
+    setGenerations((arr) =>
+      arr.map((row) => (row.id === matchId ? { ...row, ...patch } : row)),
+    );
+  }
+
   async function generateBriefs(conceptIds: string[]) {
     if (conceptIds.length === 0) return;
     const res = await fetch("/api/generate-briefs", {
@@ -97,7 +133,10 @@ export function ProjectWorkspace({
     }
     const json = await res.json();
     applyBriefs(json.briefs as Brief[]);
-    const failures = (json.failures ?? []) as { concept_id: string; message: string }[];
+    const failures = (json.failures ?? []) as {
+      concept_id: string;
+      message: string;
+    }[];
     if (failures.length > 0) {
       toast.error(
         `${failures.length} brief${failures.length === 1 ? "" : "s"} failed`,
@@ -125,6 +164,33 @@ export function ProjectWorkspace({
     }
   }
 
+  async function runReview(generationId: string) {
+    updateGeneration(generationId, { qa_status: "reviewing" });
+    try {
+      const res = await fetch("/api/review-image", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ generation_id: generationId }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        throw new Error(json.message ?? json.error ?? "QA review failed");
+      }
+      const updated = (json.generations ?? []) as Generation[];
+      mergeGenerations(updated);
+      if (json.rewrite_error) {
+        toast.error(`Auto-rewrite stopped: ${json.rewrite_error}`);
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "QA review failed");
+      updateGeneration(generationId, {
+        qa_status: "minor",
+        qa_severity: "minor",
+        qa_issues: ["QA review error"],
+      });
+    }
+  }
+
   async function generateImageForConcept(conceptId: string) {
     const brief = briefByConcept.get(conceptId);
     if (!brief) {
@@ -141,9 +207,15 @@ export function ProjectWorkspace({
       status: "generating",
       version: (latestByConcept.get(conceptId)?.version ?? 0) + 1,
       created_at: new Date().toISOString(),
+      qa_status: "pending",
+      qa_issues: [],
+      qa_severity: null,
+      auto_rewrite_count: 0,
+      is_auto_rewrite: false,
     };
     setGenerations((g) => [placeholder, ...g]);
 
+    let realId: string | null = null;
     try {
       const res = await fetch("/api/generate", {
         method: "POST",
@@ -156,26 +228,20 @@ export function ProjectWorkspace({
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.message ?? "Generation failed");
-      setGenerations((g) =>
-        g.map((row) =>
-          row.id === tempId
-            ? {
-                ...row,
-                id: json.id,
-                image_url: json.image_url,
-                status: "completed",
-              }
-            : row,
-        ),
-      );
+      realId = json.id as string;
+      updateGeneration(tempId, {
+        id: realId,
+        image_url: json.image_url,
+        status: "completed",
+        qa_status: "reviewing",
+      });
     } catch (err) {
-      setGenerations((g) =>
-        g.map((row) =>
-          row.id === tempId ? { ...row, status: "failed" } : row,
-        ),
-      );
+      updateGeneration(tempId, { status: "failed" });
       toast.error(err instanceof Error ? err.message : "Generation failed");
+      return;
     }
+
+    if (realId) await runReview(realId);
   }
 
   async function generateAllImages() {
@@ -192,6 +258,23 @@ export function ProjectWorkspace({
     }
   }
 
+  async function overrideGeneration(generationId: string) {
+    try {
+      const res = await fetch(`/api/generations/${generationId}/override`, {
+        method: "POST",
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.message ?? err.error ?? "Override failed");
+      }
+      const json = await res.json();
+      mergeGenerations([json.generation as Generation]);
+      toast.success("Image accepted");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Override failed");
+    }
+  }
+
   async function toggleConcept(conceptId: string, on: boolean) {
     const next = new Set(enabled);
     if (on) next.add(conceptId);
@@ -205,7 +288,9 @@ export function ProjectWorkspace({
   }
 
   async function downloadAll() {
-    const items = generations.filter((g) => g.image_url);
+    const items = generations.filter(
+      (g) => g.image_url && g.qa_status !== "rewriting",
+    );
     if (items.length === 0) return;
     for (const g of items) {
       const concept = conceptsById.get(g.concept_id);
@@ -336,7 +421,7 @@ export function ProjectWorkspace({
         </TabsContent>
 
         <TabsContent value="gallery" className="space-y-4 pt-4">
-          {generations.length === 0 ? (
+          {galleryConcepts.length === 0 ? (
             <Card>
               <CardContent className="py-16 text-center text-sm text-muted-foreground">
                 No images yet. Generate briefs, then images, to see them here.
@@ -344,15 +429,19 @@ export function ProjectWorkspace({
             </Card>
           ) : (
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-              {generations.map((g) => {
-                const concept = conceptsById.get(g.concept_id);
-                if (!concept) return null;
+              {galleryConcepts.map((c) => {
+                const attempts = attemptsByConcept.get(c.id) ?? [];
+                if (attempts.length === 0) return null;
+                const latest = attempts[0];
                 return (
                   <GenerationCard
-                    key={g.id}
-                    generation={g}
-                    conceptName={concept.name}
-                    onRegenerate={() => generateImageForConcept(g.concept_id)}
+                    key={c.id}
+                    conceptName={c.name}
+                    latest={latest}
+                    attempts={attempts}
+                    onRegenerate={() => generateImageForConcept(c.id)}
+                    onReReview={() => runReview(latest.id)}
+                    onOverride={() => overrideGeneration(latest.id)}
                   />
                 );
               })}

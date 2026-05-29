@@ -76,6 +76,17 @@ export interface Brief {
   updated_at: string;
 }
 
+export type QaStatus =
+  | "pending"
+  | "reviewing"
+  | "passed"
+  | "minor"
+  | "major"
+  | "overridden"
+  | "rewriting";
+
+export type QaSeverity = "minor" | "major";
+
 export interface Generation {
   id: string;
   project_id: string;
@@ -85,6 +96,11 @@ export interface Generation {
   status: GenerationStatus;
   version: number;
   created_at: string;
+  qa_status: QaStatus;
+  qa_issues: string[];
+  qa_severity: QaSeverity | null;
+  auto_rewrite_count: number;
+  is_auto_rewrite: boolean;
 }
 
 export interface ProjectImage {
