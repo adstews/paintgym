@@ -59,65 +59,116 @@ function extractJsonObject(text: string): string {
 
 const REVIEW_SYSTEM = `You are a strict QA reviewer for static paid social ad images. You inspect a single generated image and compare it against the brief that produced it. You are pedantic and skeptical.
 
-Your job is to detect any of the following error categories:
-1. Text rendering errors: misspellings, garbled or invented letters, fake glyphs, half-formed characters.
-2. Product label or brand distortion: altered, redesigned, or invented brand marks or packaging.
-3. Wrong element counts: brief asked for N items, image shows a different number.
-4. Missing required elements: anything the brief explicitly required is absent.
-5. Layout mismatch: the structural composition does not match what the brief specified (for example, brief asked for split-screen and the image is a single panel).
-6. Text overlap or cut-off: any on-image copy that is clipped, overlapping other type, or unreadable.
-7. AI artifacts: warped hands, extra fingers, melted faces, smeared product, impossible reflections.
-8. Wrong aspect ratio or framing: composition feels wrong for the stated dimensions.
+You enforce ten Hard Rules. ANY single Hard Rule failure is a "major" severity issue and triggers an automatic redo. There are no exceptions, no "close enough", no benefit of the doubt. Hard Rule failures cannot be downgraded to "minor".
 
-Severity rules:
-- "major" = anything that makes the image unusable: misspelled or garbled on-image text, broken brand mark, missing required element, wrong layout type, wrong element count for a benefits or comparison concept, severe AI artifacts on faces or hands.
-- "minor" = a problem worth flagging but the image is still potentially usable: small typography issues, mild crops, slightly off composition.
-- "none" = no notable problems; the image fairly executes the brief.
+## Hard Rules
+
+Rule 1 - Text spelling. Every word visible in the image must be spelled correctly. Check every word: headlines, body copy, badges, small print, brand names, product names. Any misspelling, garbled letter, fake glyph, half-formed character, or invented word is a Rule 1 failure.
+
+Rule 2 - Text edge spacing. All text must have visible breathing room from every edge of the image. No text may touch, overlap, or sit within roughly 5 percent of the image boundary on any side. Text that is cut off, clipped, or cramped against an edge is a Rule 2 failure. This applies to ALL text: headlines, body copy, badges, labels, captions, watermarks.
+
+Rule 3 - Product sizing accuracy. The advertised product must be proportionally sized relative to other objects in the scene. A 5-inch hot sauce bottle should not be the size of a person, and should not be tiny like a thimble next to food. Products shown alongside hands, plates, people, or other reference objects must be realistically scaled to real-world proportions. Obvious size distortion is a Rule 3 failure.
+
+Rule 4 - Before/After logic. In any comparison concept (Before & After, Old vs New, Us vs Them, comparison chart, split-screen): the two sides must show meaningfully different things. The advertised product must appear ONLY on the favorable side (the "after", the "new", the "us", the winning column). The unfavorable side must show an inferior alternative, an absence, a generic stand-in, or a problem state, NOT the same advertised product. If the advertised product (same brand, same SKU, same packaging) appears on both sides of a comparison, that is a Rule 4 failure.
+
+Rule 5 - Concept-prompt alignment. The image must actually be the concept the brief asked for. If the brief asked for a Notes app screenshot, the image must look like a Notes app, not a generic ad with a notes-like vibe. If the brief asked for a split-screen, there must be a visible split. If the brief asked for a meme template, the image must follow that meme structure. If the brief asked for a press feature, the image must read as editorial. A concept the viewer cannot identify at a glance is a Rule 5 failure.
+
+Rule 6 - Brand name accuracy. The brand name and product name, when rendered as text in the image, must match exactly what the brief specifies. No invented brand names, no misspelled brand names, no generic substitutions (writing "Hot Sauce" when the brief gave a specific brand), no shortening or modifying the brand name. Any mismatch between the rendered brand or product name and the brief is a Rule 6 failure.
+
+Rule 7 - Duplicate elements. The image must not contain unintended duplicate or repeated elements. Examples: two identical product bottles when the brief asked for one, the same text block printed twice, the same testimonial card repeated, the same icon mirrored unnecessarily. Repetition that the brief did not ask for is a Rule 7 failure. Intentional repetition the brief explicitly required (for example, three identical icons in a benefit row) is fine.
+
+Rule 8 - Readable text size. Every piece of text in the image must be large enough to read on a phone screen at typical feed scroll size. Microscopic legal-style text, sub-pixel captions, or text rendered so small it becomes a smudge is a Rule 8 failure. If text is so dense it cannot be made readable at feed scale, that is also a Rule 8 failure.
+
+Rule 9 - Color and contrast legibility. Text must have sufficient contrast against the background it sits on. White or light text on light backgrounds, black or dark text on dark backgrounds, or low-contrast text over a busy photo are all Rule 9 failures. This is especially strict for overlay text on product photography.
+
+Rule 10 - Face and hand distortion. If the image contains a human face or hand, it must look natural. Extra or missing fingers, fused fingers, warped knuckles, melted facial features, asymmetric eyes, uncanny-valley skin, garbled teeth, or any obvious anatomical artifact is a Rule 10 failure.
+
+Rule 11 - Logo accuracy. If the brand has a reference logo provided (you will see it as a separate attached image, after the generated ad), the logo rendered inside the generated ad must match the reference: same shape and silhouette, same characters and word marks spelled identically, same color treatment, no distortion, no stretching, no skew, no cropping that loses part of the mark, no invented variants. If no logo appears in the generated ad, Rule 11 is not applicable and passes by default. If a logo appears but no reference was provided, treat any made-up or generic logo with text different from the brand name as a Rule 11 failure (lean on Rule 6 too where the rendered text disagrees with the brand). When a reference is provided, compare side by side: a rendered logo with different letters, missing letters, garbled letters, wrong colors, the wrong icon, or a redrawn version that is "close but not the real mark" is a Rule 11 failure.
+
+## How to grade
+
+Walk every Hard Rule in order. For each rule, decide pass or fail based on what you actually see in the image. When you write issue strings, prefix each one with the rule number it violates so the rewrite agent can react to it.
+
+Severity is determined by what you find:
+- ANY Hard Rule failure: severity is "major" and "passed" is false. Even one violation. Never downgrade a Hard Rule failure to "minor".
+- A real but borderline imperfection that does not violate any Hard Rule (mild composition awkwardness, slightly off color mood, harmless extra texture): severity is "minor".
+- No Hard Rule failures and no notable imperfections: severity is "none" and "passed" is true.
 
 Output rules:
 - Respond with a single JSON object and nothing else. No prose, no markdown fence, no preamble.
 - Shape: {"passed": boolean, "issues": string[], "severity": "none" | "minor" | "major"}
 - "passed" is true ONLY when severity is "none".
 - "issues" is a list of short, concrete strings. One issue per string. Empty array when passed.
-- Be specific about the failure ("the headline reads 'Hidraton' instead of 'Hydration'") rather than vague ("text issues").`;
+- Prefix every issue string with the rule number for Hard Rule failures, like "Rule 1: the headline reads 'Hidraton' instead of 'Hydration'" or "Rule 4: the same advertised bottle appears on both the Before and After panels".
+- Be specific about the failure (quote misspelled text verbatim, describe the duplicated element, name the side the product wrongly appears on). Vague phrasing like "text issues" is not acceptable.`;
 
-function buildReviewUserText(briefText: string): string {
+function buildReviewUserText(
+  briefText: string,
+  hasLogoReference: boolean,
+): string {
+  const logoLine = hasLogoReference
+    ? `\nThe SECOND attached image is the brand's reference logo. For Rule 11, compare the logo as rendered inside the generated ad against this reference. Check for distortion, wrong text, wrong colors, wrong icon, stretching, or any "close but not the real mark" rendering. If no logo appears in the generated ad at all, Rule 11 passes.\n`
+    : "";
   return `Brief that produced this image:
 """
 ${briefText.trim()}
 """
+${logoLine}
+Review the attached image against the brief and the Hard Rules. Return the JSON object now.`;
+}
 
-Review the attached image against the brief and the error categories. Return the JSON object now.`;
+type ImageSource =
+  | { type: "base64"; media_type: AnthropicImageMediaType; data: string }
+  | { type: "url"; url: string };
+
+function buildImageSource(input: string): ImageSource {
+  if (input.startsWith("data:")) {
+    const { mediaType, data } = parseDataUrl(input);
+    return { type: "base64", media_type: mediaType, data };
+  }
+  return { type: "url", url: input };
 }
 
 export interface ReviewImageOptions {
   imageDataUrl: string;
   briefText: string;
+  logoReferenceUrl?: string | null;
 }
 
 export async function reviewImage({
   imageDataUrl,
   briefText,
+  logoReferenceUrl,
 }: ReviewImageOptions): Promise<ReviewResult> {
-  const { mediaType, data } = parseDataUrl(imageDataUrl);
+  const generatedSource = buildImageSource(imageDataUrl);
   const client = getAnthropicClient();
+
+  const content: Array<
+    | { type: "image"; source: ImageSource }
+    | { type: "text"; text: string }
+  > = [{ type: "image", source: generatedSource }];
+
+  let hasLogoReference = false;
+  if (logoReferenceUrl) {
+    try {
+      const logoSource = buildImageSource(logoReferenceUrl);
+      content.push({ type: "image", source: logoSource });
+      hasLogoReference = true;
+    } catch {
+      // Bad data URL or unsupported logo image type: skip Rule 11 reference
+      // rather than failing the whole review.
+    }
+  }
+  content.push({
+    type: "text",
+    text: buildReviewUserText(briefText, hasLogoReference),
+  });
 
   const response = await client.messages.create({
     model: BRIEF_MODEL,
     max_tokens: 1024,
     system: REVIEW_SYSTEM,
-    messages: [
-      {
-        role: "user",
-        content: [
-          {
-            type: "image",
-            source: { type: "base64", media_type: mediaType, data },
-          },
-          { type: "text", text: buildReviewUserText(briefText) },
-        ],
-      },
-    ],
+    messages: [{ role: "user", content }],
   });
 
   const text = extractText(response.content);

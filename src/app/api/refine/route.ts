@@ -208,6 +208,7 @@ export async function POST(request: Request) {
     const review = await reviewImage({
       imageDataUrl,
       briefText: refinedBrief,
+      logoReferenceUrl: project.logo_url,
     });
     const qa_status = review.passed
       ? "passed"

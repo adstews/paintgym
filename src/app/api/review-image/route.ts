@@ -223,6 +223,7 @@ export async function POST(request: Request) {
       result = await reviewImage({
         imageDataUrl: currentImage,
         briefText: generation.prompt_text,
+        logoReferenceUrl: project.logo_url,
       });
     } catch (err) {
       const fallback = await saveReviewFailed(
