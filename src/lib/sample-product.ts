@@ -43,5 +43,16 @@ export const SAMPLE_PROJECT: Project = {
   proof_points:
     "Featured in Bon Appetit best new hot sauces 2025. 4.8 stars across 1,200 reviews.",
   style_settings: DEFAULT_STYLE_SETTINGS,
+  brand_colors: [
+    { label: "primary", hex: "#C0322B" },
+    { label: "secondary", hex: "#2A1A12" },
+    { label: "accent", hex: "#F2D49B" },
+  ],
+  brand_fonts: [
+    { role: "heading", family: "Fraunces" },
+    { role: "body", family: "Inter" },
+  ],
+  brand_voice:
+    "Direct, a little defiant, dry humor, never corporate. Reads like a recommendation from a friend who is into hot sauce.",
   created_at: new Date(0).toISOString(),
 };

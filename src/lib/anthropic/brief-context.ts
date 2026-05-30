@@ -92,6 +92,23 @@ export function buildProductContext(project: Project): string {
   if (heroImage) lines.push(`Hero product image reference: ${heroImage}`);
   if (project.logo_url) lines.push(`Logo reference: ${project.logo_url}`);
 
+  if (project.brand_colors && project.brand_colors.length > 0) {
+    const swatches = project.brand_colors
+      .map((c) => `${c.label}: ${c.hex}`)
+      .join(", ");
+    lines.push(`Brand colors: ${swatches}. Reference these by hex in the brief; use the primary color as the dominant accent unless the concept calls for a different lead.`);
+  }
+  if (project.brand_fonts && project.brand_fonts.length > 0) {
+    const fonts = project.brand_fonts
+      .map((f) => `${f.role}: ${f.family}`)
+      .join(", ");
+    lines.push(`Brand fonts: ${fonts}. Name the typeface or describe a faithful match so the rendered type stays on brand.`);
+  }
+  if (project.brand_voice) {
+    const voice = project.brand_voice.trim();
+    if (voice) lines.push(`Brand voice: ${voice}. Any on-image copy you write must sound like this.`);
+  }
+
   if (lines.length === 0) {
     lines.push(`Brand or product name: ${project.name}`);
   }

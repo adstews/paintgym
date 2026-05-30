@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { projectCreateSchema } from "@/lib/validators/schemas";
+import { checkProjectCreationAllowed } from "@/lib/credits";
 
 export async function GET() {
   const supabase = await createClient();
@@ -36,6 +37,14 @@ export async function POST(request: Request) {
     );
   }
 
+  const tier = await checkProjectCreationAllowed(user.id);
+  if (!tier.allowed) {
+    return NextResponse.json(
+      { error: "paywall", message: tier.reason },
+      { status: 402 },
+    );
+  }
+
   const product_url =
     parsed.data.product_url && parsed.data.product_url.length > 0
       ? parsed.data.product_url
@@ -61,16 +70,31 @@ export async function POST(request: Request) {
   if (product_url) {
     void (async () => {
       try {
-        const { scrapeProduct } = await import("@/lib/scrape");
-        const product_data = await scrapeProduct(product_url);
+        const { extractProductDataFromHtml, fetchSiteHtml } = await import(
+          "@/lib/scrape"
+        );
+        const { extractBrand } = await import("@/lib/brand-extract");
+        const { analyzeBrandVoice } = await import(
+          "@/lib/anthropic/analyze-brand-voice"
+        );
+        const html = await fetchSiteHtml(product_url);
+        const product_data = extractProductDataFromHtml(html, product_url);
+        const brand = extractBrand(html);
+        const brand_voice = await analyzeBrandVoice(brand.text_sample).catch(
+          () => null,
+        );
+        const updates: Record<string, unknown> = {
+          product_data,
+          product_name: product_data.name ?? null,
+          product_description: product_data.description ?? null,
+          price_point: product_data.price ?? null,
+        };
+        if (brand.colors.length > 0) updates.brand_colors = brand.colors;
+        if (brand.fonts.length > 0) updates.brand_fonts = brand.fonts;
+        if (brand_voice) updates.brand_voice = brand_voice;
         await supabase
           .from("projects")
-          .update({
-            product_data,
-            product_name: product_data.name ?? null,
-            product_description: product_data.description ?? null,
-            price_point: product_data.price ?? null,
-          })
+          .update(updates)
           .eq("id", data.id)
           .eq("user_id", user.id);
       } catch {

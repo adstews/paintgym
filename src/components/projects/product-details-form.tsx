@@ -9,6 +9,7 @@ import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import { ImageUploadField } from "./image-upload-field";
 import { StyleControls } from "./style-controls";
+import { BrandKitSection } from "./brand-kit-section";
 import type { Project, ProductData, StyleSettings } from "@/lib/types";
 
 interface Props {
@@ -48,6 +49,9 @@ export function ProductDetailsForm({ project, onProjectChange }: Props) {
       proof_points: project.proof_points,
       style_settings: project.style_settings,
       product_data: project.product_data,
+      brand_colors: project.brand_colors,
+      brand_fonts: project.brand_fonts,
+      brand_voice: project.brand_voice,
     };
     const res = await fetch(`/api/projects/${project.id}`, {
       method: "PATCH",
@@ -79,16 +83,28 @@ export function ProductDetailsForm({ project, onProjectChange }: Props) {
         const err = await res.json().catch(() => ({}));
         throw new Error(err.message ?? "Scrape failed");
       }
-      const { data } = await res.json();
+      const json = await res.json();
+      const data = json.data ?? {};
+      const brand = json.brand ?? {};
       const merged: Project = {
         ...project,
         product_data: data,
         product_name: project.product_name ?? data.name ?? null,
-        product_description: project.product_description ?? data.description ?? null,
+        product_description:
+          project.product_description ?? data.description ?? null,
         price_point: project.price_point ?? data.price ?? null,
+        brand_colors:
+          project.brand_colors && project.brand_colors.length > 0
+            ? project.brand_colors
+            : (brand.colors ?? []),
+        brand_fonts:
+          project.brand_fonts && project.brand_fonts.length > 0
+            ? project.brand_fonts
+            : (brand.fonts ?? []),
+        brand_voice: project.brand_voice ?? brand.voice ?? null,
       };
       onProjectChange(merged);
-      toast.success("Product details refreshed");
+      toast.success("Product and brand kit refreshed");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Scrape failed");
     } finally {
@@ -236,6 +252,12 @@ export function ProductDetailsForm({ project, onProjectChange }: Props) {
             </Button>
           </div>
         </div>
+      </section>
+
+      <Separator />
+
+      <section>
+        <BrandKitSection project={project} onChange={(patch) => patchLocal(patch)} />
       </section>
 
       <Separator />

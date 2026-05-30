@@ -136,7 +136,7 @@ function unwrapGraph(item: unknown, type: string): LdNode | null {
   return null;
 }
 
-export async function scrapeProduct(url: string): Promise<ProductData> {
+export async function fetchSiteHtml(url: string): Promise<string> {
   const res = await fetch(url, {
     headers: {
       "user-agent": UA,
@@ -145,8 +145,13 @@ export async function scrapeProduct(url: string): Promise<ProductData> {
     redirect: "follow",
   });
   if (!res.ok) throw new Error(`Fetch failed: ${res.status}`);
-  const html = await res.text();
+  return await res.text();
+}
 
+export function extractProductDataFromHtml(
+  html: string,
+  url: string,
+): ProductData {
   const fromLd = extractJsonLdProduct(html);
   const name = fromLd.name ?? extractTitle(html);
   const description = fromLd.description
@@ -172,4 +177,9 @@ export async function scrapeProduct(url: string): Promise<ProductData> {
     features,
     url,
   };
+}
+
+export async function scrapeProduct(url: string): Promise<ProductData> {
+  const html = await fetchSiteHtml(url);
+  return extractProductDataFromHtml(html, url);
 }

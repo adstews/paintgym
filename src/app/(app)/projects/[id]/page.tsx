@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { ProjectWorkspace } from "@/components/projects/project-workspace";
 import { DEFAULT_STYLE_SETTINGS } from "@/lib/types";
+import { ensureProfile } from "@/lib/credits";
 import type {
   Brief,
   Concept,
@@ -19,6 +20,11 @@ export default async function ProjectPage({ params }: PageProps) {
   const { id } = await params;
   const supabase = await createClient();
 
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) notFound();
+
   const { data: project } = await supabase
     .from("projects")
     .select("*")
@@ -32,6 +38,7 @@ export default async function ProjectPage({ params }: PageProps) {
     { data: pcs },
     { data: briefs },
     { data: recreations },
+    userProfile,
   ] = await Promise.all([
     supabase
       .from("concepts")
@@ -52,6 +59,7 @@ export default async function ProjectPage({ params }: PageProps) {
       .select("*")
       .eq("project_id", id)
       .order("created_at", { ascending: false }),
+    ensureProfile(user.id),
   ]);
 
   const enabledSet = new Set<string>();
@@ -70,6 +78,8 @@ export default async function ProjectPage({ params }: PageProps) {
     style_settings:
       (projectRow.style_settings as StyleSettings | null) ??
       DEFAULT_STYLE_SETTINGS,
+    brand_colors: projectRow.brand_colors ?? [],
+    brand_fonts: projectRow.brand_fonts ?? [],
   };
 
   return (
@@ -80,6 +90,7 @@ export default async function ProjectPage({ params }: PageProps) {
       initialBriefs={(briefs ?? []) as Brief[]}
       initialRecreations={(recreations ?? []) as Recreation[]}
       enabledConceptIds={enabledSet}
+      userProfile={userProfile}
     />
   );
 }

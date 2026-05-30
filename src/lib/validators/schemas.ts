@@ -7,6 +7,18 @@ export const styleSettingsSchema = z.object({
   platform: z.enum(["meta", "tiktok", "linkedin"]),
 });
 
+export const brandColorSchema = z.object({
+  label: z.string().min(1).max(40),
+  hex: z.string().regex(/^#[0-9a-fA-F]{6}$/),
+});
+
+export const brandFontSchema = z.object({
+  role: z.string().min(1).max(40),
+  family: z.string().min(1).max(120),
+});
+
+const conceptVariantEnum = z.enum(["A", "B", "C"]);
+
 export const projectCreateSchema = z.object({
   name: z.string().min(1).max(120),
   client_name: z.string().max(120).optional().nullable(),
@@ -38,6 +50,9 @@ export const projectPatchSchema = z.object({
     })
     .optional()
     .nullable(),
+  brand_colors: z.array(brandColorSchema).max(10).optional(),
+  brand_fonts: z.array(brandFontSchema).max(10).optional(),
+  brand_voice: z.string().max(2000).optional().nullable(),
 });
 
 export const conceptUpsertSchema = z.object({
@@ -64,6 +79,7 @@ export const generateRequestSchema = z
   .object({
     project_id: z.string().uuid(),
     concept_id: z.string().uuid().optional(),
+    concept_variant: conceptVariantEnum.optional(),
     recreation_id: z.string().uuid().optional(),
     variant_label: variantLabelEnum.optional(),
     prompt_text: z.string().min(1).max(20000),
@@ -82,6 +98,10 @@ export const generateRequestSchema = z
 export const recreateRequestSchema = z.object({
   project_id: z.string().uuid(),
   source_image_url: z.string().url(),
+});
+
+export const stripeCheckoutSchema = z.object({
+  pack: z.enum(["starter", "pro", "studio"]),
 });
 
 export const generateBriefsSchema = z.object({

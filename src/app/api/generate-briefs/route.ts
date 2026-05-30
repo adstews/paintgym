@@ -1,17 +1,18 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { generateBriefsSchema } from "@/lib/validators/schemas";
-import { generateBriefForConcept } from "@/lib/anthropic/generate-brief";
+import { generateBriefsForConcept } from "@/lib/anthropic/generate-brief";
 import { DEFAULT_STYLE_SETTINGS } from "@/lib/types";
 import type { Concept, Project, StyleSettings } from "@/lib/types";
 
 export const runtime = "nodejs";
-export const maxDuration = 120;
+export const maxDuration = 180;
 
 interface BriefOut {
   id: string;
   project_id: string;
   concept_id: string;
+  variant: "A" | "B" | "C";
   brief_text: string;
   created_at: string;
   updated_at: string;
@@ -38,18 +39,18 @@ export async function POST(request: Request) {
 
   const { project_id, concept_ids } = parsed.data;
 
-  const { data: project, error: projErr } = await supabase
+  const { data: projectRow, error: projErr } = await supabase
     .from("projects")
     .select("*")
     .eq("id", project_id)
     .single();
-  if (projErr || !project || project.user_id !== user.id) {
+  if (projErr || !projectRow || (projectRow as Project).user_id !== user.id) {
     return NextResponse.json({ error: "not_found" }, { status: 404 });
   }
-  const fullProject = {
-    ...(project as Project),
+  const fullProject: Project = {
+    ...(projectRow as Project),
     style_settings:
-      ((project as Project).style_settings as StyleSettings | null) ??
+      ((projectRow as Project).style_settings as StyleSettings | null) ??
       DEFAULT_STYLE_SETTINGS,
   };
 
@@ -63,18 +64,32 @@ export async function POST(request: Request) {
 
   const settled = await Promise.allSettled(
     (concepts as Concept[]).map((concept) =>
-      generateBriefForConcept({ project: fullProject, concept }).then(
-        (brief_text) => ({ concept, brief_text }),
+      generateBriefsForConcept({ project: fullProject, concept }).then(
+        (variants) => ({ concept, variants }),
       ),
     ),
   );
 
-  const successes: { concept: Concept; brief_text: string }[] = [];
+  const rows: {
+    project_id: string;
+    concept_id: string;
+    variant: "A" | "B" | "C";
+    brief_text: string;
+    updated_at: string;
+  }[] = [];
   const failures: { concept_id: string; message: string }[] = [];
   for (let i = 0; i < settled.length; i++) {
     const item = settled[i];
     if (item.status === "fulfilled") {
-      successes.push(item.value);
+      for (const v of item.value.variants) {
+        rows.push({
+          project_id,
+          concept_id: item.value.concept.id,
+          variant: v.variant,
+          brief_text: v.brief_text,
+          updated_at: new Date().toISOString(),
+        });
+      }
     } else {
       failures.push({
         concept_id: (concepts as Concept[])[i].id,
@@ -87,16 +102,10 @@ export async function POST(request: Request) {
   }
 
   const briefs: BriefOut[] = [];
-  if (successes.length > 0) {
-    const rows = successes.map((s) => ({
-      project_id,
-      concept_id: s.concept.id,
-      brief_text: s.brief_text,
-      updated_at: new Date().toISOString(),
-    }));
+  if (rows.length > 0) {
     const { data: upserted, error: upErr } = await supabase
       .from("briefs")
-      .upsert(rows, { onConflict: "project_id,concept_id" })
+      .upsert(rows, { onConflict: "project_id,concept_id,variant" })
       .select("*");
     if (upErr) {
       return NextResponse.json(

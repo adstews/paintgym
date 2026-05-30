@@ -3,6 +3,8 @@ import { createClient } from "@/lib/supabase/server";
 import { recreateRequestSchema } from "@/lib/validators/schemas";
 import { recreateFromExample } from "@/lib/anthropic/recreate-from-example";
 import { generateImage } from "@/lib/gemini/generate-image";
+import { watermarkImageDataUrl } from "@/lib/image/watermark";
+import { checkGenerationAllowed } from "@/lib/credits";
 import { DEFAULT_STYLE_SETTINGS, VARIANT_LABELS } from "@/lib/types";
 import type {
   Generation,
@@ -57,6 +59,14 @@ export async function POST(request: Request) {
       ((projectRow as Project).style_settings as StyleSettings | null) ??
       DEFAULT_STYLE_SETTINGS,
   };
+
+  const tier = await checkGenerationAllowed(user.id, VARIANT_LABELS.length);
+  if (!tier.allowed) {
+    return NextResponse.json(
+      { error: "paywall", message: tier.reason },
+      { status: 402 },
+    );
+  }
 
   // 1) Analyze + write five briefs (one Claude vision call).
   let recreateResult;
@@ -113,6 +123,12 @@ export async function POST(request: Request) {
       }
       try {
         const { imageDataUrl } = await generateImage({ prompt: brief_text });
+        let watermarked: string | null = null;
+        try {
+          watermarked = await watermarkImageDataUrl(imageDataUrl);
+        } catch {
+          watermarked = imageDataUrl;
+        }
         const { data: gen, error: insErr } = await supabase
           .from("generations")
           .insert({
@@ -122,10 +138,12 @@ export async function POST(request: Request) {
             variant_label: label,
             prompt_text: brief_text,
             image_url: imageDataUrl,
+            watermarked_url: watermarked,
             status: "completed",
             version: index + 1,
             qa_status: "pending",
             qa_issues: [],
+            is_unlocked: false,
           })
           .select("*")
           .single();

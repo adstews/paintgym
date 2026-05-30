@@ -30,6 +30,7 @@ interface Props {
   onRegenerate: () => Promise<void>;
   onReReview: () => Promise<void>;
   onOverride: () => Promise<void>;
+  onUnlock?: () => Promise<void>;
 }
 
 interface QaPresentation {
@@ -62,10 +63,12 @@ export function GenerationCard({
   onRegenerate,
   onReReview,
   onOverride,
+  onUnlock,
 }: Props) {
   const [regenLoading, setRegenLoading] = useState(false);
   const [reviewLoading, setReviewLoading] = useState(false);
   const [overrideLoading, setOverrideLoading] = useState(false);
+  const [unlockLoading, setUnlockLoading] = useState(false);
   const [pinnedId, setPinnedId] = useState<string | null>(null);
   const [showAttempts, setShowAttempts] = useState(false);
   const [open, setOpen] = useState(false);
@@ -114,7 +117,25 @@ export function GenerationCard({
     }
   }
 
+  async function handleUnlock() {
+    if (!onUnlock) return;
+    setUnlockLoading(true);
+    try {
+      await onUnlock();
+    } finally {
+      setUnlockLoading(false);
+    }
+  }
+
+  const displayUrl = selected.is_unlocked
+    ? selected.image_url
+    : (selected.watermarked_url ?? selected.image_url);
+
   function handleDownload() {
+    if (!selected.is_unlocked) {
+      toast.error("Unlock this image to download a clean copy");
+      return;
+    }
     if (!selected.image_url) return;
     const a = document.createElement("a");
     a.href = selected.image_url;
@@ -144,9 +165,9 @@ export function GenerationCard({
                       : "Rewriting..."}
                 </span>
               </>
-            ) : selected.image_url ? (
+            ) : displayUrl ? (
               <Image
-                src={selected.image_url}
+                src={displayUrl}
                 alt={conceptName}
                 fill
                 sizes="(min-width:1024px) 320px, (min-width:640px) 50vw, 100vw"
@@ -180,6 +201,11 @@ export function GenerationCard({
             {selected.is_auto_rewrite && (
               <div className="absolute left-2 top-2 rounded-full bg-background/90 px-2 py-1 text-xs font-medium text-foreground shadow-sm">
                 Auto-rewrite #{selected.auto_rewrite_count}
+              </div>
+            )}
+            {!selected.is_unlocked && selected.image_url && (
+              <div className="absolute bottom-2 left-2 rounded-full bg-background/90 px-2 py-1 text-xs font-medium text-foreground shadow-sm">
+                Watermarked preview
               </div>
             )}
           </button>
@@ -222,11 +248,20 @@ export function GenerationCard({
           )}
 
           <div className="flex w-full flex-wrap gap-1">
+            {!selected.is_unlocked && selected.image_url && onUnlock && (
+              <Button
+                size="sm"
+                onClick={handleUnlock}
+                disabled={unlockLoading || isInFlight}
+              >
+                {unlockLoading ? "..." : "Unlock (1 credit)"}
+              </Button>
+            )}
             <Button
               size="sm"
               variant="ghost"
               onClick={handleDownload}
-              disabled={!selected.image_url}
+              disabled={!selected.image_url || !selected.is_unlocked}
             >
               Download
             </Button>
@@ -296,11 +331,11 @@ export function GenerationCard({
               {selected.is_auto_rewrite ? `, auto-rewrite ${selected.auto_rewrite_count}` : ""})
             </DialogTitle>
           </DialogHeader>
-          {selected.image_url && (
+          {displayUrl && (
             <div className="space-y-3">
               <div className="relative w-full aspect-[4/5] bg-muted rounded-md overflow-hidden">
                 <Image
-                  src={selected.image_url}
+                  src={displayUrl}
                   alt={conceptName}
                   fill
                   className="object-contain"

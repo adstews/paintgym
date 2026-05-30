@@ -10,12 +10,19 @@ import { GenerationCard } from "@/components/gallery/generation-card";
 import { ProductDetailsForm } from "./product-details-form";
 import { BriefCard } from "./brief-card";
 import { RecreateTab } from "./recreate-tab";
+import { CreditsPanel } from "./credits-panel";
+import {
+  CONCEPT_VARIANTS,
+  CONCEPT_VARIANT_DISPLAY,
+} from "@/lib/types";
 import type {
   Brief,
   Concept,
+  ConceptVariant,
   Generation,
   Project,
   Recreation,
+  UserProfile,
   VariantLabel,
 } from "@/lib/types";
 
@@ -26,6 +33,7 @@ interface Props {
   initialBriefs: Brief[];
   initialRecreations: Recreation[];
   enabledConceptIds: Set<string>;
+  userProfile: UserProfile;
 }
 
 let tempCounter = 0;
@@ -38,6 +46,14 @@ function newerFirst(a: Generation, b: Generation): number {
   return b.version - a.version;
 }
 
+function briefKey(conceptId: string, variant: ConceptVariant): string {
+  return `${conceptId}:${variant}`;
+}
+
+function variantKey(conceptId: string, variant: ConceptVariant | null): string {
+  return `${conceptId}:${variant ?? "A"}`;
+}
+
 export function ProjectWorkspace({
   project: initialProject,
   concepts,
@@ -45,12 +61,14 @@ export function ProjectWorkspace({
   initialBriefs,
   initialRecreations,
   enabledConceptIds: initialEnabled,
+  userProfile: initialProfile,
 }: Props) {
   const [project, setProject] = useState(initialProject);
   const [generations, setGenerations] = useState(initialGenerations);
   const [briefs, setBriefs] = useState(initialBriefs);
   const [recreations, setRecreations] = useState(initialRecreations);
   const [enabled, setEnabled] = useState(initialEnabled);
+  const [profile, setProfile] = useState(initialProfile);
   const [batchBriefsLoading, setBatchBriefsLoading] = useState(false);
   const [batchImagesLoading, setBatchImagesLoading] = useState(false);
 
@@ -64,41 +82,41 @@ export function ProjectWorkspace({
     [concepts, enabled],
   );
 
-  const briefByConcept = useMemo(() => {
+  const briefsByKey = useMemo(() => {
     const m = new Map<string, Brief>();
-    for (const b of briefs) m.set(b.concept_id, b);
+    for (const b of briefs) m.set(briefKey(b.concept_id, b.variant), b);
     return m;
   }, [briefs]);
 
-  const attemptsByConcept = useMemo(() => {
+  const attemptsByKey = useMemo(() => {
     const map = new Map<string, Generation[]>();
     for (const g of generations) {
       if (!g.concept_id) continue;
-      const arr = map.get(g.concept_id) ?? [];
+      const key = variantKey(
+        g.concept_id,
+        (g.concept_variant ?? "A") as ConceptVariant,
+      );
+      const arr = map.get(key) ?? [];
       arr.push(g);
-      map.set(g.concept_id, arr);
+      map.set(key, arr);
     }
     for (const arr of map.values()) arr.sort(newerFirst);
     return map;
   }, [generations]);
 
-  const latestByConcept = useMemo(() => {
-    const map = new Map<string, Generation>();
-    for (const [conceptId, arr] of attemptsByConcept) {
-      if (arr.length > 0) map.set(conceptId, arr[0]);
-    }
-    return map;
-  }, [attemptsByConcept]);
-
-  const galleryConcepts = useMemo(() => {
-    return concepts.filter((c) => attemptsByConcept.has(c.id));
-  }, [concepts, attemptsByConcept]);
+  const galleryConcepts = useMemo(
+    () =>
+      concepts.filter((c) =>
+        CONCEPT_VARIANTS.some((v) => attemptsByKey.has(variantKey(c.id, v))),
+      ),
+    [concepts, attemptsByKey],
+  );
 
   function applyBriefs(newBriefs: Brief[]) {
     if (newBriefs.length === 0) return;
-    const map = new Map(briefs.map((b) => [b.concept_id, b]));
-    for (const b of newBriefs) map.set(b.concept_id, b);
-    setBriefs(Array.from(map.values()));
+    const m = new Map(briefs.map((b) => [b.id, b]));
+    for (const b of newBriefs) m.set(b.id, b);
+    setBriefs(Array.from(m.values()));
   }
 
   function replaceBrief(updated: Brief) {
@@ -151,7 +169,7 @@ export function ProjectWorkspace({
     }[];
     if (failures.length > 0) {
       toast.error(
-        `${failures.length} brief${failures.length === 1 ? "" : "s"} failed`,
+        `${failures.length} concept${failures.length === 1 ? "" : "s"} failed`,
       );
     }
   }
@@ -168,7 +186,7 @@ export function ProjectWorkspace({
     }
   }
 
-  async function regenerateBrief(conceptId: string) {
+  async function regenerateBriefsForConcept(conceptId: string) {
     try {
       await generateBriefs([conceptId]);
     } catch (err) {
@@ -203,23 +221,30 @@ export function ProjectWorkspace({
     }
   }
 
-  async function generateImageForConcept(conceptId: string) {
-    const brief = briefByConcept.get(conceptId);
+  async function generateImageForVariant(
+    conceptId: string,
+    variant: ConceptVariant,
+  ) {
+    const brief = briefsByKey.get(briefKey(conceptId, variant));
     if (!brief) {
-      toast.error("Generate the brief first");
+      toast.error("Generate briefs for this concept first");
       return;
     }
-    const tempId = makeTempId(conceptId);
+    const tempId = makeTempId(`${conceptId}-${variant}`);
+    const existing = attemptsByKey.get(variantKey(conceptId, variant)) ?? [];
     const placeholder: Generation = {
       id: tempId,
       project_id: project.id,
       concept_id: conceptId,
+      concept_variant: variant,
       recreation_id: null,
       variant_label: null,
       prompt_text: brief.brief_text,
       image_url: null,
+      watermarked_url: null,
+      is_unlocked: false,
       status: "generating",
-      version: (latestByConcept.get(conceptId)?.version ?? 0) + 1,
+      version: (existing[0]?.version ?? 0) + 1,
       created_at: new Date().toISOString(),
       qa_status: "pending",
       qa_issues: [],
@@ -237,15 +262,27 @@ export function ProjectWorkspace({
         body: JSON.stringify({
           project_id: project.id,
           concept_id: conceptId,
+          concept_variant: variant,
           prompt_text: brief.brief_text,
         }),
       });
       const json = await res.json();
-      if (!res.ok) throw new Error(json.message ?? "Generation failed");
+      if (!res.ok) {
+        if (res.status === 402) {
+          toast.error(json.message ?? "Free preview limit reached");
+        } else {
+          throw new Error(json.message ?? "Generation failed");
+        }
+        updateGeneration(tempId, { status: "failed" });
+        return;
+      }
       realId = json.id as string;
+      const updatedRow = json.generation as Generation | undefined;
       updateGeneration(tempId, {
         id: realId,
-        image_url: json.image_url,
+        image_url: updatedRow?.image_url ?? json.image_url,
+        watermarked_url: updatedRow?.watermarked_url ?? null,
+        is_unlocked: updatedRow?.is_unlocked ?? false,
         status: "completed",
         qa_status: "reviewing",
       });
@@ -258,7 +295,7 @@ export function ProjectWorkspace({
     if (realId) await runReview(realId);
   }
 
-  async function regenerateVariant(
+  async function regenerateVariantImage(
     recreationId: string,
     variantLabel: VariantLabel,
     promptText: string,
@@ -274,10 +311,13 @@ export function ProjectWorkspace({
       id: tempId,
       project_id: project.id,
       concept_id: null,
+      concept_variant: null,
       recreation_id: recreationId,
       variant_label: variantLabel,
       prompt_text: promptText,
       image_url: null,
+      watermarked_url: null,
+      is_unlocked: false,
       status: "generating",
       version: nextVersion,
       created_at: new Date().toISOString(),
@@ -302,11 +342,22 @@ export function ProjectWorkspace({
         }),
       });
       const json = await res.json();
-      if (!res.ok) throw new Error(json.message ?? "Generation failed");
+      if (!res.ok) {
+        if (res.status === 402) {
+          toast.error(json.message ?? "Free preview limit reached");
+        } else {
+          throw new Error(json.message ?? "Generation failed");
+        }
+        updateGeneration(tempId, { status: "failed" });
+        return;
+      }
       realId = json.id as string;
+      const updatedRow = json.generation as Generation | undefined;
       updateGeneration(tempId, {
         id: realId,
-        image_url: json.image_url,
+        image_url: updatedRow?.image_url ?? json.image_url,
+        watermarked_url: updatedRow?.watermarked_url ?? null,
+        is_unlocked: updatedRow?.is_unlocked ?? false,
         status: "completed",
         qa_status: "reviewing",
       });
@@ -327,8 +378,10 @@ export function ProjectWorkspace({
     setBatchImagesLoading(true);
     try {
       for (const c of enabledConcepts) {
-        if (briefByConcept.get(c.id)) {
-          await generateImageForConcept(c.id);
+        for (const v of CONCEPT_VARIANTS) {
+          if (briefsByKey.has(briefKey(c.id, v))) {
+            await generateImageForVariant(c.id, v);
+          }
         }
       }
       toast.success("Batch complete");
@@ -354,6 +407,42 @@ export function ProjectWorkspace({
     }
   }
 
+  async function unlockGeneration(generationId: string) {
+    try {
+      const res = await fetch(`/api/generations/${generationId}/unlock`, {
+        method: "POST",
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        throw new Error(json.message ?? json.error ?? "Unlock failed");
+      }
+      mergeGenerations([json.generation as Generation]);
+      if (json.profile) setProfile(json.profile as UserProfile);
+      toast.success("Image unlocked");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Unlock failed");
+    }
+  }
+
+  async function unlockAll() {
+    try {
+      const res = await fetch(`/api/projects/${project.id}/unlock-all`, {
+        method: "POST",
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        throw new Error(json.message ?? json.error ?? "Unlock all failed");
+      }
+      if (Array.isArray(json.generations)) {
+        mergeGenerations(json.generations as Generation[]);
+      }
+      if (json.profile) setProfile(json.profile as UserProfile);
+      toast.success(`Unlocked ${json.unlocked_count} images`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Unlock all failed");
+    }
+  }
+
   async function toggleConcept(conceptId: string, on: boolean) {
     const next = new Set(enabled);
     if (on) next.add(conceptId);
@@ -368,24 +457,45 @@ export function ProjectWorkspace({
 
   async function downloadAll() {
     const items = generations.filter(
-      (g) => g.image_url && g.qa_status !== "rewriting" && g.concept_id,
+      (g) =>
+        g.image_url &&
+        g.is_unlocked &&
+        g.qa_status !== "rewriting" &&
+        g.concept_id,
     );
-    if (items.length === 0) return;
+    if (items.length === 0) {
+      toast.error("Unlock images first");
+      return;
+    }
     for (const g of items) {
       const concept = g.concept_id ? conceptsById.get(g.concept_id) : null;
       if (!concept || !g.image_url) continue;
       const a = document.createElement("a");
       a.href = g.image_url;
-      a.download = `${concept.name.toLowerCase().replace(/\s+/g, "-")}-v${g.version}.png`;
+      a.download = `${concept.name.toLowerCase().replace(/\s+/g, "-")}-${g.concept_variant ?? ""}-v${g.version}.png`;
       document.body.appendChild(a);
       a.click();
       a.remove();
     }
   }
 
-  const briefsCount = enabledConcepts.filter((c) =>
-    briefByConcept.has(c.id),
-  ).length;
+  const briefsCount = useMemo(() => {
+    let n = 0;
+    for (const c of enabledConcepts) {
+      for (const v of CONCEPT_VARIANTS) {
+        if (briefsByKey.has(briefKey(c.id, v))) n += 1;
+      }
+    }
+    return n;
+  }, [enabledConcepts, briefsByKey]);
+
+  const lockedCount = useMemo(
+    () =>
+      generations.filter(
+        (g) => g.image_url && !g.is_unlocked && g.status === "completed",
+      ).length,
+    [generations],
+  );
 
   return (
     <div className="space-y-6">
@@ -408,7 +518,7 @@ export function ProjectWorkspace({
           >
             {batchBriefsLoading
               ? "Writing briefs..."
-              : `Generate briefs (${enabledConcepts.length})`}
+              : `Generate briefs (${enabledConcepts.length} x 3)`}
           </Button>
           <Button
             onClick={generateAllImages}
@@ -422,14 +532,22 @@ export function ProjectWorkspace({
             variant="outline"
             onClick={downloadAll}
             disabled={
-              generations.filter((g) => g.image_url && g.concept_id).length ===
-              0
+              generations.filter(
+                (g) => g.image_url && g.is_unlocked && g.concept_id,
+              ).length === 0
             }
           >
             Download all
           </Button>
         </div>
       </div>
+
+      <CreditsPanel
+        profile={profile}
+        lockedCount={lockedCount}
+        onProfileChange={setProfile}
+        onUnlockAll={lockedCount > 0 ? unlockAll : undefined}
+      />
 
       <Tabs defaultValue="product">
         <TabsList>
@@ -449,7 +567,8 @@ export function ProjectWorkspace({
 
         <TabsContent value="concepts" className="space-y-3 pt-4">
           <div className="text-sm text-muted-foreground">
-            Toggle the concepts you want briefs and images for.
+            Toggle the concepts you want briefs and images for. Each concept
+            produces three variant briefs (A, B, C).
           </div>
           <div className="grid gap-2 sm:grid-cols-2">
             {concepts.map((c) => {
@@ -478,7 +597,7 @@ export function ProjectWorkspace({
           </div>
         </TabsContent>
 
-        <TabsContent value="briefs" className="space-y-4 pt-4">
+        <TabsContent value="briefs" className="space-y-6 pt-4">
           {enabledConcepts.length === 0 ? (
             <Card>
               <CardContent className="py-16 text-center text-sm text-muted-foreground">
@@ -486,23 +605,53 @@ export function ProjectWorkspace({
               </CardContent>
             </Card>
           ) : (
-            <div className="grid gap-4 lg:grid-cols-2">
-              {enabledConcepts.map((c) => (
-                <BriefCard
-                  key={c.id}
-                  concept={c}
-                  brief={briefByConcept.get(c.id) ?? null}
-                  latestGeneration={latestByConcept.get(c.id) ?? null}
-                  onBriefChange={replaceBrief}
-                  onRegenerate={() => regenerateBrief(c.id)}
-                  onGenerateImage={() => generateImageForConcept(c.id)}
-                />
-              ))}
-            </div>
+            enabledConcepts.map((c) => (
+              <div key={c.id} className="space-y-2">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <h2 className="text-base font-semibold">{c.name}</h2>
+                    <p className="text-xs text-muted-foreground">
+                      {c.description}
+                    </p>
+                  </div>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={() => regenerateBriefsForConcept(c.id)}
+                  >
+                    Regenerate all 3
+                  </Button>
+                </div>
+                <div className="grid gap-3 lg:grid-cols-3">
+                  {CONCEPT_VARIANTS.map((v) => {
+                    const brief =
+                      briefsByKey.get(briefKey(c.id, v)) ?? null;
+                    const attempts =
+                      attemptsByKey.get(variantKey(c.id, v)) ?? [];
+                    const latest = attempts[0] ?? null;
+                    return (
+                      <BriefCard
+                        key={`${c.id}:${v}`}
+                        concept={c}
+                        variant={v}
+                        brief={brief}
+                        latestGeneration={latest}
+                        onBriefChange={replaceBrief}
+                        onRegenerateConcept={() =>
+                          regenerateBriefsForConcept(c.id)
+                        }
+                        onGenerateImage={() => generateImageForVariant(c.id, v)}
+                      />
+                    );
+                  })}
+                </div>
+              </div>
+            ))
           )}
         </TabsContent>
 
-        <TabsContent value="gallery" className="space-y-4 pt-4">
+        <TabsContent value="gallery" className="space-y-6 pt-4">
           {galleryConcepts.length === 0 ? (
             <Card>
               <CardContent className="py-16 text-center text-sm text-muted-foreground">
@@ -510,24 +659,41 @@ export function ProjectWorkspace({
               </CardContent>
             </Card>
           ) : (
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-              {galleryConcepts.map((c) => {
-                const attempts = attemptsByConcept.get(c.id) ?? [];
-                if (attempts.length === 0) return null;
-                const latest = attempts[0];
-                return (
-                  <GenerationCard
-                    key={c.id}
-                    conceptName={c.name}
-                    latest={latest}
-                    attempts={attempts}
-                    onRegenerate={() => generateImageForConcept(c.id)}
-                    onReReview={() => runReview(latest.id)}
-                    onOverride={() => overrideGeneration(latest.id)}
-                  />
-                );
-              })}
-            </div>
+            galleryConcepts.map((c) => (
+              <div key={c.id} className="space-y-2">
+                <h2 className="text-base font-semibold">{c.name}</h2>
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                  {CONCEPT_VARIANTS.map((v) => {
+                    const attempts =
+                      attemptsByKey.get(variantKey(c.id, v)) ?? [];
+                    const latest = attempts[0];
+                    if (!latest) {
+                      return (
+                        <Card key={`${c.id}:${v}`}>
+                          <CardContent className="py-12 text-center text-xs text-muted-foreground">
+                            {CONCEPT_VARIANT_DISPLAY[v]} not generated yet.
+                          </CardContent>
+                        </Card>
+                      );
+                    }
+                    return (
+                      <GenerationCard
+                        key={`${c.id}:${v}`}
+                        conceptName={`${c.name} - ${CONCEPT_VARIANT_DISPLAY[v]}`}
+                        latest={latest}
+                        attempts={attempts}
+                        onRegenerate={() =>
+                          generateImageForVariant(c.id, v)
+                        }
+                        onReReview={() => runReview(latest.id)}
+                        onOverride={() => overrideGeneration(latest.id)}
+                        onUnlock={() => unlockGeneration(latest.id)}
+                      />
+                    );
+                  })}
+                </div>
+              </div>
+            ))
           )}
         </TabsContent>
 
@@ -540,7 +706,8 @@ export function ProjectWorkspace({
             onGenerationsUpdated={mergeGenerations}
             onReviewGeneration={runReview}
             onOverrideGeneration={overrideGeneration}
-            onRegenerateVariant={regenerateVariant}
+            onUnlockGeneration={unlockGeneration}
+            onRegenerateVariant={regenerateVariantImage}
           />
         </TabsContent>
       </Tabs>

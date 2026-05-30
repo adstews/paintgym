@@ -4,6 +4,7 @@ import { reviewImageSchema } from "@/lib/validators/schemas";
 import { reviewImage } from "@/lib/anthropic/review-image";
 import { rewriteBriefAfterFailure } from "@/lib/anthropic/rewrite-brief";
 import { generateImage } from "@/lib/gemini/generate-image";
+import { watermarkImageDataUrl } from "@/lib/image/watermark";
 import { DEFAULT_STYLE_SETTINGS } from "@/lib/types";
 import type {
   Concept,
@@ -128,8 +129,10 @@ async function insertAutoRewriteRow(
   base: {
     project_id: string;
     concept_id: string;
+    concept_variant: string | null;
     prompt_text: string;
     image_url: string;
+    watermarked_url: string;
     version: number;
     auto_rewrite_count: number;
   },
@@ -139,14 +142,17 @@ async function insertAutoRewriteRow(
     .insert({
       project_id: base.project_id,
       concept_id: base.concept_id,
+      concept_variant: base.concept_variant,
       prompt_text: base.prompt_text,
       image_url: base.image_url,
+      watermarked_url: base.watermarked_url,
       status: "completed",
       version: base.version,
       qa_status: "pending",
       qa_issues: [],
       auto_rewrite_count: base.auto_rewrite_count,
       is_auto_rewrite: true,
+      is_unlocked: false,
     })
     .select("*")
     .single();
@@ -158,12 +164,17 @@ async function nextVersion(
   supabase: SupabaseClient,
   projectId: string,
   conceptId: string,
+  conceptVariant: string | null,
 ): Promise<number> {
-  const { count } = await supabase
+  let q = supabase
     .from("generations")
     .select("id", { count: "exact", head: true })
     .eq("project_id", projectId)
     .eq("concept_id", conceptId);
+  if (conceptVariant) {
+    q = q.eq("concept_variant", conceptVariant);
+  }
+  const { count } = await q;
   return (count ?? 0) + 1;
 }
 
@@ -267,15 +278,30 @@ export async function POST(request: Request) {
       });
     }
 
+    let newWatermarked = newImage.imageDataUrl;
+    try {
+      newWatermarked = await watermarkImageDataUrl(newImage.imageDataUrl);
+    } catch {
+      // Fall back to clean if watermarking fails.
+    }
+
     const conceptId = generation.concept_id;
     if (!conceptId) break; // safety: cannot happen given canRewrite above
-    const nextV = await nextVersion(supabase, generation.project_id, conceptId);
+    const conceptVariant = generation.concept_variant ?? null;
+    const nextV = await nextVersion(
+      supabase,
+      generation.project_id,
+      conceptId,
+      conceptVariant,
+    );
 
     const inserted = await insertAutoRewriteRow(supabase, {
       project_id: generation.project_id,
       concept_id: conceptId,
+      concept_variant: conceptVariant,
       prompt_text: newBrief,
       image_url: newImage.imageDataUrl,
+      watermarked_url: newWatermarked,
       version: nextV,
       auto_rewrite_count: generation.auto_rewrite_count + 1,
     });

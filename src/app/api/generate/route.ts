@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { generateRequestSchema } from "@/lib/validators/schemas";
 import { generateImage } from "@/lib/gemini/generate-image";
+import { watermarkImageDataUrl } from "@/lib/image/watermark";
+import { checkGenerationAllowed } from "@/lib/credits";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -22,8 +24,14 @@ export async function POST(request: Request) {
     );
   }
 
-  const { project_id, concept_id, recreation_id, variant_label, prompt_text } =
-    parsed.data;
+  const {
+    project_id,
+    concept_id,
+    concept_variant,
+    recreation_id,
+    variant_label,
+    prompt_text,
+  } = parsed.data;
 
   const { data: project, error: projErr } = await supabase
     .from("projects")
@@ -34,16 +42,29 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "not_found" }, { status: 404 });
   }
 
-  // Version counter is scoped to either concept or (recreation + variant).
-  const baseQuery = supabase
+  const tier = await checkGenerationAllowed(user.id, 1);
+  if (!tier.allowed) {
+    return NextResponse.json(
+      { error: "paywall", message: tier.reason },
+      { status: 402 },
+    );
+  }
+
+  // Version counter is scoped to (concept + variant) or (recreation + variant_label).
+  let versionQuery = supabase
     .from("generations")
     .select("id", { count: "exact", head: true })
     .eq("project_id", project_id);
-  const versionQuery = concept_id
-    ? baseQuery.eq("concept_id", concept_id)
-    : baseQuery
-        .eq("recreation_id", recreation_id ?? "")
-        .eq("variant_label", variant_label ?? "");
+  if (concept_id) {
+    versionQuery = versionQuery.eq("concept_id", concept_id);
+    if (concept_variant) {
+      versionQuery = versionQuery.eq("concept_variant", concept_variant);
+    }
+  } else if (recreation_id) {
+    versionQuery = versionQuery
+      .eq("recreation_id", recreation_id)
+      .eq("variant_label", variant_label ?? "");
+  }
   const { count } = await versionQuery;
   const version = (count ?? 0) + 1;
 
@@ -52,6 +73,7 @@ export async function POST(request: Request) {
     .insert({
       project_id,
       concept_id: concept_id ?? null,
+      concept_variant: concept_variant ?? null,
       recreation_id: recreation_id ?? null,
       variant_label: variant_label ?? null,
       prompt_text,
@@ -59,6 +81,7 @@ export async function POST(request: Request) {
       version,
       qa_status: "pending",
       qa_issues: [],
+      is_unlocked: false,
     })
     .select("*")
     .single();
@@ -71,9 +94,21 @@ export async function POST(request: Request) {
 
   try {
     const { imageDataUrl } = await generateImage({ prompt: prompt_text });
+    let watermarked: string | null = null;
+    try {
+      watermarked = await watermarkImageDataUrl(imageDataUrl);
+    } catch {
+      // Watermarking failures should not block delivery; fall back to clean
+      // image being shown but marked as locked.
+      watermarked = imageDataUrl;
+    }
     const { data: updated, error: updErr } = await supabase
       .from("generations")
-      .update({ status: "completed", image_url: imageDataUrl })
+      .update({
+        status: "completed",
+        image_url: imageDataUrl,
+        watermarked_url: watermarked,
+      })
       .eq("id", row.id)
       .select("*")
       .single();
@@ -81,6 +116,8 @@ export async function POST(request: Request) {
     return NextResponse.json({
       id: updated.id,
       image_url: updated.image_url,
+      watermarked_url: updated.watermarked_url,
+      is_unlocked: updated.is_unlocked,
       status: "completed",
       version,
       generation: updated,

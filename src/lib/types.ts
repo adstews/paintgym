@@ -37,6 +37,16 @@ export interface ProductData {
   url?: string;
 }
 
+export interface BrandColor {
+  label: string;
+  hex: string;
+}
+
+export interface BrandFont {
+  role: string;
+  family: string;
+}
+
 export interface Project {
   id: string;
   user_id: string;
@@ -53,6 +63,9 @@ export interface Project {
   price_point: string | null;
   proof_points: string | null;
   style_settings: StyleSettings;
+  brand_colors: BrandColor[];
+  brand_fonts: BrandFont[];
+  brand_voice: string | null;
   created_at: string;
 }
 
@@ -68,10 +81,27 @@ export interface Concept {
   created_at: string;
 }
 
+export type ConceptVariant = "A" | "B" | "C";
+
+export const CONCEPT_VARIANTS: ConceptVariant[] = ["A", "B", "C"];
+
+export const CONCEPT_VARIANT_DISPLAY: Record<ConceptVariant, string> = {
+  A: "Variant A",
+  B: "Variant B",
+  C: "Variant C",
+};
+
+export const CONCEPT_VARIANT_DIRECTION: Record<ConceptVariant, string> = {
+  A: "the most natural interpretation of the concept",
+  B: "a different angle: different headline, different visual composition, different emotional framing",
+  C: "an unexpected, wildcard take on the concept that still serves the product",
+};
+
 export interface Brief {
   id: string;
   project_id: string;
   concept_id: string;
+  variant: ConceptVariant;
   brief_text: string;
   created_at: string;
   updated_at: string;
@@ -123,10 +153,13 @@ export interface Generation {
   id: string;
   project_id: string;
   concept_id: string | null;
+  concept_variant: ConceptVariant | null;
   recreation_id: string | null;
   variant_label: VariantLabel | null;
   prompt_text: string;
   image_url: string | null;
+  watermarked_url: string | null;
+  is_unlocked: boolean;
   status: GenerationStatus;
   version: number;
   created_at: string;
@@ -136,6 +169,32 @@ export interface Generation {
   auto_rewrite_count: number;
   is_auto_rewrite: boolean;
 }
+
+export interface UserProfile {
+  user_id: string;
+  credit_balance: number;
+  stripe_customer_id: string | null;
+  has_purchased: boolean;
+}
+
+export const FREE_PROJECT_LIMIT = 1;
+export const FREE_GENERATION_LIMIT = 5;
+export const INITIAL_FREE_CREDITS = 5;
+
+export interface CreditPack {
+  id: "starter" | "pro" | "studio";
+  credits: number;
+  amount_cents: number;
+  label: string;
+}
+
+export const CREDIT_PACKS: CreditPack[] = [
+  { id: "starter", credits: 50, amount_cents: 2900, label: "Starter" },
+  { id: "pro", credits: 200, amount_cents: 7900, label: "Pro" },
+  { id: "studio", credits: 500, amount_cents: 14900, label: "Studio" },
+];
+
+export const UNLOCK_ALL_DISCOUNT = 0.8;
 
 export interface ProjectImage {
   id: string;

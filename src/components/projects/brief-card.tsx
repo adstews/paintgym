@@ -6,23 +6,34 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/componen
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
-import type { Brief, Concept, Generation } from "@/lib/types";
+import {
+  CONCEPT_VARIANT_DIRECTION,
+  CONCEPT_VARIANT_DISPLAY,
+} from "@/lib/types";
+import type {
+  Brief,
+  Concept,
+  ConceptVariant,
+  Generation,
+} from "@/lib/types";
 
 interface Props {
   concept: Concept;
+  variant: ConceptVariant;
   brief: Brief | null;
   latestGeneration: Generation | null;
   onBriefChange: (next: Brief) => void;
-  onRegenerate: () => Promise<void>;
+  onRegenerateConcept: () => Promise<void>;
   onGenerateImage: () => Promise<void>;
 }
 
 export function BriefCard({
   concept,
+  variant,
   brief,
   latestGeneration,
   onBriefChange,
-  onRegenerate,
+  onRegenerateConcept,
   onGenerateImage,
 }: Props) {
   const [draft, setDraft] = useState(brief?.brief_text ?? "");
@@ -64,7 +75,7 @@ export function BriefCard({
   async function handleRegenerate() {
     setRegen(true);
     try {
-      await onRegenerate();
+      await onRegenerateConcept();
     } finally {
       setRegen(false);
     }
@@ -89,13 +100,20 @@ export function BriefCard({
       <CardHeader className="pb-3">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <CardTitle className="text-base">{concept.name}</CardTitle>
+            <div className="flex items-center gap-2">
+              <Badge variant="outline" className="font-mono">
+                {variant}
+              </Badge>
+              <CardTitle className="text-sm">
+                {CONCEPT_VARIANT_DISPLAY[variant]}
+              </CardTitle>
+            </div>
             <p className="mt-1 text-xs text-muted-foreground line-clamp-2">
-              {concept.description}
+              {CONCEPT_VARIANT_DIRECTION[variant]}
             </p>
           </div>
           <div className="flex shrink-0 items-center gap-2">
-            {!hasBrief && <Badge variant="outline">No brief yet</Badge>}
+            {!hasBrief && <Badge variant="outline">Empty</Badge>}
             {hasBrief && dirty && <Badge variant="secondary">Unsaved</Badge>}
             {isGenerating && <Badge variant="secondary">Generating</Badge>}
             {!isGenerating && qaStatus === "reviewing" && (
@@ -129,7 +147,7 @@ export function BriefCard({
           />
         ) : (
           <div className="rounded-md border border-dashed py-8 text-center text-xs text-muted-foreground">
-            Generate the briefs for this project to fill this in.
+            Generate briefs for {concept.name} to fill in variant {variant}.
           </div>
         )}
       </CardContent>
@@ -162,8 +180,9 @@ export function BriefCard({
             variant="outline"
             onClick={handleRegenerate}
             disabled={regen}
+            title="Regenerates all three variants for this concept"
           >
-            {regen ? "Regenerating..." : hasBrief ? "Regenerate brief" : "Generate brief"}
+            {regen ? "..." : "Regenerate all 3"}
           </Button>
           <Button
             type="button"
