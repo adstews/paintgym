@@ -40,7 +40,7 @@ export async function watermarkImageDataUrl(
   const image = sharp(parsed.buffer);
   const meta = await image.metadata();
   const width = meta.width ?? 1080;
-  const height = meta.height ?? 1080;
+  const height = meta.height ?? 1350;
 
   const overlay = Buffer.from(buildOverlaySvg(width, height));
   const composited = await image

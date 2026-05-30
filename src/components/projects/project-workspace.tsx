@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactElement } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -10,6 +10,7 @@ import { GenerationCard } from "@/components/gallery/generation-card";
 import { ProductDetailsForm } from "./product-details-form";
 import { BriefCard } from "./brief-card";
 import { RecreateTab } from "./recreate-tab";
+import { CompetitorSpyTab } from "./competitor-spy-tab";
 import { CreditsPanel } from "./credits-panel";
 import {
   CONCEPT_VARIANTS,
@@ -71,6 +72,8 @@ export function ProjectWorkspace({
   const [profile, setProfile] = useState(initialProfile);
   const [batchBriefsLoading, setBatchBriefsLoading] = useState(false);
   const [batchImagesLoading, setBatchImagesLoading] = useState(false);
+  const [topPerformersOnly, setTopPerformersOnly] = useState(false);
+  const [informedBy, setInformedBy] = useState<Record<string, number>>({});
 
   const conceptsById = useMemo(
     () => new Map(concepts.map((c) => [c.id, c])),
@@ -92,6 +95,7 @@ export function ProjectWorkspace({
     const map = new Map<string, Generation[]>();
     for (const g of generations) {
       if (!g.concept_id) continue;
+      if (g.is_competitive) continue;
       const key = variantKey(
         g.concept_id,
         (g.concept_variant ?? "A") as ConceptVariant,
@@ -163,6 +167,12 @@ export function ProjectWorkspace({
     }
     const json = await res.json();
     applyBriefs(json.briefs as Brief[]);
+    if (json.informed_by && typeof json.informed_by === "object") {
+      setInformedBy((prev) => ({
+        ...prev,
+        ...(json.informed_by as Record<string, number>),
+      }));
+    }
     const failures = (json.failures ?? []) as {
       concept_id: string;
       message: string;
@@ -251,6 +261,13 @@ export function ProjectWorkspace({
       qa_severity: null,
       auto_rewrite_count: 0,
       is_auto_rewrite: false,
+      rating: null,
+      is_favorited: false,
+      used_in_ad: false,
+      refined_from: null,
+      refinement_feedback: null,
+      is_competitive: false,
+      competitor_name: null,
     };
     setGenerations((g) => [placeholder, ...g]);
 
@@ -326,6 +343,13 @@ export function ProjectWorkspace({
       qa_severity: null,
       auto_rewrite_count: 0,
       is_auto_rewrite: false,
+      rating: null,
+      is_favorited: false,
+      used_in_ad: false,
+      refined_from: null,
+      refinement_feedback: null,
+      is_competitive: false,
+      competitor_name: null,
     };
     setGenerations((g) => [placeholder, ...g]);
 
@@ -404,6 +428,17 @@ export function ProjectWorkspace({
       toast.success("Image accepted");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Override failed");
+    }
+  }
+
+  function applyRatingUpdate(updated: Generation) {
+    mergeGenerations([updated]);
+  }
+
+  function applyRefinedGeneration(updated: Generation, newBalance?: number) {
+    mergeGenerations([updated]);
+    if (typeof newBalance === "number") {
+      setProfile((p) => ({ ...p, credit_balance: newBalance }));
     }
   }
 
@@ -556,6 +591,7 @@ export function ProjectWorkspace({
           <TabsTrigger value="briefs">Briefs</TabsTrigger>
           <TabsTrigger value="gallery">Gallery</TabsTrigger>
           <TabsTrigger value="recreate">Recreate</TabsTrigger>
+          <TabsTrigger value="competitor">Competitor Spy</TabsTrigger>
         </TabsList>
 
         <TabsContent value="product" className="pt-4">
@@ -613,6 +649,12 @@ export function ProjectWorkspace({
                     <p className="text-xs text-muted-foreground">
                       {c.description}
                     </p>
+                    {informedBy[c.id] > 0 && (
+                      <p className="mt-1 text-xs text-emerald-700 dark:text-emerald-400">
+                        Informed by {informedBy[c.id]} top-rated example
+                        {informedBy[c.id] === 1 ? "" : "s"} from your library
+                      </p>
+                    )}
                   </div>
                   <Button
                     type="button"
@@ -652,6 +694,21 @@ export function ProjectWorkspace({
         </TabsContent>
 
         <TabsContent value="gallery" className="space-y-6 pt-4">
+          <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border bg-muted/30 px-3 py-2">
+            <div className="text-xs text-muted-foreground">
+              Rate the images you like. High-rated briefs are used as
+              few-shot examples the next time Claude writes briefs for
+              the same concept.
+            </div>
+            <Button
+              type="button"
+              size="sm"
+              variant={topPerformersOnly ? "default" : "outline"}
+              onClick={() => setTopPerformersOnly((v) => !v)}
+            >
+              {topPerformersOnly ? "Showing top only" : "Top Performers only"}
+            </Button>
+          </div>
           {galleryConcepts.length === 0 ? (
             <Card>
               <CardContent className="py-16 text-center text-sm text-muted-foreground">
@@ -659,41 +716,47 @@ export function ProjectWorkspace({
               </CardContent>
             </Card>
           ) : (
-            galleryConcepts.map((c) => (
-              <div key={c.id} className="space-y-2">
-                <h2 className="text-base font-semibold">{c.name}</h2>
-                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                  {CONCEPT_VARIANTS.map((v) => {
-                    const attempts =
-                      attemptsByKey.get(variantKey(c.id, v)) ?? [];
-                    const latest = attempts[0];
-                    if (!latest) {
-                      return (
-                        <Card key={`${c.id}:${v}`}>
-                          <CardContent className="py-12 text-center text-xs text-muted-foreground">
-                            {CONCEPT_VARIANT_DISPLAY[v]} not generated yet.
-                          </CardContent>
-                        </Card>
-                      );
-                    }
-                    return (
-                      <GenerationCard
-                        key={`${c.id}:${v}`}
-                        conceptName={`${c.name} - ${CONCEPT_VARIANT_DISPLAY[v]}`}
-                        latest={latest}
-                        attempts={attempts}
-                        onRegenerate={() =>
-                          generateImageForVariant(c.id, v)
-                        }
-                        onReReview={() => runReview(latest.id)}
-                        onOverride={() => overrideGeneration(latest.id)}
-                        onUnlock={() => unlockGeneration(latest.id)}
-                      />
-                    );
-                  })}
+            galleryConcepts.map((c) => {
+              const cards = CONCEPT_VARIANTS.map((v) => {
+                const attempts =
+                  attemptsByKey.get(variantKey(c.id, v)) ?? [];
+                const latest = attempts[0];
+                if (!latest) return null;
+                if (
+                  topPerformersOnly &&
+                  (latest.rating ?? 0) < 4 &&
+                  !latest.is_favorited &&
+                  !latest.used_in_ad
+                ) {
+                  return null;
+                }
+                return (
+                  <GenerationCard
+                    key={`${c.id}:${v}`}
+                    conceptName={`${c.name} - ${CONCEPT_VARIANT_DISPLAY[v]}`}
+                    latest={latest}
+                    attempts={attempts}
+                    onRegenerate={() => generateImageForVariant(c.id, v)}
+                    onReReview={() => runReview(latest.id)}
+                    onOverride={() => overrideGeneration(latest.id)}
+                    onUnlock={() => unlockGeneration(latest.id)}
+                    onRatingChange={applyRatingUpdate}
+                    onRefined={applyRefinedGeneration}
+                  />
+                );
+              }).filter(Boolean) as ReactElement[];
+
+              if (cards.length === 0) return null;
+
+              return (
+                <div key={c.id} className="space-y-2">
+                  <h2 className="text-base font-semibold">{c.name}</h2>
+                  <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                    {cards}
+                  </div>
                 </div>
-              </div>
-            ))
+              );
+            })
           )}
         </TabsContent>
 
@@ -708,6 +771,26 @@ export function ProjectWorkspace({
             onOverrideGeneration={overrideGeneration}
             onUnlockGeneration={unlockGeneration}
             onRegenerateVariant={regenerateVariantImage}
+            onRatingChange={applyRatingUpdate}
+            onRefined={applyRefinedGeneration}
+          />
+        </TabsContent>
+
+        <TabsContent value="competitor" className="pt-4">
+          <CompetitorSpyTab
+            project={project}
+            concepts={concepts}
+            enabledConceptIds={enabled}
+            generations={generations}
+            profile={profile}
+            onProjectChange={setProject}
+            onGenerationsUpdated={mergeGenerations}
+            onProfileChange={setProfile}
+            onReviewGeneration={runReview}
+            onOverrideGeneration={overrideGeneration}
+            onUnlockGeneration={unlockGeneration}
+            onRatingChange={applyRatingUpdate}
+            onRefined={applyRefinedGeneration}
           />
         </TabsContent>
       </Tabs>

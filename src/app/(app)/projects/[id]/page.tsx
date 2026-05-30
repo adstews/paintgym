@@ -80,6 +80,7 @@ export default async function ProjectPage({ params }: PageProps) {
       DEFAULT_STYLE_SETTINGS,
     brand_colors: projectRow.brand_colors ?? [],
     brand_fonts: projectRow.brand_fonts ?? [],
+    competitor_data: projectRow.competitor_data ?? null,
   };
 
   return (
