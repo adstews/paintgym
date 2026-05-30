@@ -12,6 +12,25 @@ Hard rules for this image. Follow every rule, no exceptions:
 - If the prompt specifies text to display, render it exactly as written, word for word.
 `.trim();
 
-export function applyHardRules(prompt: string): string {
-  return `${prompt.trim()}\n\n${GEMINI_HARD_RULES}`;
+export interface HardRuleOptions {
+  aspect?: string;
+  width?: number;
+  height?: number;
+}
+
+// Defaults match the Meta 4:5 feed format. Callers pass platform-specific
+// dimensions when generating for a different surface.
+const DEFAULT_ASPECT = "4:5";
+const DEFAULT_WIDTH = 1080;
+const DEFAULT_HEIGHT = 1350;
+
+export function applyHardRules(
+  prompt: string,
+  opts: HardRuleOptions = {},
+): string {
+  const aspect = opts.aspect ?? DEFAULT_ASPECT;
+  const width = opts.width ?? DEFAULT_WIDTH;
+  const height = opts.height ?? DEFAULT_HEIGHT;
+  const aspectRule = `- Output the image at a ${aspect} aspect ratio (${width} by ${height} pixels). Do not crop to square. Do not pad with letterbox bars; compose the scene to fill the full ${aspect} frame edge to edge.`;
+  return `${prompt.trim()}\n\n${GEMINI_HARD_RULES}\n${aspectRule}`;
 }

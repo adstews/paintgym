@@ -141,6 +141,12 @@ export const refineRequestSchema = z.object({
   user_feedback: z.string().min(3).max(2000),
 });
 
+export const competitorSpySchema = z.object({
+  project_id: z.string().uuid(),
+  competitor_url: z.string().url(),
+  concept_ids: z.array(z.string().uuid()).min(1).max(20),
+});
+
 export const adminConceptCreateSchema = z.object({
   name: z.string().min(1).max(120),
   description: z.string().min(1).max(2000),

@@ -10,6 +10,7 @@ import { GenerationCard } from "@/components/gallery/generation-card";
 import { ProductDetailsForm } from "./product-details-form";
 import { BriefCard } from "./brief-card";
 import { RecreateTab } from "./recreate-tab";
+import { CompetitorSpyTab } from "./competitor-spy-tab";
 import { CreditsPanel } from "./credits-panel";
 import {
   CONCEPT_VARIANTS,
@@ -94,6 +95,7 @@ export function ProjectWorkspace({
     const map = new Map<string, Generation[]>();
     for (const g of generations) {
       if (!g.concept_id) continue;
+      if (g.is_competitive) continue;
       const key = variantKey(
         g.concept_id,
         (g.concept_variant ?? "A") as ConceptVariant,
@@ -264,6 +266,8 @@ export function ProjectWorkspace({
       used_in_ad: false,
       refined_from: null,
       refinement_feedback: null,
+      is_competitive: false,
+      competitor_name: null,
     };
     setGenerations((g) => [placeholder, ...g]);
 
@@ -344,6 +348,8 @@ export function ProjectWorkspace({
       used_in_ad: false,
       refined_from: null,
       refinement_feedback: null,
+      is_competitive: false,
+      competitor_name: null,
     };
     setGenerations((g) => [placeholder, ...g]);
 
@@ -585,6 +591,7 @@ export function ProjectWorkspace({
           <TabsTrigger value="briefs">Briefs</TabsTrigger>
           <TabsTrigger value="gallery">Gallery</TabsTrigger>
           <TabsTrigger value="recreate">Recreate</TabsTrigger>
+          <TabsTrigger value="competitor">Competitor Spy</TabsTrigger>
         </TabsList>
 
         <TabsContent value="product" className="pt-4">
@@ -764,6 +771,24 @@ export function ProjectWorkspace({
             onOverrideGeneration={overrideGeneration}
             onUnlockGeneration={unlockGeneration}
             onRegenerateVariant={regenerateVariantImage}
+            onRatingChange={applyRatingUpdate}
+            onRefined={applyRefinedGeneration}
+          />
+        </TabsContent>
+
+        <TabsContent value="competitor" className="pt-4">
+          <CompetitorSpyTab
+            project={project}
+            concepts={concepts}
+            enabledConceptIds={enabled}
+            generations={generations}
+            profile={profile}
+            onProjectChange={setProject}
+            onGenerationsUpdated={mergeGenerations}
+            onProfileChange={setProfile}
+            onReviewGeneration={runReview}
+            onOverrideGeneration={overrideGeneration}
+            onUnlockGeneration={unlockGeneration}
             onRatingChange={applyRatingUpdate}
             onRefined={applyRefinedGeneration}
           />

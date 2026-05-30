@@ -268,7 +268,10 @@ export async function POST(request: Request) {
 
     let newImage;
     try {
-      newImage = await generateImage({ prompt: newBrief });
+      newImage = await generateImage({
+        prompt: newBrief,
+        platform: project.style_settings.platform,
+      });
     } catch (err) {
       return NextResponse.json({
         generations: touched,

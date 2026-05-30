@@ -41,7 +41,7 @@ const VARIANT_SPECS: VariantSpec[] = [
     label: "platform_adapted",
     display: "Platform adapted",
     direction:
-      "Same creative concept, restaged for a different platform feel. If the original looks like a square Meta ad, restage as a vertical 9:16 TikTok or Reels frame with the hero in the upper two-thirds. If the original is vertical, restage as a horizontal LinkedIn-friendly frame. Adjust composition so the message survives the new aspect.",
+      "Same creative concept, restaged for a different platform feel. If the original looks like a 4:5 Meta feed ad, restage as a vertical 9:16 TikTok or Reels frame with the hero in the upper two-thirds. If the original is vertical, restage as a horizontal LinkedIn-friendly frame. Adjust composition so the message survives the new aspect.",
   },
 ];
 

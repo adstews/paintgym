@@ -22,7 +22,7 @@ export const DEFAULT_STYLE_SETTINGS: StyleSettings = {
 };
 
 export const PLATFORM_DIMENSIONS: Record<Platform, { width: number; height: number; aspect: string }> = {
-  meta: { width: 1080, height: 1080, aspect: "1:1" },
+  meta: { width: 1080, height: 1350, aspect: "4:5" },
   tiktok: { width: 1080, height: 1920, aspect: "9:16" },
   linkedin: { width: 1200, height: 627, aspect: "1.91:1" },
 };
@@ -35,6 +35,11 @@ export interface ProductData {
   ingredients?: string[];
   images?: string[];
   url?: string;
+}
+
+export interface CompetitorData extends ProductData {
+  brand?: string;
+  scraped_at?: string;
 }
 
 export interface BrandColor {
@@ -66,6 +71,7 @@ export interface Project {
   brand_colors: BrandColor[];
   brand_fonts: BrandFont[];
   brand_voice: string | null;
+  competitor_data: CompetitorData | null;
   created_at: string;
 }
 
@@ -173,6 +179,8 @@ export interface Generation {
   used_in_ad: boolean;
   refined_from: string | null;
   refinement_feedback: string | null;
+  is_competitive: boolean;
+  competitor_name: string | null;
 }
 
 export interface UserProfile {

@@ -160,7 +160,10 @@ export async function POST(request: Request) {
 
   let imageDataUrl: string;
   try {
-    const result = await generateImage({ prompt: refinedBrief });
+    const result = await generateImage({
+      prompt: refinedBrief,
+      platform: project.style_settings.platform,
+    });
     imageDataUrl = result.imageDataUrl;
   } catch (err) {
     await supabase

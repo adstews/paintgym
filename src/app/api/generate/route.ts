@@ -3,7 +3,11 @@ import { createClient } from "@/lib/supabase/server";
 import { generateRequestSchema } from "@/lib/validators/schemas";
 import { generateImage } from "@/lib/gemini/generate-image";
 import { checkGenerationCredits, deductCredits } from "@/lib/credits";
-import { GENERATION_CREDIT_COST } from "@/lib/types";
+import {
+  DEFAULT_STYLE_SETTINGS,
+  GENERATION_CREDIT_COST,
+} from "@/lib/types";
+import type { StyleSettings } from "@/lib/types";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -35,12 +39,14 @@ export async function POST(request: Request) {
 
   const { data: project, error: projErr } = await supabase
     .from("projects")
-    .select("id, user_id")
+    .select("id, user_id, style_settings")
     .eq("id", project_id)
     .single();
   if (projErr || !project || project.user_id !== user.id) {
     return NextResponse.json({ error: "not_found" }, { status: 404 });
   }
+  const style =
+    (project.style_settings as StyleSettings | null) ?? DEFAULT_STYLE_SETTINGS;
 
   const tier = await checkGenerationCredits(user.id, 1);
   if (!tier.allowed) {
@@ -98,7 +104,10 @@ export async function POST(request: Request) {
   }
 
   try {
-    const { imageDataUrl } = await generateImage({ prompt: prompt_text });
+    const { imageDataUrl } = await generateImage({
+      prompt: prompt_text,
+      platform: style.platform,
+    });
 
     // Only deduct after a successful Gemini render so failed generations
     // don't burn a credit.

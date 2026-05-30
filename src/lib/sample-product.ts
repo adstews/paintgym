@@ -54,5 +54,6 @@ export const SAMPLE_PROJECT: Project = {
   ],
   brand_voice:
     "Direct, a little defiant, dry humor, never corporate. Reads like a recommendation from a friend who is into hot sauce.",
+  competitor_data: null,
   created_at: new Date(0).toISOString(),
 };

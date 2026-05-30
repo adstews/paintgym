@@ -133,7 +133,10 @@ export async function POST(request: Request) {
         };
       }
       try {
-        const { imageDataUrl } = await generateImage({ prompt: brief_text });
+        const { imageDataUrl } = await generateImage({
+          prompt: brief_text,
+          platform: project.style_settings.platform,
+        });
         const { data: gen, error: insErr } = await supabase
           .from("generations")
           .insert({

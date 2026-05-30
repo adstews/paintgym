@@ -216,6 +216,11 @@ export function GenerationCard({
                 Watermarked preview
               </div>
             )}
+            {selected.is_competitive && (
+              <div className="absolute bottom-2 right-2 rounded-full bg-foreground/90 px-2 py-1 text-xs font-semibold text-background shadow-sm">
+                vs {selected.competitor_name ?? "Competitor"}
+              </div>
+            )}
           </button>
         </CardContent>
 
