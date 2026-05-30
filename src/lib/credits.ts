@@ -1,16 +1,15 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
   CREDIT_PACKS,
-  FREE_GENERATION_LIMIT,
-  FREE_PROJECT_LIMIT,
+  GENERATION_CREDIT_COST,
   INITIAL_FREE_CREDITS,
   UNLOCK_ALL_DISCOUNT,
 } from "@/lib/types";
 import type { CreditPack, UserProfile } from "@/lib/types";
 
-// All credit + tier logic runs through the admin client. RLS would block
-// cross-table aggregates and the user_profiles write path needs to be
-// idempotent on first sign-in for users that predated the trigger.
+// All credit logic runs through the admin client. RLS would block the
+// user_profiles upsert needed on first sign-in (for users that predated the
+// auth trigger) and cross-table aggregates are admin-only.
 
 export interface ProfileWithUsage extends UserProfile {
   generation_count: number;
@@ -74,38 +73,31 @@ export async function loadProfileWithUsage(
   };
 }
 
-export interface TierCheck {
+export interface CreditCheck {
   allowed: boolean;
   reason?: string;
+  balance: number;
+  required: number;
 }
 
-export async function checkGenerationAllowed(
+// Ensures the user has at least `count` * GENERATION_CREDIT_COST credits to
+// run that many generations. The actual deduction happens after the
+// generation succeeds via deductCredits.
+export async function checkGenerationCredits(
   userId: string,
-  newGenerations = 1,
-): Promise<TierCheck> {
-  const usage = await loadProfileWithUsage(userId);
-  if (usage.has_purchased) return { allowed: true };
-  if (usage.generation_count + newGenerations > FREE_GENERATION_LIMIT) {
+  count = 1,
+): Promise<CreditCheck> {
+  const profile = await ensureProfile(userId);
+  const required = count * GENERATION_CREDIT_COST;
+  if (profile.credit_balance < required) {
     return {
       allowed: false,
-      reason: `Free preview limit reached (${FREE_GENERATION_LIMIT} generations). Buy credits to keep generating.`,
+      balance: profile.credit_balance,
+      required,
+      reason: `Need ${required} credit${required === 1 ? "" : "s"} to generate. You have ${profile.credit_balance}. Buy more to keep going.`,
     };
   }
-  return { allowed: true };
-}
-
-export async function checkProjectCreationAllowed(
-  userId: string,
-): Promise<TierCheck> {
-  const usage = await loadProfileWithUsage(userId);
-  if (usage.has_purchased) return { allowed: true };
-  if (usage.project_count >= FREE_PROJECT_LIMIT) {
-    return {
-      allowed: false,
-      reason: `Free tier is limited to ${FREE_PROJECT_LIMIT} project. Buy credits to unlock more.`,
-    };
-  }
-  return { allowed: true };
+  return { allowed: true, balance: profile.credit_balance, required };
 }
 
 export interface DeductResult {

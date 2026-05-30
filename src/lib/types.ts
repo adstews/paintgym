@@ -177,23 +177,34 @@ export interface UserProfile {
   has_purchased: boolean;
 }
 
-export const FREE_PROJECT_LIMIT = 1;
-export const FREE_GENERATION_LIMIT = 5;
+// One credit per generation. New users start with five.
 export const INITIAL_FREE_CREDITS = 5;
+export const GENERATION_CREDIT_COST = 1;
+
+export type CreditPackId = "starter" | "full_project" | "pro" | "agency";
 
 export interface CreditPack {
-  id: "starter" | "pro" | "studio";
+  id: CreditPackId;
   credits: number;
   amount_cents: number;
   label: string;
+  most_popular?: boolean;
 }
 
 export const CREDIT_PACKS: CreditPack[] = [
-  { id: "starter", credits: 50, amount_cents: 2900, label: "Starter" },
-  { id: "pro", credits: 200, amount_cents: 7900, label: "Pro" },
-  { id: "studio", credits: 500, amount_cents: 14900, label: "Studio" },
+  { id: "starter", credits: 50, amount_cents: 3900, label: "Starter" },
+  {
+    id: "full_project",
+    credits: 110,
+    amount_cents: 6900,
+    label: "Full Project",
+    most_popular: true,
+  },
+  { id: "pro", credits: 300, amount_cents: 14900, label: "Pro" },
+  { id: "agency", credits: 750, amount_cents: 29900, label: "Agency" },
 ];
 
+// Legacy: still used by the bulk-unlock path for any pre-existing locked rows.
 export const UNLOCK_ALL_DISCOUNT = 0.8;
 
 export interface ProjectImage {

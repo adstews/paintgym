@@ -26,6 +26,10 @@ function formatPrice(cents: number): string {
   return `$${(cents / 100).toFixed(0)}`;
 }
 
+function perCreditPrice(cents: number, credits: number): string {
+  return `$${(cents / 100 / credits).toFixed(2)} per credit`;
+}
+
 export function CreditsPanel({
   profile,
   lockedCount,
@@ -69,18 +73,18 @@ export function CreditsPanel({
     <Card>
       <CardContent className="flex flex-col gap-3 py-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex flex-wrap items-center gap-3">
-          <Badge variant={profile.credit_balance > 0 ? "default" : "secondary"}>
+          <Badge variant={profile.credit_balance > 0 ? "default" : "destructive"}>
             {profile.credit_balance} credit{profile.credit_balance === 1 ? "" : "s"}
           </Badge>
-          {!profile.has_purchased && (
-            <Badge variant="outline">Free preview</Badge>
+          {!profile.has_purchased && profile.credit_balance > 0 && (
+            <Badge variant="outline">Free trial</Badge>
           )}
-          {lockedCount > 0 && (
-            <span className="text-xs text-muted-foreground">
-              {lockedCount} image{lockedCount === 1 ? "" : "s"} watermarked.
-              Spend 1 credit to download a clean copy.
-            </span>
-          )}
+          <span className="text-xs text-muted-foreground">
+            One credit per image generation.
+            {lockedCount > 0
+              ? ` ${lockedCount} legacy image${lockedCount === 1 ? "" : "s"} need${lockedCount === 1 ? "s" : ""} unlocking.`
+              : ""}
+          </span>
         </div>
         <div className="flex flex-wrap gap-2">
           {onUnlockAll && lockedCount > 0 && (
@@ -90,7 +94,7 @@ export function CreditsPanel({
               onClick={handleUnlockAll}
               disabled={unlockingAll}
             >
-              {unlockingAll ? "Unlocking..." : `Unlock all (${lockedCount})`}
+              {unlockingAll ? "Unlocking..." : `Unlock legacy (${lockedCount})`}
             </Button>
           )}
           <Button size="sm" onClick={() => setDialogOpen(true)}>
@@ -100,15 +104,15 @@ export function CreditsPanel({
       </CardContent>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-3xl">
           <DialogHeader>
             <DialogTitle>Buy credits</DialogTitle>
           </DialogHeader>
           <p className="text-sm text-muted-foreground">
-            Credits unlock clean, watermark-free downloads. One credit per
-            image. Bulk unlocks get a discount.
+            One credit per image generation. Credits never expire. Failed
+            renders never cost a credit.
           </p>
-          <div className="grid gap-3 sm:grid-cols-3">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             {CREDIT_PACKS.map((p) => (
               <button
                 key={p.id}
@@ -116,10 +120,16 @@ export function CreditsPanel({
                 onClick={() => buyPack(p.id)}
                 disabled={buying !== null}
                 className={cn(
-                  "rounded-lg border p-4 text-left transition hover:bg-accent",
+                  "relative rounded-lg border p-4 text-left transition hover:bg-accent",
+                  p.most_popular && "border-foreground/60 ring-1 ring-foreground/40",
                   buying === p.id && "opacity-60",
                 )}
               >
+                {p.most_popular && (
+                  <Badge className="absolute -top-2 right-3">
+                    Most popular
+                  </Badge>
+                )}
                 <div className="text-xs uppercase tracking-wide text-muted-foreground">
                   {p.label}
                 </div>
@@ -128,14 +138,14 @@ export function CreditsPanel({
                 </div>
                 <div className="text-sm">{formatPrice(p.amount_cents)}</div>
                 <div className="mt-2 text-xs text-muted-foreground">
-                  {`$${(p.amount_cents / 100 / p.credits).toFixed(2)} per credit`}
+                  {perCreditPrice(p.amount_cents, p.credits)}
                 </div>
               </button>
             ))}
           </div>
           <p className="text-xs text-muted-foreground">
-            Secure checkout powered by Stripe. Credits appear in your balance
-            after the payment confirms.
+            Secure checkout powered by Stripe. Credits arrive in your balance
+            seconds after the payment confirms.
           </p>
         </DialogContent>
       </Dialog>

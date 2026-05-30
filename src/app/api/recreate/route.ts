@@ -3,9 +3,15 @@ import { createClient } from "@/lib/supabase/server";
 import { recreateRequestSchema } from "@/lib/validators/schemas";
 import { recreateFromExample } from "@/lib/anthropic/recreate-from-example";
 import { generateImage } from "@/lib/gemini/generate-image";
-import { watermarkImageDataUrl } from "@/lib/image/watermark";
-import { checkGenerationAllowed } from "@/lib/credits";
-import { DEFAULT_STYLE_SETTINGS, VARIANT_LABELS } from "@/lib/types";
+import {
+  checkGenerationCredits,
+  deductCredits,
+} from "@/lib/credits";
+import {
+  DEFAULT_STYLE_SETTINGS,
+  GENERATION_CREDIT_COST,
+  VARIANT_LABELS,
+} from "@/lib/types";
 import type {
   Generation,
   Project,
@@ -60,10 +66,15 @@ export async function POST(request: Request) {
       DEFAULT_STYLE_SETTINGS,
   };
 
-  const tier = await checkGenerationAllowed(user.id, VARIANT_LABELS.length);
+  const tier = await checkGenerationCredits(user.id, VARIANT_LABELS.length);
   if (!tier.allowed) {
     return NextResponse.json(
-      { error: "paywall", message: tier.reason },
+      {
+        error: "paywall",
+        message: tier.reason,
+        balance: tier.balance,
+        required: tier.required,
+      },
       { status: 402 },
     );
   }
@@ -123,12 +134,6 @@ export async function POST(request: Request) {
       }
       try {
         const { imageDataUrl } = await generateImage({ prompt: brief_text });
-        let watermarked: string | null = null;
-        try {
-          watermarked = await watermarkImageDataUrl(imageDataUrl);
-        } catch {
-          watermarked = imageDataUrl;
-        }
         const { data: gen, error: insErr } = await supabase
           .from("generations")
           .insert({
@@ -138,12 +143,11 @@ export async function POST(request: Request) {
             variant_label: label,
             prompt_text: brief_text,
             image_url: imageDataUrl,
-            watermarked_url: watermarked,
             status: "completed",
             version: index + 1,
             qa_status: "pending",
             qa_issues: [],
-            is_unlocked: false,
+            is_unlocked: true,
           })
           .select("*")
           .single();
@@ -186,10 +190,24 @@ export async function POST(request: Request) {
     }
   }
 
+  // Deduct one credit per successful render. Failed variants don't burn a
+  // credit so the user only pays for what shipped.
+  let new_balance: number | undefined;
+  if (generations.length > 0) {
+    const deducted = await deductCredits(
+      user.id,
+      generations.length * GENERATION_CREDIT_COST,
+    );
+    if (deducted.ok) {
+      new_balance = deducted.new_balance;
+    }
+  }
+
   return NextResponse.json({
     recreation,
     analysis: recreation.analysis,
     generations,
     failures,
+    new_balance,
   });
 }

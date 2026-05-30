@@ -101,7 +101,7 @@ export const recreateRequestSchema = z.object({
 });
 
 export const stripeCheckoutSchema = z.object({
-  pack: z.enum(["starter", "pro", "studio"]),
+  pack: z.enum(["starter", "full_project", "pro", "agency"]),
 });
 
 export const generateBriefsSchema = z.object({

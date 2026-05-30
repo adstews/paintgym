@@ -4,7 +4,6 @@ import { reviewImageSchema } from "@/lib/validators/schemas";
 import { reviewImage } from "@/lib/anthropic/review-image";
 import { rewriteBriefAfterFailure } from "@/lib/anthropic/rewrite-brief";
 import { generateImage } from "@/lib/gemini/generate-image";
-import { watermarkImageDataUrl } from "@/lib/image/watermark";
 import { DEFAULT_STYLE_SETTINGS } from "@/lib/types";
 import type {
   Concept,
@@ -132,11 +131,12 @@ async function insertAutoRewriteRow(
     concept_variant: string | null;
     prompt_text: string;
     image_url: string;
-    watermarked_url: string;
     version: number;
     auto_rewrite_count: number;
   },
 ): Promise<Generation | null> {
+  // Auto-rewrites are QA-driven retries on a generation the user already paid
+  // for, so they do not deduct credits and the resulting row is unlocked.
   const { data, error } = await supabase
     .from("generations")
     .insert({
@@ -145,14 +145,13 @@ async function insertAutoRewriteRow(
       concept_variant: base.concept_variant,
       prompt_text: base.prompt_text,
       image_url: base.image_url,
-      watermarked_url: base.watermarked_url,
       status: "completed",
       version: base.version,
       qa_status: "pending",
       qa_issues: [],
       auto_rewrite_count: base.auto_rewrite_count,
       is_auto_rewrite: true,
-      is_unlocked: false,
+      is_unlocked: true,
     })
     .select("*")
     .single();
@@ -278,13 +277,6 @@ export async function POST(request: Request) {
       });
     }
 
-    let newWatermarked = newImage.imageDataUrl;
-    try {
-      newWatermarked = await watermarkImageDataUrl(newImage.imageDataUrl);
-    } catch {
-      // Fall back to clean if watermarking fails.
-    }
-
     const conceptId = generation.concept_id;
     if (!conceptId) break; // safety: cannot happen given canRewrite above
     const conceptVariant = generation.concept_variant ?? null;
@@ -301,7 +293,6 @@ export async function POST(request: Request) {
       concept_variant: conceptVariant,
       prompt_text: newBrief,
       image_url: newImage.imageDataUrl,
-      watermarked_url: newWatermarked,
       version: nextV,
       auto_rewrite_count: generation.auto_rewrite_count + 1,
     });

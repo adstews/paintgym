@@ -2,8 +2,8 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { generateRequestSchema } from "@/lib/validators/schemas";
 import { generateImage } from "@/lib/gemini/generate-image";
-import { watermarkImageDataUrl } from "@/lib/image/watermark";
-import { checkGenerationAllowed } from "@/lib/credits";
+import { checkGenerationCredits, deductCredits } from "@/lib/credits";
+import { GENERATION_CREDIT_COST } from "@/lib/types";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -42,10 +42,15 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "not_found" }, { status: 404 });
   }
 
-  const tier = await checkGenerationAllowed(user.id, 1);
+  const tier = await checkGenerationCredits(user.id, 1);
   if (!tier.allowed) {
     return NextResponse.json(
-      { error: "paywall", message: tier.reason },
+      {
+        error: "paywall",
+        message: tier.reason,
+        balance: tier.balance,
+        required: tier.required,
+      },
       { status: 402 },
     );
   }
@@ -81,7 +86,7 @@ export async function POST(request: Request) {
       version,
       qa_status: "pending",
       qa_issues: [],
-      is_unlocked: false,
+      is_unlocked: true,
     })
     .select("*")
     .single();
@@ -94,20 +99,29 @@ export async function POST(request: Request) {
 
   try {
     const { imageDataUrl } = await generateImage({ prompt: prompt_text });
-    let watermarked: string | null = null;
-    try {
-      watermarked = await watermarkImageDataUrl(imageDataUrl);
-    } catch {
-      // Watermarking failures should not block delivery; fall back to clean
-      // image being shown but marked as locked.
-      watermarked = imageDataUrl;
+
+    // Only deduct after a successful Gemini render so failed generations
+    // don't burn a credit.
+    const deducted = await deductCredits(user.id, GENERATION_CREDIT_COST);
+    if (!deducted.ok) {
+      await supabase
+        .from("generations")
+        .update({ status: "failed" })
+        .eq("id", row.id);
+      return NextResponse.json(
+        {
+          error: "paywall",
+          message: deducted.reason ?? "Insufficient credits",
+        },
+        { status: 402 },
+      );
     }
+
     const { data: updated, error: updErr } = await supabase
       .from("generations")
       .update({
         status: "completed",
         image_url: imageDataUrl,
-        watermarked_url: watermarked,
       })
       .eq("id", row.id)
       .select("*")
@@ -121,6 +135,7 @@ export async function POST(request: Request) {
       status: "completed",
       version,
       generation: updated,
+      new_balance: deducted.new_balance,
     });
   } catch (err) {
     await supabase

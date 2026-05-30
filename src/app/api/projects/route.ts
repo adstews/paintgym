@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { projectCreateSchema } from "@/lib/validators/schemas";
-import { checkProjectCreationAllowed } from "@/lib/credits";
 
 export async function GET() {
   const supabase = await createClient();
@@ -34,14 +33,6 @@ export async function POST(request: Request) {
     return NextResponse.json(
       { error: "invalid_request", details: parsed.error.flatten() },
       { status: 400 },
-    );
-  }
-
-  const tier = await checkProjectCreationAllowed(user.id);
-  if (!tier.allowed) {
-    return NextResponse.json(
-      { error: "paywall", message: tier.reason },
-      { status: 402 },
     );
   }
 
