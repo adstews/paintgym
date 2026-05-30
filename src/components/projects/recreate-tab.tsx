@@ -34,6 +34,8 @@ interface Props {
     variantLabel: VariantLabel,
     promptText: string,
   ) => Promise<void>;
+  onRatingChange: (generation: Generation) => void;
+  onRefined: (generation: Generation, newBalance?: number) => void;
 }
 
 function newerFirst(a: Generation, b: Generation): number {
@@ -50,6 +52,8 @@ export function RecreateTab({
   onOverrideGeneration,
   onUnlockGeneration,
   onRegenerateVariant,
+  onRatingChange,
+  onRefined,
 }: Props) {
   const [sourceUrls, setSourceUrls] = useState<string[]>([]);
   const [generating, setGenerating] = useState(false);
@@ -183,6 +187,8 @@ export function RecreateTab({
             }
             onCopy={copyToConceptLibrary}
             onGenerationsUpdated={onGenerationsUpdated}
+            onRatingChange={onRatingChange}
+            onRefined={onRefined}
           />
         );
       })}
@@ -202,6 +208,8 @@ interface BlockProps {
   ) => Promise<void>;
   onCopy: (label: VariantLabel, briefText: string) => Promise<void>;
   onGenerationsUpdated: (generations: Generation[]) => void;
+  onRatingChange: (generation: Generation) => void;
+  onRefined: (generation: Generation, newBalance?: number) => void;
 }
 
 function RecreationBlock({
@@ -212,6 +220,8 @@ function RecreationBlock({
   onUnlockGeneration,
   onRegenerateVariant,
   onCopy,
+  onRatingChange,
+  onRefined,
 }: BlockProps) {
   const [showAnalysis, setShowAnalysis] = useState(false);
 
@@ -299,6 +309,8 @@ function RecreationBlock({
                   onReReview={() => onReviewGeneration(latest.id)}
                   onOverride={() => onOverrideGeneration(latest.id)}
                   onUnlock={() => onUnlockGeneration(latest.id)}
+                  onRatingChange={onRatingChange}
+                  onRefined={onRefined}
                 />
                 <Button
                   type="button"

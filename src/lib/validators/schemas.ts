@@ -122,6 +122,25 @@ export const reviewImageSchema = z.object({
   generation_id: z.string().uuid(),
 });
 
+export const ratingPatchSchema = z
+  .object({
+    rating: z.number().int().min(1).max(5).nullable().optional(),
+    is_favorited: z.boolean().optional(),
+    used_in_ad: z.boolean().optional(),
+  })
+  .refine(
+    (v) =>
+      v.rating !== undefined ||
+      v.is_favorited !== undefined ||
+      v.used_in_ad !== undefined,
+    { message: "Provide at least one of rating, is_favorited, used_in_ad" },
+  );
+
+export const refineRequestSchema = z.object({
+  generation_id: z.string().uuid(),
+  user_feedback: z.string().min(3).max(2000),
+});
+
 export const adminConceptCreateSchema = z.object({
   name: z.string().min(1).max(120),
   description: z.string().min(1).max(2000),

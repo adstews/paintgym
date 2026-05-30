@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { generateBriefsSchema } from "@/lib/validators/schemas";
 import { generateBriefsForConcept } from "@/lib/anthropic/generate-brief";
+import { loadFewShotExamples } from "@/lib/anthropic/few-shot";
 import { DEFAULT_STYLE_SETTINGS } from "@/lib/types";
 import type { Concept, Project, StyleSettings } from "@/lib/types";
 
@@ -62,12 +63,21 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "concepts_not_found" }, { status: 404 });
   }
 
+  const fewShotByConcept = new Map<string, number>();
   const settled = await Promise.allSettled(
-    (concepts as Concept[]).map((concept) =>
-      generateBriefsForConcept({ project: fullProject, concept }).then(
-        (variants) => ({ concept, variants }),
-      ),
-    ),
+    (concepts as Concept[]).map(async (concept) => {
+      const examples = await loadFewShotExamples({
+        userId: user.id,
+        conceptId: concept.id,
+      });
+      fewShotByConcept.set(concept.id, examples.length);
+      const variants = await generateBriefsForConcept({
+        project: fullProject,
+        concept,
+        fewShotExamples: examples,
+      });
+      return { concept, variants };
+    }),
   );
 
   const rows: {
@@ -116,5 +126,10 @@ export async function POST(request: Request) {
     for (const row of upserted as BriefOut[]) briefs.push(row);
   }
 
-  return NextResponse.json({ briefs, failures });
+  const informed_by: Record<string, number> = {};
+  for (const [conceptId, count] of fewShotByConcept) {
+    informed_by[conceptId] = count;
+  }
+
+  return NextResponse.json({ briefs, failures, informed_by });
 }

@@ -7,6 +7,7 @@ import {
   TriangleAlertIcon,
   OctagonXIcon,
   Loader2Icon,
+  SparklesIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
@@ -21,6 +22,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { RatingControls } from "./rating-controls";
+import { RefineDialog } from "./refine-dialog";
 import type { Generation, QaStatus } from "@/lib/types";
 
 interface Props {
@@ -31,6 +34,8 @@ interface Props {
   onReReview: () => Promise<void>;
   onOverride: () => Promise<void>;
   onUnlock?: () => Promise<void>;
+  onRatingChange: (next: Generation) => void;
+  onRefined: (next: Generation, newBalance?: number) => void;
 }
 
 interface QaPresentation {
@@ -64,6 +69,8 @@ export function GenerationCard({
   onReReview,
   onOverride,
   onUnlock,
+  onRatingChange,
+  onRefined,
 }: Props) {
   const [regenLoading, setRegenLoading] = useState(false);
   const [reviewLoading, setReviewLoading] = useState(false);
@@ -73,6 +80,7 @@ export function GenerationCard({
   const [showAttempts, setShowAttempts] = useState(false);
   const [open, setOpen] = useState(false);
   const [issuesOpen, setIssuesOpen] = useState(false);
+  const [refineOpen, setRefineOpen] = useState(false);
 
   // Show the user-pinned attempt if they explicitly clicked one and it still
   // exists; otherwise show the latest. This avoids an effect-driven setState.
@@ -273,6 +281,17 @@ export function GenerationCard({
             >
               {regenLoading ? "..." : "Regenerate"}
             </Button>
+            {selected.image_url && !isInFlight && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setRefineOpen(true)}
+                className="gap-1"
+              >
+                <SparklesIcon className="size-3.5" aria-hidden />
+                Refine
+              </Button>
+            )}
             {isFlagged && selected.image_url && (
               <>
                 <Button
@@ -294,6 +313,20 @@ export function GenerationCard({
               </>
             )}
           </div>
+
+          {selected.image_url && !isInFlight && (
+            <div className="w-full border-t pt-2">
+              <RatingControls
+                generation={selected}
+                onUpdated={onRatingChange}
+              />
+              {selected.refined_from && (
+                <div className="mt-1 text-[11px] text-muted-foreground">
+                  Refined from an earlier version
+                </div>
+              )}
+            </div>
+          )}
 
           {attempts.length > 1 && (
             <div className="w-full">
@@ -322,6 +355,14 @@ export function GenerationCard({
           )}
         </CardFooter>
       </Card>
+
+      <RefineDialog
+        open={refineOpen}
+        onOpenChange={setRefineOpen}
+        source={selected}
+        conceptName={conceptName}
+        onRefined={onRefined}
+      />
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-w-3xl">
@@ -363,6 +404,16 @@ export function GenerationCard({
                   {selected.prompt_text}
                 </pre>
               </div>
+              {selected.refinement_feedback && (
+                <div>
+                  <div className="text-xs font-medium text-muted-foreground">
+                    Feedback that produced this version
+                  </div>
+                  <p className="mt-1 rounded-md border bg-muted/30 p-2 text-xs">
+                    {selected.refinement_feedback}
+                  </p>
+                </div>
+              )}
             </div>
           )}
         </DialogContent>
@@ -379,6 +430,7 @@ interface ThumbProps {
 
 function AttemptThumb({ attempt, isSelected, onClick }: ThumbProps) {
   const presentation = QA_PRESENTATION[attempt.qa_status];
+  const refined = Boolean(attempt.refined_from);
   return (
     <button
       type="button"
@@ -389,7 +441,11 @@ function AttemptThumb({ attempt, isSelected, onClick }: ThumbProps) {
           ? "border-foreground ring-2 ring-foreground/60"
           : "border-border hover:border-foreground/40",
       )}
-      title={`v${attempt.version} - ${presentation.label}`}
+      title={
+        refined
+          ? `v${attempt.version} - ${presentation.label} (refined)`
+          : `v${attempt.version} - ${presentation.label}`
+      }
     >
       {attempt.image_url ? (
         <Image

@@ -5,6 +5,7 @@ import {
   buildProductContext,
   buildStyleSection,
 } from "./brief-context";
+import { buildFewShotSection, type FewShotExample } from "./few-shot";
 import type { Concept, ConceptVariant, Project } from "../types";
 import { CONCEPT_VARIANT_DIRECTION } from "../types";
 
@@ -32,7 +33,12 @@ Output format:
 - Return all three variants, in the order A, B, C.`;
 }
 
-function buildUserPrompt(project: Project, concept: Concept): string {
+function buildUserPrompt(
+  project: Project,
+  concept: Concept,
+  examples: FewShotExample[],
+): string {
+  const fewShot = buildFewShotSection(examples);
   return `## Product context
 ${buildProductContext(project)}
 
@@ -46,7 +52,7 @@ ${buildStyleSection(project.style_settings)}
 A: ${CONCEPT_VARIANT_DIRECTION.A}
 B: ${CONCEPT_VARIANT_DIRECTION.B}
 C: ${CONCEPT_VARIANT_DIRECTION.C}
-
+${fewShot ? `\n${fewShot}\n` : ""}
 ## Your task
 Write the three image generation briefs for this concept. Return only the JSON object.`;
 }
@@ -85,11 +91,13 @@ export interface VariantBrief {
 export interface GenerateBriefOptions {
   project: Project;
   concept: Concept;
+  fewShotExamples?: FewShotExample[];
 }
 
 export async function generateBriefsForConcept({
   project,
   concept,
+  fewShotExamples = [],
 }: GenerateBriefOptions): Promise<VariantBrief[]> {
   const client = getAnthropicClient();
 
@@ -98,7 +106,10 @@ export async function generateBriefsForConcept({
     max_tokens: 4000,
     system: buildSystemPrompt(),
     messages: [
-      { role: "user", content: buildUserPrompt(project, concept) },
+      {
+        role: "user",
+        content: buildUserPrompt(project, concept, fewShotExamples),
+      },
     ],
   });
 

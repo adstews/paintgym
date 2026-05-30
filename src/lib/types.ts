@@ -168,6 +168,11 @@ export interface Generation {
   qa_severity: QaSeverity | null;
   auto_rewrite_count: number;
   is_auto_rewrite: boolean;
+  rating: number | null;
+  is_favorited: boolean;
+  used_in_ad: boolean;
+  refined_from: string | null;
+  refinement_feedback: string | null;
 }
 
 export interface UserProfile {
