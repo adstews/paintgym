@@ -69,6 +69,7 @@ async function renderOne(
     platform: StyleSettings["platform"];
     competitor_name: string | null;
     version: number;
+    logo_url: string | null;
   },
 ): Promise<RenderResult> {
   const { data: row, error: insErr } = await supabase
@@ -122,6 +123,7 @@ async function renderOne(
     const review = await reviewImage({
       imageDataUrl,
       briefText: args.brief_text,
+      logoReferenceUrl: args.logo_url,
     });
     const qa_status = review.passed
       ? "passed"
@@ -305,6 +307,7 @@ export async function POST(request: Request) {
             platform: project.style_settings.platform,
             competitor_name: competitor_label,
             version,
+            logo_url: project.logo_url,
           });
         })(),
       );

@@ -83,6 +83,8 @@ Rule 9 - Color and contrast legibility. Text must have sufficient contrast again
 
 Rule 10 - Face and hand distortion. If the image contains a human face or hand, it must look natural. Extra or missing fingers, fused fingers, warped knuckles, melted facial features, asymmetric eyes, uncanny-valley skin, garbled teeth, or any obvious anatomical artifact is a Rule 10 failure.
 
+Rule 11 - Logo accuracy. If the brand has a reference logo provided (you will see it as a separate attached image, after the generated ad), the logo rendered inside the generated ad must match the reference: same shape and silhouette, same characters and word marks spelled identically, same color treatment, no distortion, no stretching, no skew, no cropping that loses part of the mark, no invented variants. If no logo appears in the generated ad, Rule 11 is not applicable and passes by default. If a logo appears but no reference was provided, treat any made-up or generic logo with text different from the brand name as a Rule 11 failure (lean on Rule 6 too where the rendered text disagrees with the brand). When a reference is provided, compare side by side: a rendered logo with different letters, missing letters, garbled letters, wrong colors, the wrong icon, or a redrawn version that is "close but not the real mark" is a Rule 11 failure.
+
 ## How to grade
 
 Walk every Hard Rule in order. For each rule, decide pass or fail based on what you actually see in the image. When you write issue strings, prefix each one with the rule number it violates so the rewrite agent can react to it.
@@ -100,43 +102,73 @@ Output rules:
 - Prefix every issue string with the rule number for Hard Rule failures, like "Rule 1: the headline reads 'Hidraton' instead of 'Hydration'" or "Rule 4: the same advertised bottle appears on both the Before and After panels".
 - Be specific about the failure (quote misspelled text verbatim, describe the duplicated element, name the side the product wrongly appears on). Vague phrasing like "text issues" is not acceptable.`;
 
-function buildReviewUserText(briefText: string): string {
+function buildReviewUserText(
+  briefText: string,
+  hasLogoReference: boolean,
+): string {
+  const logoLine = hasLogoReference
+    ? `\nThe SECOND attached image is the brand's reference logo. For Rule 11, compare the logo as rendered inside the generated ad against this reference. Check for distortion, wrong text, wrong colors, wrong icon, stretching, or any "close but not the real mark" rendering. If no logo appears in the generated ad at all, Rule 11 passes.\n`
+    : "";
   return `Brief that produced this image:
 """
 ${briefText.trim()}
 """
+${logoLine}
+Review the attached image against the brief and the Hard Rules. Return the JSON object now.`;
+}
 
-Review the attached image against the brief and the error categories. Return the JSON object now.`;
+type ImageSource =
+  | { type: "base64"; media_type: AnthropicImageMediaType; data: string }
+  | { type: "url"; url: string };
+
+function buildImageSource(input: string): ImageSource {
+  if (input.startsWith("data:")) {
+    const { mediaType, data } = parseDataUrl(input);
+    return { type: "base64", media_type: mediaType, data };
+  }
+  return { type: "url", url: input };
 }
 
 export interface ReviewImageOptions {
   imageDataUrl: string;
   briefText: string;
+  logoReferenceUrl?: string | null;
 }
 
 export async function reviewImage({
   imageDataUrl,
   briefText,
+  logoReferenceUrl,
 }: ReviewImageOptions): Promise<ReviewResult> {
-  const { mediaType, data } = parseDataUrl(imageDataUrl);
+  const generatedSource = buildImageSource(imageDataUrl);
   const client = getAnthropicClient();
+
+  const content: Array<
+    | { type: "image"; source: ImageSource }
+    | { type: "text"; text: string }
+  > = [{ type: "image", source: generatedSource }];
+
+  let hasLogoReference = false;
+  if (logoReferenceUrl) {
+    try {
+      const logoSource = buildImageSource(logoReferenceUrl);
+      content.push({ type: "image", source: logoSource });
+      hasLogoReference = true;
+    } catch {
+      // Bad data URL or unsupported logo image type: skip Rule 11 reference
+      // rather than failing the whole review.
+    }
+  }
+  content.push({
+    type: "text",
+    text: buildReviewUserText(briefText, hasLogoReference),
+  });
 
   const response = await client.messages.create({
     model: BRIEF_MODEL,
     max_tokens: 1024,
     system: REVIEW_SYSTEM,
-    messages: [
-      {
-        role: "user",
-        content: [
-          {
-            type: "image",
-            source: { type: "base64", media_type: mediaType, data },
-          },
-          { type: "text", text: buildReviewUserText(briefText) },
-        ],
-      },
-    ],
+    messages: [{ role: "user", content }],
   });
 
   const text = extractText(response.content);
