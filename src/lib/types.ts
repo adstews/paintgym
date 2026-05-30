@@ -63,6 +63,7 @@ export interface Concept {
   prompt_template: string;
   sort_order: number;
   is_default: boolean;
+  active: boolean;
   user_id: string | null;
   created_at: string;
 }

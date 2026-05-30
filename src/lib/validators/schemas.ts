@@ -77,6 +77,22 @@ export const reviewImageSchema = z.object({
   generation_id: z.string().uuid(),
 });
 
+export const adminConceptCreateSchema = z.object({
+  name: z.string().min(1).max(120),
+  description: z.string().min(1).max(2000),
+  prompt_template: z.string().min(1).max(8000),
+  sort_order: z.number().int().min(0).max(99999).default(0),
+  active: z.boolean().default(true),
+});
+
+export const adminConceptPatchSchema = z.object({
+  name: z.string().min(1).max(120).optional(),
+  description: z.string().min(1).max(2000).optional(),
+  prompt_template: z.string().min(1).max(8000).optional(),
+  sort_order: z.number().int().min(0).max(99999).optional(),
+  active: z.boolean().optional(),
+});
+
 export const authEmailSchema = z.object({
   email: z.string().email(),
   password: z.string().min(8).max(128),
