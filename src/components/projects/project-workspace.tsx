@@ -1,39 +1,76 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
+import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import { GenerationCard } from "@/components/gallery/generation-card";
-import { fillTemplate } from "@/lib/prompt";
-import type { Concept, Generation, Project } from "@/lib/types";
+import { ProductDetailsForm } from "./product-details-form";
+import { BriefCard } from "./brief-card";
+import { RecreateTab } from "./recreate-tab";
+import { CreditsPanel } from "./credits-panel";
+import {
+  CONCEPT_VARIANTS,
+  CONCEPT_VARIANT_DISPLAY,
+} from "@/lib/types";
+import type {
+  Brief,
+  Concept,
+  ConceptVariant,
+  Generation,
+  Project,
+  Recreation,
+  UserProfile,
+  VariantLabel,
+} from "@/lib/types";
 
 interface Props {
   project: Project;
   concepts: Concept[];
   initialGenerations: Generation[];
+  initialBriefs: Brief[];
+  initialRecreations: Recreation[];
   enabledConceptIds: Set<string>;
+  userProfile: UserProfile;
+}
+
+let tempCounter = 0;
+function makeTempId(prefix: string): string {
+  tempCounter += 1;
+  return `tmp-${prefix}-${tempCounter}`;
+}
+
+function newerFirst(a: Generation, b: Generation): number {
+  return b.version - a.version;
+}
+
+function briefKey(conceptId: string, variant: ConceptVariant): string {
+  return `${conceptId}:${variant}`;
+}
+
+function variantKey(conceptId: string, variant: ConceptVariant | null): string {
+  return `${conceptId}:${variant ?? "A"}`;
 }
 
 export function ProjectWorkspace({
   project: initialProject,
   concepts,
   initialGenerations,
+  initialBriefs,
+  initialRecreations,
   enabledConceptIds: initialEnabled,
+  userProfile: initialProfile,
 }: Props) {
-  const router = useRouter();
   const [project, setProject] = useState(initialProject);
   const [generations, setGenerations] = useState(initialGenerations);
+  const [briefs, setBriefs] = useState(initialBriefs);
+  const [recreations, setRecreations] = useState(initialRecreations);
   const [enabled, setEnabled] = useState(initialEnabled);
-  const [batchLoading, setBatchLoading] = useState(false);
-  const [, startTransition] = useTransition();
+  const [profile, setProfile] = useState(initialProfile);
+  const [batchBriefsLoading, setBatchBriefsLoading] = useState(false);
+  const [batchImagesLoading, setBatchImagesLoading] = useState(false);
 
   const conceptsById = useMemo(
     () => new Map(concepts.map((c) => [c.id, c])),
@@ -45,33 +82,179 @@ export function ProjectWorkspace({
     [concepts, enabled],
   );
 
-  const latestByConcept = useMemo(() => {
-    const map = new Map<string, Generation>();
+  const briefsByKey = useMemo(() => {
+    const m = new Map<string, Brief>();
+    for (const b of briefs) m.set(briefKey(b.concept_id, b.variant), b);
+    return m;
+  }, [briefs]);
+
+  const attemptsByKey = useMemo(() => {
+    const map = new Map<string, Generation[]>();
     for (const g of generations) {
-      const existing = map.get(g.concept_id);
-      if (!existing || g.version > existing.version) map.set(g.concept_id, g);
+      if (!g.concept_id) continue;
+      const key = variantKey(
+        g.concept_id,
+        (g.concept_variant ?? "A") as ConceptVariant,
+      );
+      const arr = map.get(key) ?? [];
+      arr.push(g);
+      map.set(key, arr);
     }
+    for (const arr of map.values()) arr.sort(newerFirst);
     return map;
   }, [generations]);
 
-  async function generateOne(conceptId: string) {
-    const concept = conceptsById.get(conceptId);
-    if (!concept) return;
-    const prompt_text = fillTemplate(concept.prompt_template, project);
+  const galleryConcepts = useMemo(
+    () =>
+      concepts.filter((c) =>
+        CONCEPT_VARIANTS.some((v) => attemptsByKey.has(variantKey(c.id, v))),
+      ),
+    [concepts, attemptsByKey],
+  );
 
-    const tempId = `tmp-${conceptId}-${Date.now()}`;
+  function applyBriefs(newBriefs: Brief[]) {
+    if (newBriefs.length === 0) return;
+    const m = new Map(briefs.map((b) => [b.id, b]));
+    for (const b of newBriefs) m.set(b.id, b);
+    setBriefs(Array.from(m.values()));
+  }
+
+  function replaceBrief(updated: Brief) {
+    setBriefs((arr) => {
+      const i = arr.findIndex((b) => b.id === updated.id);
+      if (i === -1) return [...arr, updated];
+      const next = arr.slice();
+      next[i] = updated;
+      return next;
+    });
+  }
+
+  function mergeGenerations(incoming: Generation[]) {
+    if (incoming.length === 0) return;
+    setGenerations((arr) => {
+      const byId = new Map(arr.map((g) => [g.id, g]));
+      for (const g of incoming) byId.set(g.id, g);
+      return Array.from(byId.values());
+    });
+  }
+
+  function updateGeneration(
+    matchId: string,
+    patch: Partial<Generation> & { id?: string },
+  ) {
+    setGenerations((arr) =>
+      arr.map((row) => (row.id === matchId ? { ...row, ...patch } : row)),
+    );
+  }
+
+  async function generateBriefs(conceptIds: string[]) {
+    if (conceptIds.length === 0) return;
+    const res = await fetch("/api/generate-briefs", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        project_id: project.id,
+        concept_ids: conceptIds,
+      }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.message ?? err.error ?? "Brief generation failed");
+    }
+    const json = await res.json();
+    applyBriefs(json.briefs as Brief[]);
+    const failures = (json.failures ?? []) as {
+      concept_id: string;
+      message: string;
+    }[];
+    if (failures.length > 0) {
+      toast.error(
+        `${failures.length} concept${failures.length === 1 ? "" : "s"} failed`,
+      );
+    }
+  }
+
+  async function generateAllBriefs() {
+    setBatchBriefsLoading(true);
+    try {
+      await generateBriefs(enabledConcepts.map((c) => c.id));
+      toast.success("Briefs ready");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Brief generation failed");
+    } finally {
+      setBatchBriefsLoading(false);
+    }
+  }
+
+  async function regenerateBriefsForConcept(conceptId: string) {
+    try {
+      await generateBriefs([conceptId]);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Regenerate failed");
+    }
+  }
+
+  async function runReview(generationId: string) {
+    updateGeneration(generationId, { qa_status: "reviewing" });
+    try {
+      const res = await fetch("/api/review-image", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ generation_id: generationId }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        throw new Error(json.message ?? json.error ?? "QA review failed");
+      }
+      const updated = (json.generations ?? []) as Generation[];
+      mergeGenerations(updated);
+      if (json.rewrite_error) {
+        toast.error(`Auto-rewrite stopped: ${json.rewrite_error}`);
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "QA review failed");
+      updateGeneration(generationId, {
+        qa_status: "minor",
+        qa_severity: "minor",
+        qa_issues: ["QA review error"],
+      });
+    }
+  }
+
+  async function generateImageForVariant(
+    conceptId: string,
+    variant: ConceptVariant,
+  ) {
+    const brief = briefsByKey.get(briefKey(conceptId, variant));
+    if (!brief) {
+      toast.error("Generate briefs for this concept first");
+      return;
+    }
+    const tempId = makeTempId(`${conceptId}-${variant}`);
+    const existing = attemptsByKey.get(variantKey(conceptId, variant)) ?? [];
     const placeholder: Generation = {
       id: tempId,
       project_id: project.id,
       concept_id: conceptId,
-      prompt_text,
+      concept_variant: variant,
+      recreation_id: null,
+      variant_label: null,
+      prompt_text: brief.brief_text,
       image_url: null,
+      watermarked_url: null,
+      is_unlocked: false,
       status: "generating",
-      version: (latestByConcept.get(conceptId)?.version ?? 0) + 1,
+      version: (existing[0]?.version ?? 0) + 1,
       created_at: new Date().toISOString(),
+      qa_status: "pending",
+      qa_issues: [],
+      qa_severity: null,
+      auto_rewrite_count: 0,
+      is_auto_rewrite: false,
     };
     setGenerations((g) => [placeholder, ...g]);
 
+    let realId: string | null = null;
     try {
       const res = await fetch("/api/generate", {
         method: "POST",
@@ -79,42 +262,184 @@ export function ProjectWorkspace({
         body: JSON.stringify({
           project_id: project.id,
           concept_id: conceptId,
-          prompt_text,
+          concept_variant: variant,
+          prompt_text: brief.brief_text,
         }),
       });
       const json = await res.json();
-      if (!res.ok) throw new Error(json.message ?? "Generation failed");
-      setGenerations((g) =>
-        g.map((row) =>
-          row.id === tempId
-            ? {
-                ...row,
-                id: json.id,
-                image_url: json.image_url,
-                status: "completed",
-              }
-            : row,
-        ),
-      );
+      if (!res.ok) {
+        if (res.status === 402) {
+          toast.error(json.message ?? "Free preview limit reached");
+        } else {
+          throw new Error(json.message ?? "Generation failed");
+        }
+        updateGeneration(tempId, { status: "failed" });
+        return;
+      }
+      realId = json.id as string;
+      const updatedRow = json.generation as Generation | undefined;
+      updateGeneration(tempId, {
+        id: realId,
+        image_url: updatedRow?.image_url ?? json.image_url,
+        watermarked_url: updatedRow?.watermarked_url ?? null,
+        is_unlocked: updatedRow?.is_unlocked ?? false,
+        status: "completed",
+        qa_status: "reviewing",
+      });
     } catch (err) {
-      setGenerations((g) =>
-        g.map((row) =>
-          row.id === tempId ? { ...row, status: "failed" } : row,
-        ),
-      );
+      updateGeneration(tempId, { status: "failed" });
       toast.error(err instanceof Error ? err.message : "Generation failed");
+      return;
     }
+
+    if (realId) await runReview(realId);
   }
 
-  async function generateAll() {
-    setBatchLoading(true);
+  async function regenerateVariantImage(
+    recreationId: string,
+    variantLabel: VariantLabel,
+    promptText: string,
+  ) {
+    const existing = generations.filter(
+      (g) =>
+        g.recreation_id === recreationId && g.variant_label === variantLabel,
+    );
+    const nextVersion =
+      existing.reduce((m, g) => Math.max(m, g.version), 0) + 1;
+    const tempId = makeTempId(`${recreationId}-${variantLabel}`);
+    const placeholder: Generation = {
+      id: tempId,
+      project_id: project.id,
+      concept_id: null,
+      concept_variant: null,
+      recreation_id: recreationId,
+      variant_label: variantLabel,
+      prompt_text: promptText,
+      image_url: null,
+      watermarked_url: null,
+      is_unlocked: false,
+      status: "generating",
+      version: nextVersion,
+      created_at: new Date().toISOString(),
+      qa_status: "pending",
+      qa_issues: [],
+      qa_severity: null,
+      auto_rewrite_count: 0,
+      is_auto_rewrite: false,
+    };
+    setGenerations((g) => [placeholder, ...g]);
+
+    let realId: string | null = null;
+    try {
+      const res = await fetch("/api/generate", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          project_id: project.id,
+          recreation_id: recreationId,
+          variant_label: variantLabel,
+          prompt_text: promptText,
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        if (res.status === 402) {
+          toast.error(json.message ?? "Free preview limit reached");
+        } else {
+          throw new Error(json.message ?? "Generation failed");
+        }
+        updateGeneration(tempId, { status: "failed" });
+        return;
+      }
+      realId = json.id as string;
+      const updatedRow = json.generation as Generation | undefined;
+      updateGeneration(tempId, {
+        id: realId,
+        image_url: updatedRow?.image_url ?? json.image_url,
+        watermarked_url: updatedRow?.watermarked_url ?? null,
+        is_unlocked: updatedRow?.is_unlocked ?? false,
+        status: "completed",
+        qa_status: "reviewing",
+      });
+    } catch (err) {
+      updateGeneration(tempId, { status: "failed" });
+      toast.error(err instanceof Error ? err.message : "Generation failed");
+      return;
+    }
+    if (realId) await runReview(realId);
+  }
+
+  function applyRecreation(recreation: Recreation, newGens: Generation[]) {
+    setRecreations((arr) => [recreation, ...arr]);
+    setGenerations((arr) => [...newGens, ...arr]);
+  }
+
+  async function generateAllImages() {
+    setBatchImagesLoading(true);
     try {
       for (const c of enabledConcepts) {
-        if (!latestByConcept.get(c.id)) await generateOne(c.id);
+        for (const v of CONCEPT_VARIANTS) {
+          if (briefsByKey.has(briefKey(c.id, v))) {
+            await generateImageForVariant(c.id, v);
+          }
+        }
       }
       toast.success("Batch complete");
     } finally {
-      setBatchLoading(false);
+      setBatchImagesLoading(false);
+    }
+  }
+
+  async function overrideGeneration(generationId: string) {
+    try {
+      const res = await fetch(`/api/generations/${generationId}/override`, {
+        method: "POST",
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.message ?? err.error ?? "Override failed");
+      }
+      const json = await res.json();
+      mergeGenerations([json.generation as Generation]);
+      toast.success("Image accepted");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Override failed");
+    }
+  }
+
+  async function unlockGeneration(generationId: string) {
+    try {
+      const res = await fetch(`/api/generations/${generationId}/unlock`, {
+        method: "POST",
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        throw new Error(json.message ?? json.error ?? "Unlock failed");
+      }
+      mergeGenerations([json.generation as Generation]);
+      if (json.profile) setProfile(json.profile as UserProfile);
+      toast.success("Image unlocked");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Unlock failed");
+    }
+  }
+
+  async function unlockAll() {
+    try {
+      const res = await fetch(`/api/projects/${project.id}/unlock-all`, {
+        method: "POST",
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        throw new Error(json.message ?? json.error ?? "Unlock all failed");
+      }
+      if (Array.isArray(json.generations)) {
+        mergeGenerations(json.generations as Generation[]);
+      }
+      if (json.profile) setProfile(json.profile as UserProfile);
+      toast.success(`Unlocked ${json.unlocked_count} images`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Unlock all failed");
     }
   }
 
@@ -130,111 +455,120 @@ export function ProjectWorkspace({
     });
   }
 
-  async function rescrape() {
-    if (!project.product_url) return;
-    const res = await fetch("/api/scrape", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        url: project.product_url,
-        project_id: project.id,
-      }),
-    });
-    if (res.ok) {
-      const { data } = await res.json();
-      setProject({ ...project, product_data: data });
-      toast.success("Product data refreshed");
-    } else {
-      toast.error("Refresh failed");
-    }
-  }
-
   async function downloadAll() {
-    const items = generations.filter((g) => g.image_url);
-    if (items.length === 0) return;
+    const items = generations.filter(
+      (g) =>
+        g.image_url &&
+        g.is_unlocked &&
+        g.qa_status !== "rewriting" &&
+        g.concept_id,
+    );
+    if (items.length === 0) {
+      toast.error("Unlock images first");
+      return;
+    }
     for (const g of items) {
-      const concept = conceptsById.get(g.concept_id);
+      const concept = g.concept_id ? conceptsById.get(g.concept_id) : null;
       if (!concept || !g.image_url) continue;
       const a = document.createElement("a");
       a.href = g.image_url;
-      a.download = `${concept.name.toLowerCase().replace(/\s+/g, "-")}-v${g.version}.png`;
+      a.download = `${concept.name.toLowerCase().replace(/\s+/g, "-")}-${g.concept_variant ?? ""}-v${g.version}.png`;
       document.body.appendChild(a);
       a.click();
       a.remove();
-      await new Promise((r) => setTimeout(r, 80));
     }
   }
 
-  async function updateProductMeta(patch: Partial<Project>) {
-    setProject((p) => ({ ...p, ...patch }));
-    startTransition(async () => {
-      await fetch(`/api/projects/${project.id}`, {
-        method: "PATCH",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify(patch),
-      });
-      router.refresh();
-    });
-  }
+  const briefsCount = useMemo(() => {
+    let n = 0;
+    for (const c of enabledConcepts) {
+      for (const v of CONCEPT_VARIANTS) {
+        if (briefsByKey.has(briefKey(c.id, v))) n += 1;
+      }
+    }
+    return n;
+  }, [enabledConcepts, briefsByKey]);
 
-  const productData = project.product_data ?? {};
+  const lockedCount = useMemo(
+    () =>
+      generations.filter(
+        (g) => g.image_url && !g.is_unlocked && g.status === "completed",
+      ).length,
+    [generations],
+  );
 
   return (
     <div className="space-y-6">
-      <div className="flex items-start justify-between gap-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">
             {project.name}
           </h1>
-          {project.client_name && (
-            <p className="text-sm text-muted-foreground">{project.client_name}</p>
+          {(project.brand_name || project.client_name) && (
+            <p className="text-sm text-muted-foreground">
+              {project.brand_name ?? project.client_name}
+            </p>
           )}
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={downloadAll} disabled={generations.length === 0}>
-            Download all
+        <div className="flex flex-wrap gap-2">
+          <Button
+            variant="outline"
+            onClick={generateAllBriefs}
+            disabled={batchBriefsLoading || enabledConcepts.length === 0}
+          >
+            {batchBriefsLoading
+              ? "Writing briefs..."
+              : `Generate briefs (${enabledConcepts.length} x 3)`}
           </Button>
-          <Button onClick={generateAll} disabled={batchLoading || enabledConcepts.length === 0}>
-            {batchLoading ? "Generating..." : `Generate ${enabledConcepts.length}`}
+          <Button
+            onClick={generateAllImages}
+            disabled={batchImagesLoading || briefsCount === 0}
+          >
+            {batchImagesLoading
+              ? "Generating..."
+              : `Generate images (${briefsCount})`}
+          </Button>
+          <Button
+            variant="outline"
+            onClick={downloadAll}
+            disabled={
+              generations.filter(
+                (g) => g.image_url && g.is_unlocked && g.concept_id,
+              ).length === 0
+            }
+          >
+            Download all
           </Button>
         </div>
       </div>
 
-      <Tabs defaultValue="gallery">
+      <CreditsPanel
+        profile={profile}
+        lockedCount={lockedCount}
+        onProfileChange={setProfile}
+        onUnlockAll={lockedCount > 0 ? unlockAll : undefined}
+      />
+
+      <Tabs defaultValue="product">
         <TabsList>
-          <TabsTrigger value="gallery">Gallery</TabsTrigger>
-          <TabsTrigger value="concepts">Concepts</TabsTrigger>
           <TabsTrigger value="product">Product</TabsTrigger>
+          <TabsTrigger value="concepts">Concepts</TabsTrigger>
+          <TabsTrigger value="briefs">Briefs</TabsTrigger>
+          <TabsTrigger value="gallery">Gallery</TabsTrigger>
+          <TabsTrigger value="recreate">Recreate</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="gallery" className="space-y-4 pt-4">
-          {generations.length === 0 ? (
-            <Card>
-              <CardContent className="py-16 text-center text-sm text-muted-foreground">
-                No images yet. Enable concepts and hit Generate.
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-              {generations.map((g) => {
-                const concept = conceptsById.get(g.concept_id);
-                if (!concept) return null;
-                return (
-                  <GenerationCard
-                    key={g.id}
-                    generation={g}
-                    conceptName={concept.name}
-                    onRegenerate={() => generateOne(g.concept_id)}
-                  />
-                );
-              })}
-            </div>
-          )}
+        <TabsContent value="product" className="pt-4">
+          <ProductDetailsForm
+            project={project}
+            onProjectChange={setProject}
+          />
         </TabsContent>
 
         <TabsContent value="concepts" className="space-y-3 pt-4">
           <div className="text-sm text-muted-foreground">
-            Toggle the concepts you want to include in this project.
+            Toggle the concepts you want briefs and images for. Each concept
+            produces three variant briefs (A, B, C).
           </div>
           <div className="grid gap-2 sm:grid-cols-2">
             {concepts.map((c) => {
@@ -263,108 +597,120 @@ export function ProjectWorkspace({
           </div>
         </TabsContent>
 
-        <TabsContent value="product" className="space-y-4 pt-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Product source</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="space-y-1.5">
-                <Label htmlFor="prod-url">Product URL</Label>
-                <div className="flex gap-2">
-                  <Input
-                    id="prod-url"
-                    value={project.product_url ?? ""}
-                    onChange={(e) =>
-                      setProject({ ...project, product_url: e.target.value })
-                    }
-                  />
+        <TabsContent value="briefs" className="space-y-6 pt-4">
+          {enabledConcepts.length === 0 ? (
+            <Card>
+              <CardContent className="py-16 text-center text-sm text-muted-foreground">
+                Enable at least one concept to start writing briefs.
+              </CardContent>
+            </Card>
+          ) : (
+            enabledConcepts.map((c) => (
+              <div key={c.id} className="space-y-2">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <h2 className="text-base font-semibold">{c.name}</h2>
+                    <p className="text-xs text-muted-foreground">
+                      {c.description}
+                    </p>
+                  </div>
                   <Button
+                    type="button"
+                    size="sm"
                     variant="outline"
-                    onClick={() =>
-                      updateProductMeta({ product_url: project.product_url })
-                    }
+                    onClick={() => regenerateBriefsForConcept(c.id)}
                   >
-                    Save
-                  </Button>
-                  <Button variant="outline" onClick={rescrape} disabled={!project.product_url}>
-                    Rescrape
+                    Regenerate all 3
                   </Button>
                 </div>
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="logo-url">Logo URL</Label>
-                <div className="flex gap-2">
-                  <Input
-                    id="logo-url"
-                    value={project.logo_url ?? ""}
-                    onChange={(e) =>
-                      setProject({ ...project, logo_url: e.target.value })
-                    }
-                  />
-                  <Button
-                    variant="outline"
-                    onClick={() =>
-                      updateProductMeta({ logo_url: project.logo_url })
-                    }
-                  >
-                    Save
-                  </Button>
+                <div className="grid gap-3 lg:grid-cols-3">
+                  {CONCEPT_VARIANTS.map((v) => {
+                    const brief =
+                      briefsByKey.get(briefKey(c.id, v)) ?? null;
+                    const attempts =
+                      attemptsByKey.get(variantKey(c.id, v)) ?? [];
+                    const latest = attempts[0] ?? null;
+                    return (
+                      <BriefCard
+                        key={`${c.id}:${v}`}
+                        concept={c}
+                        variant={v}
+                        brief={brief}
+                        latestGeneration={latest}
+                        onBriefChange={replaceBrief}
+                        onRegenerateConcept={() =>
+                          regenerateBriefsForConcept(c.id)
+                        }
+                        onGenerateImage={() => generateImageForVariant(c.id, v)}
+                      />
+                    );
+                  })}
                 </div>
               </div>
-              <Separator />
-              <div className="grid gap-3 sm:grid-cols-2 text-sm">
-                <Field label="Name" value={productData.name} />
-                <Field label="Price" value={productData.price} />
-                <Field
-                  label="Description"
-                  value={productData.description}
-                  className="sm:col-span-2"
-                />
-                <Field
-                  label="Features"
-                  value={(productData.features ?? []).join(", ")}
-                  className="sm:col-span-2"
-                />
+            ))
+          )}
+        </TabsContent>
+
+        <TabsContent value="gallery" className="space-y-6 pt-4">
+          {galleryConcepts.length === 0 ? (
+            <Card>
+              <CardContent className="py-16 text-center text-sm text-muted-foreground">
+                No images yet. Generate briefs, then images, to see them here.
+              </CardContent>
+            </Card>
+          ) : (
+            galleryConcepts.map((c) => (
+              <div key={c.id} className="space-y-2">
+                <h2 className="text-base font-semibold">{c.name}</h2>
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                  {CONCEPT_VARIANTS.map((v) => {
+                    const attempts =
+                      attemptsByKey.get(variantKey(c.id, v)) ?? [];
+                    const latest = attempts[0];
+                    if (!latest) {
+                      return (
+                        <Card key={`${c.id}:${v}`}>
+                          <CardContent className="py-12 text-center text-xs text-muted-foreground">
+                            {CONCEPT_VARIANT_DISPLAY[v]} not generated yet.
+                          </CardContent>
+                        </Card>
+                      );
+                    }
+                    return (
+                      <GenerationCard
+                        key={`${c.id}:${v}`}
+                        conceptName={`${c.name} - ${CONCEPT_VARIANT_DISPLAY[v]}`}
+                        latest={latest}
+                        attempts={attempts}
+                        onRegenerate={() =>
+                          generateImageForVariant(c.id, v)
+                        }
+                        onReReview={() => runReview(latest.id)}
+                        onOverride={() => overrideGeneration(latest.id)}
+                        onUnlock={() => unlockGeneration(latest.id)}
+                      />
+                    );
+                  })}
+                </div>
               </div>
-              <div className="space-y-2">
-                <Label>Manual notes</Label>
-                <Textarea
-                  rows={3}
-                  defaultValue={productData.description ?? ""}
-                  onBlur={(e) =>
-                    updateProductMeta({
-                      product_data: {
-                        ...productData,
-                        description: e.target.value,
-                      },
-                    })
-                  }
-                />
-              </div>
-            </CardContent>
-          </Card>
+            ))
+          )}
+        </TabsContent>
+
+        <TabsContent value="recreate" className="pt-4">
+          <RecreateTab
+            project={project}
+            recreations={recreations}
+            generations={generations}
+            onRecreationCreated={applyRecreation}
+            onGenerationsUpdated={mergeGenerations}
+            onReviewGeneration={runReview}
+            onOverrideGeneration={overrideGeneration}
+            onUnlockGeneration={unlockGeneration}
+            onRegenerateVariant={regenerateVariantImage}
+          />
         </TabsContent>
       </Tabs>
-    </div>
-  );
-}
-
-function Field({
-  label,
-  value,
-  className = "",
-}: {
-  label: string;
-  value?: string | null;
-  className?: string;
-}) {
-  return (
-    <div className={className}>
-      <div className="text-xs uppercase tracking-wide text-muted-foreground">
-        {label}
-      </div>
-      <div className="text-sm">{value || "—"}</div>
     </div>
   );
 }
