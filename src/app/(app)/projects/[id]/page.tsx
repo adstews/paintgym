@@ -7,6 +7,7 @@ import type {
   Concept,
   Generation,
   Project,
+  Recreation,
   StyleSettings,
 } from "@/lib/types";
 
@@ -25,23 +26,33 @@ export default async function ProjectPage({ params }: PageProps) {
     .single();
   if (!project) notFound();
 
-  const [{ data: concepts }, { data: gens }, { data: pcs }, { data: briefs }] =
-    await Promise.all([
-      supabase
-        .from("concepts")
-        .select("*")
-        .order("sort_order", { ascending: true }),
-      supabase
-        .from("generations")
-        .select("*")
-        .eq("project_id", id)
-        .order("created_at", { ascending: false }),
-      supabase
-        .from("project_concepts")
-        .select("concept_id, enabled")
-        .eq("project_id", id),
-      supabase.from("briefs").select("*").eq("project_id", id),
-    ]);
+  const [
+    { data: concepts },
+    { data: gens },
+    { data: pcs },
+    { data: briefs },
+    { data: recreations },
+  ] = await Promise.all([
+    supabase
+      .from("concepts")
+      .select("*")
+      .order("sort_order", { ascending: true }),
+    supabase
+      .from("generations")
+      .select("*")
+      .eq("project_id", id)
+      .order("created_at", { ascending: false }),
+    supabase
+      .from("project_concepts")
+      .select("concept_id, enabled")
+      .eq("project_id", id),
+    supabase.from("briefs").select("*").eq("project_id", id),
+    supabase
+      .from("recreations")
+      .select("*")
+      .eq("project_id", id)
+      .order("created_at", { ascending: false }),
+  ]);
 
   const enabledSet = new Set<string>();
   const allConcepts = (concepts ?? []) as Concept[];
@@ -67,6 +78,7 @@ export default async function ProjectPage({ params }: PageProps) {
       concepts={allConcepts}
       initialGenerations={(gens ?? []) as Generation[]}
       initialBriefs={(briefs ?? []) as Brief[]}
+      initialRecreations={(recreations ?? []) as Recreation[]}
       enabledConceptIds={enabledSet}
     />
   );

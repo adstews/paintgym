@@ -22,7 +22,8 @@ export async function POST(request: Request) {
     );
   }
 
-  const { project_id, concept_id, prompt_text } = parsed.data;
+  const { project_id, concept_id, recreation_id, variant_label, prompt_text } =
+    parsed.data;
 
   const { data: project, error: projErr } = await supabase
     .from("projects")
@@ -33,23 +34,33 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "not_found" }, { status: 404 });
   }
 
-  const { count } = await supabase
+  // Version counter is scoped to either concept or (recreation + variant).
+  const baseQuery = supabase
     .from("generations")
     .select("id", { count: "exact", head: true })
-    .eq("project_id", project_id)
-    .eq("concept_id", concept_id);
+    .eq("project_id", project_id);
+  const versionQuery = concept_id
+    ? baseQuery.eq("concept_id", concept_id)
+    : baseQuery
+        .eq("recreation_id", recreation_id ?? "")
+        .eq("variant_label", variant_label ?? "");
+  const { count } = await versionQuery;
   const version = (count ?? 0) + 1;
 
   const { data: row, error: insErr } = await supabase
     .from("generations")
     .insert({
       project_id,
-      concept_id,
+      concept_id: concept_id ?? null,
+      recreation_id: recreation_id ?? null,
+      variant_label: variant_label ?? null,
       prompt_text,
       status: "generating",
       version,
+      qa_status: "pending",
+      qa_issues: [],
     })
-    .select("id")
+    .select("*")
     .single();
   if (insErr || !row) {
     return NextResponse.json(
@@ -60,16 +71,19 @@ export async function POST(request: Request) {
 
   try {
     const { imageDataUrl } = await generateImage({ prompt: prompt_text });
-    const { error: updErr } = await supabase
+    const { data: updated, error: updErr } = await supabase
       .from("generations")
       .update({ status: "completed", image_url: imageDataUrl })
-      .eq("id", row.id);
-    if (updErr) throw updErr;
+      .eq("id", row.id)
+      .select("*")
+      .single();
+    if (updErr || !updated) throw updErr ?? new Error("update_failed");
     return NextResponse.json({
-      id: row.id,
-      image_url: imageDataUrl,
+      id: updated.id,
+      image_url: updated.image_url,
       status: "completed",
       version,
+      generation: updated,
     });
   } catch (err) {
     await supabase

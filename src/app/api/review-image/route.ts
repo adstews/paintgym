@@ -19,11 +19,18 @@ const MAX_AUTO_REWRITES = 2;
 
 type SupabaseClient = Awaited<ReturnType<typeof createClient>>;
 
+interface LoadResult {
+  generation: Generation;
+  project: Project;
+  // null for recreations; the auto-rewrite chain is skipped in that case
+  concept: Concept | null;
+}
+
 async function loadGenerationWithContext(
   supabase: SupabaseClient,
   generationId: string,
   userId: string,
-): Promise<{ generation: Generation; project: Project; concept: Concept } | null> {
+): Promise<LoadResult | null> {
   const { data: gen } = await supabase
     .from("generations")
     .select("*")
@@ -39,12 +46,16 @@ async function loadGenerationWithContext(
     .single();
   if (!project || (project as Project).user_id !== userId) return null;
 
-  const { data: concept } = await supabase
-    .from("concepts")
-    .select("*")
-    .eq("id", generation.concept_id)
-    .single();
-  if (!concept) return null;
+  let concept: Concept | null = null;
+  if (generation.concept_id) {
+    const { data } = await supabase
+      .from("concepts")
+      .select("*")
+      .eq("id", generation.concept_id)
+      .single();
+    concept = (data as Concept | null) ?? null;
+    if (!concept) return null;
+  }
 
   const projectRow = project as Project;
   return {
@@ -55,7 +66,7 @@ async function loadGenerationWithContext(
         (projectRow.style_settings as StyleSettings | null) ??
         DEFAULT_STYLE_SETTINGS,
     },
-    concept: concept as Concept,
+    concept,
   };
 }
 
@@ -184,7 +195,9 @@ export async function POST(request: Request) {
 
   const touched: Generation[] = [];
 
-  // Walk: review -> if major + budget, rewrite + regen -> review again -> ...
+  // Walk: review -> if major + concept + budget, rewrite + regen -> review again.
+  // Recreation generations (concept=null) are reviewed but never auto-rewritten;
+  // the rewrite path is concept-bound.
   for (let step = 0; step < MAX_AUTO_REWRITES + 1; step++) {
     const currentImage = generation.image_url;
     if (!currentImage) {
@@ -220,6 +233,8 @@ export async function POST(request: Request) {
     const canRewrite =
       !result.passed &&
       result.severity === "major" &&
+      concept !== null &&
+      generation.concept_id !== null &&
       generation.auto_rewrite_count < MAX_AUTO_REWRITES;
     if (!canRewrite) break;
 
@@ -252,15 +267,13 @@ export async function POST(request: Request) {
       });
     }
 
-    const nextV = await nextVersion(
-      supabase,
-      generation.project_id,
-      generation.concept_id,
-    );
+    const conceptId = generation.concept_id;
+    if (!conceptId) break; // safety: cannot happen given canRewrite above
+    const nextV = await nextVersion(supabase, generation.project_id, conceptId);
 
     const inserted = await insertAutoRewriteRow(supabase, {
       project_id: generation.project_id,
-      concept_id: generation.concept_id,
+      concept_id: conceptId,
       prompt_text: newBrief,
       image_url: newImage.imageDataUrl,
       version: nextV,

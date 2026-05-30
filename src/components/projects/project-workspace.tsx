@@ -9,20 +9,29 @@ import { toast } from "sonner";
 import { GenerationCard } from "@/components/gallery/generation-card";
 import { ProductDetailsForm } from "./product-details-form";
 import { BriefCard } from "./brief-card";
-import type { Brief, Concept, Generation, Project } from "@/lib/types";
+import { RecreateTab } from "./recreate-tab";
+import type {
+  Brief,
+  Concept,
+  Generation,
+  Project,
+  Recreation,
+  VariantLabel,
+} from "@/lib/types";
 
 interface Props {
   project: Project;
   concepts: Concept[];
   initialGenerations: Generation[];
   initialBriefs: Brief[];
+  initialRecreations: Recreation[];
   enabledConceptIds: Set<string>;
 }
 
 let tempCounter = 0;
-function makeTempId(conceptId: string): string {
+function makeTempId(prefix: string): string {
   tempCounter += 1;
-  return `tmp-${conceptId}-${tempCounter}`;
+  return `tmp-${prefix}-${tempCounter}`;
 }
 
 function newerFirst(a: Generation, b: Generation): number {
@@ -34,11 +43,13 @@ export function ProjectWorkspace({
   concepts,
   initialGenerations,
   initialBriefs,
+  initialRecreations,
   enabledConceptIds: initialEnabled,
 }: Props) {
   const [project, setProject] = useState(initialProject);
   const [generations, setGenerations] = useState(initialGenerations);
   const [briefs, setBriefs] = useState(initialBriefs);
+  const [recreations, setRecreations] = useState(initialRecreations);
   const [enabled, setEnabled] = useState(initialEnabled);
   const [batchBriefsLoading, setBatchBriefsLoading] = useState(false);
   const [batchImagesLoading, setBatchImagesLoading] = useState(false);
@@ -62,6 +73,7 @@ export function ProjectWorkspace({
   const attemptsByConcept = useMemo(() => {
     const map = new Map<string, Generation[]>();
     for (const g of generations) {
+      if (!g.concept_id) continue;
       const arr = map.get(g.concept_id) ?? [];
       arr.push(g);
       map.set(g.concept_id, arr);
@@ -202,6 +214,8 @@ export function ProjectWorkspace({
       id: tempId,
       project_id: project.id,
       concept_id: conceptId,
+      recreation_id: null,
+      variant_label: null,
       prompt_text: brief.brief_text,
       image_url: null,
       status: "generating",
@@ -242,6 +256,71 @@ export function ProjectWorkspace({
     }
 
     if (realId) await runReview(realId);
+  }
+
+  async function regenerateVariant(
+    recreationId: string,
+    variantLabel: VariantLabel,
+    promptText: string,
+  ) {
+    const existing = generations.filter(
+      (g) =>
+        g.recreation_id === recreationId && g.variant_label === variantLabel,
+    );
+    const nextVersion =
+      existing.reduce((m, g) => Math.max(m, g.version), 0) + 1;
+    const tempId = makeTempId(`${recreationId}-${variantLabel}`);
+    const placeholder: Generation = {
+      id: tempId,
+      project_id: project.id,
+      concept_id: null,
+      recreation_id: recreationId,
+      variant_label: variantLabel,
+      prompt_text: promptText,
+      image_url: null,
+      status: "generating",
+      version: nextVersion,
+      created_at: new Date().toISOString(),
+      qa_status: "pending",
+      qa_issues: [],
+      qa_severity: null,
+      auto_rewrite_count: 0,
+      is_auto_rewrite: false,
+    };
+    setGenerations((g) => [placeholder, ...g]);
+
+    let realId: string | null = null;
+    try {
+      const res = await fetch("/api/generate", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          project_id: project.id,
+          recreation_id: recreationId,
+          variant_label: variantLabel,
+          prompt_text: promptText,
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.message ?? "Generation failed");
+      realId = json.id as string;
+      updateGeneration(tempId, {
+        id: realId,
+        image_url: json.image_url,
+        status: "completed",
+        qa_status: "reviewing",
+      });
+    } catch (err) {
+      updateGeneration(tempId, { status: "failed" });
+      toast.error(err instanceof Error ? err.message : "Generation failed");
+      return;
+    }
+    if (realId) await runReview(realId);
+  }
+
+  function applyRecreation(recreation: Recreation, newGens: Generation[]) {
+    setRecreations((arr) => [recreation, ...arr]);
+    setGenerations((arr) => [...newGens, ...arr]);
   }
 
   async function generateAllImages() {
@@ -289,11 +368,11 @@ export function ProjectWorkspace({
 
   async function downloadAll() {
     const items = generations.filter(
-      (g) => g.image_url && g.qa_status !== "rewriting",
+      (g) => g.image_url && g.qa_status !== "rewriting" && g.concept_id,
     );
     if (items.length === 0) return;
     for (const g of items) {
-      const concept = conceptsById.get(g.concept_id);
+      const concept = g.concept_id ? conceptsById.get(g.concept_id) : null;
       if (!concept || !g.image_url) continue;
       const a = document.createElement("a");
       a.href = g.image_url;
@@ -301,7 +380,6 @@ export function ProjectWorkspace({
       document.body.appendChild(a);
       a.click();
       a.remove();
-      await new Promise((r) => setTimeout(r, 80));
     }
   }
 
@@ -343,7 +421,10 @@ export function ProjectWorkspace({
           <Button
             variant="outline"
             onClick={downloadAll}
-            disabled={generations.filter((g) => g.image_url).length === 0}
+            disabled={
+              generations.filter((g) => g.image_url && g.concept_id).length ===
+              0
+            }
           >
             Download all
           </Button>
@@ -356,6 +437,7 @@ export function ProjectWorkspace({
           <TabsTrigger value="concepts">Concepts</TabsTrigger>
           <TabsTrigger value="briefs">Briefs</TabsTrigger>
           <TabsTrigger value="gallery">Gallery</TabsTrigger>
+          <TabsTrigger value="recreate">Recreate</TabsTrigger>
         </TabsList>
 
         <TabsContent value="product" className="pt-4">
@@ -447,6 +529,19 @@ export function ProjectWorkspace({
               })}
             </div>
           )}
+        </TabsContent>
+
+        <TabsContent value="recreate" className="pt-4">
+          <RecreateTab
+            project={project}
+            recreations={recreations}
+            generations={generations}
+            onRecreationCreated={applyRecreation}
+            onGenerationsUpdated={mergeGenerations}
+            onReviewGeneration={runReview}
+            onOverrideGeneration={overrideGeneration}
+            onRegenerateVariant={regenerateVariant}
+          />
         </TabsContent>
       </Tabs>
     </div>

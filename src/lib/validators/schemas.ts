@@ -52,11 +52,36 @@ export const scrapeRequestSchema = z.object({
   project_id: z.string().uuid().optional(),
 });
 
-export const generateRequestSchema = z.object({
+const variantLabelEnum = z.enum([
+  "faithful",
+  "simplified",
+  "bold",
+  "alt_palette",
+  "platform_adapted",
+]);
+
+export const generateRequestSchema = z
+  .object({
+    project_id: z.string().uuid(),
+    concept_id: z.string().uuid().optional(),
+    recreation_id: z.string().uuid().optional(),
+    variant_label: variantLabelEnum.optional(),
+    prompt_text: z.string().min(1).max(20000),
+    reference_image_urls: z.array(z.string()).optional(),
+  })
+  .refine(
+    (v) =>
+      (v.concept_id && !v.recreation_id && !v.variant_label) ||
+      (!v.concept_id && v.recreation_id && v.variant_label),
+    {
+      message:
+        "Provide either concept_id, or recreation_id together with variant_label",
+    },
+  );
+
+export const recreateRequestSchema = z.object({
   project_id: z.string().uuid(),
-  concept_id: z.string().uuid(),
-  prompt_text: z.string().min(1).max(20000),
-  reference_image_urls: z.array(z.string()).optional(),
+  source_image_url: z.string().url(),
 });
 
 export const generateBriefsSchema = z.object({

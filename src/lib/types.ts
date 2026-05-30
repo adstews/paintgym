@@ -88,10 +88,43 @@ export type QaStatus =
 
 export type QaSeverity = "minor" | "major";
 
+export type VariantLabel =
+  | "faithful"
+  | "simplified"
+  | "bold"
+  | "alt_palette"
+  | "platform_adapted";
+
+export const VARIANT_LABELS: VariantLabel[] = [
+  "faithful",
+  "simplified",
+  "bold",
+  "alt_palette",
+  "platform_adapted",
+];
+
+export const VARIANT_DISPLAY: Record<VariantLabel, string> = {
+  faithful: "Faithful",
+  simplified: "Simplified",
+  bold: "Bold",
+  alt_palette: "Alt palette",
+  platform_adapted: "Platform adapted",
+};
+
+export interface Recreation {
+  id: string;
+  project_id: string;
+  source_image_url: string;
+  analysis: string | null;
+  created_at: string;
+}
+
 export interface Generation {
   id: string;
   project_id: string;
-  concept_id: string;
+  concept_id: string | null;
+  recreation_id: string | null;
+  variant_label: VariantLabel | null;
   prompt_text: string;
   image_url: string | null;
   status: GenerationStatus;
