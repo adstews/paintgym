@@ -71,7 +71,7 @@ export default function LandingPage() {
           />
           <Feature
             title="Pick your frameworks"
-            body="Start from 17 proven static ad formats, or write your own prompt templates."
+            body="Start from 35 proven static ad formats, or write your own prompt templates."
           />
           <Feature
             title="Generate, refine, download"
