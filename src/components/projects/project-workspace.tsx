@@ -12,10 +12,7 @@ import { BriefCard } from "./brief-card";
 import { RecreateTab } from "./recreate-tab";
 import { CompetitorSpyTab } from "./competitor-spy-tab";
 import { CreditsPanel } from "./credits-panel";
-import {
-  CONCEPT_VARIANTS,
-  CONCEPT_VARIANT_DISPLAY,
-} from "@/lib/types";
+import { CONCEPT_VARIANTS } from "@/lib/types";
 import type {
   Brief,
   Concept,
@@ -553,7 +550,7 @@ export function ProjectWorkspace({
           >
             {batchBriefsLoading
               ? "Writing briefs..."
-              : `Generate briefs (${enabledConcepts.length} x 3)`}
+              : `Generate briefs (${enabledConcepts.length})`}
           </Button>
           <Button
             onClick={generateAllImages}
@@ -604,7 +601,7 @@ export function ProjectWorkspace({
         <TabsContent value="concepts" className="space-y-3 pt-4">
           <div className="text-sm text-muted-foreground">
             Toggle the concepts you want briefs and images for. Each concept
-            produces three variant briefs (A, B, C).
+            produces one brief.
           </div>
           <div className="grid gap-2 sm:grid-cols-2">
             {concepts.map((c) => {
@@ -662,10 +659,10 @@ export function ProjectWorkspace({
                     variant="outline"
                     onClick={() => regenerateBriefsForConcept(c.id)}
                   >
-                    Regenerate all 3
+                    Regenerate
                   </Button>
                 </div>
-                <div className="grid gap-3 lg:grid-cols-3">
+                <div className="grid gap-3">
                   {CONCEPT_VARIANTS.map((v) => {
                     const brief =
                       briefsByKey.get(briefKey(c.id, v)) ?? null;
@@ -733,7 +730,7 @@ export function ProjectWorkspace({
                 return (
                   <GenerationCard
                     key={`${c.id}:${v}`}
-                    conceptName={`${c.name} - ${CONCEPT_VARIANT_DISPLAY[v]}`}
+                    conceptName={c.name}
                     latest={latest}
                     attempts={attempts}
                     onRegenerate={() => generateImageForVariant(c.id, v)}

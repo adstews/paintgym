@@ -8,6 +8,7 @@ import {
 import { generateCompetitiveBriefsForConcept } from "@/lib/anthropic/competitive-brief";
 import { reviewImage } from "@/lib/anthropic/review-image";
 import { generateImage } from "@/lib/gemini/generate-image";
+import { collectReferenceImages } from "@/lib/gemini/reference-images";
 import {
   checkGenerationCredits,
   deductCredits,
@@ -70,6 +71,7 @@ async function renderOne(
     competitor_name: string | null;
     version: number;
     logo_url: string | null;
+    referenceImages: { mimeType: string; data: string }[];
   },
 ): Promise<RenderResult> {
   const { data: row, error: insErr } = await supabase
@@ -98,6 +100,7 @@ async function renderOne(
     const result = await generateImage({
       prompt: args.brief_text,
       platform: args.platform,
+      referenceImages: args.referenceImages,
     });
     imageDataUrl = result.imageDataUrl;
   } catch (err) {
@@ -196,6 +199,13 @@ export async function POST(request: Request) {
       DEFAULT_STYLE_SETTINGS,
   };
 
+  // The user's product + logo, attached to every render so competitive ads
+  // show the real product instead of an invented one.
+  const referenceImages = await collectReferenceImages(
+    project.product_data?.images,
+    project.logo_url,
+  );
+
   // 1) Scrape the competitor URL.
   let competitor: CompetitorData;
   try {
@@ -237,7 +247,7 @@ export async function POST(request: Request) {
     );
   }
 
-  // 3) Budget check: three variants per concept.
+  // 3) Budget check: one brief per concept.
   const required = concepts.length * CONCEPT_VARIANTS.length;
   const tier = await checkGenerationCredits(user.id, required);
   if (!tier.allowed) {
@@ -308,6 +318,7 @@ export async function POST(request: Request) {
             competitor_name: competitor_label,
             version,
             logo_url: project.logo_url,
+            referenceImages,
           });
         })(),
       );

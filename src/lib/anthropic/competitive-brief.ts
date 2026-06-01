@@ -11,7 +11,6 @@ import type {
   ConceptVariant,
   Project,
 } from "../types";
-import { CONCEPT_VARIANT_DIRECTION } from "../types";
 
 const SYSTEM = `You are a senior creative director who writes static social ad briefs that position one product directly against a named competitor. Every brief you write must do work for the user's product by pointing at the competitor's weakness. You are not subtle. You are accurate.
 
@@ -20,7 +19,7 @@ You will be given:
 2. The competitor's product, scraped from their site. Name, description, features, and price may be present.
 3. A concept template that frames the ad.
 
-For every concept you write three briefs - variant A, B, C - that are fundamentally different from each other. Each brief feeds an image model (Gemini Nano Banana). One self-contained paragraph per brief.
+For the concept you are given, write ONE brief that positions the user's product against the competitor. The brief feeds an image model (Gemini Nano Banana). One self-contained paragraph.
 
 How to use the competitor data:
 - Use the competitor's real name where appropriate. For "Us vs Them", "Comparison Chart", "Old vs New": name the competitor explicitly in the brief and in any on-image copy.
@@ -32,7 +31,7 @@ How to use the competitor data:
 Rules that always apply to every brief:
 - Use the exact product, brand, price, and proof details for the user. Do not invent product names, prices, features, claims, or testimonials.
 - Use the competitor name exactly as scraped. Do not insult them, do not use slurs or derogatory language, do not lie about them. Be sharp, not unfair.
-- Each brief is for ONE static image. Describe composition, subject, lighting, color palette, typography, on-image copy, and aspect ratio.
+- The brief is for ONE static image. Describe composition, subject, lighting, color palette, typography, on-image copy, and aspect ratio.
 - On-image copy must be short and concrete. Quote it verbatim in double quotes so the image model renders it exactly.
 - Match the supplied aggressiveness, tone, visual style, and platform.
 - Never use em dashes. Never use exclamation marks. Never use AI cliches like unleash, elevate, revolutionize, game-changer, journey.
@@ -40,8 +39,7 @@ Rules that always apply to every brief:
 
 Output format:
 - Respond with a single JSON object and nothing else. No prose, no markdown fence, no preamble.
-- Shape: {"variants": [{"variant": "A", "brief_text": "..."}, {"variant": "B", "brief_text": "..."}, {"variant": "C", "brief_text": "..."}]}
-- Return all three variants, in the order A, B, C.`;
+- Shape: {"brief_text": "..."}`;
 
 function buildCompetitorSection(competitor: CompetitorData): string {
   const lines: string[] = [];
@@ -82,22 +80,12 @@ ${buildConceptSection(concept)}
 ## Style direction
 ${buildStyleSection(project.style_settings)}
 
-## Variant directions
-A: ${CONCEPT_VARIANT_DIRECTION.A}
-B: ${CONCEPT_VARIANT_DIRECTION.B}
-C: ${CONCEPT_VARIANT_DIRECTION.C}
-
 ## Your task
-Write the three competitive briefs for this concept. Each brief must use the competitor information above to sharpen the positioning. Return only the JSON object.`;
+Write one competitive brief for this concept. Use the competitor information above to sharpen the positioning. Return only the JSON object.`;
 }
 
-const variantSchema = z.object({
-  variant: z.enum(["A", "B", "C"]),
-  brief_text: z.string().min(20),
-});
-
 const responseSchema = z.object({
-  variants: z.array(variantSchema).length(3),
+  brief_text: z.string().min(20),
 });
 
 function extractText(blocks: Array<{ type: string; text?: string }>): string {
@@ -137,7 +125,7 @@ export async function generateCompetitiveBriefsForConcept({
 
   const response = await client.messages.create({
     model: BRIEF_MODEL,
-    max_tokens: 4000,
+    max_tokens: 2000,
     system: SYSTEM,
     messages: [
       {
@@ -161,14 +149,5 @@ export async function generateCompetitiveBriefsForConcept({
       "Competitive brief response did not match the expected schema",
     );
   }
-  const byVariant = new Map(validated.data.variants.map((v) => [v.variant, v]));
-  const ordered: CompetitiveVariantBrief[] = [];
-  for (const v of ["A", "B", "C"] as const) {
-    const found = byVariant.get(v);
-    if (!found) {
-      throw new Error(`Competitive brief response is missing variant ${v}`);
-    }
-    ordered.push({ variant: found.variant, brief_text: found.brief_text });
-  }
-  return ordered;
+  return [{ variant: "A", brief_text: validated.data.brief_text }];
 }

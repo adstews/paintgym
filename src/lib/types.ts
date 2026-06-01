@@ -89,7 +89,7 @@ export interface Concept {
 
 export type ConceptVariant = "A" | "B" | "C";
 
-export const CONCEPT_VARIANTS: ConceptVariant[] = ["A", "B", "C"];
+export const CONCEPT_VARIANTS: ConceptVariant[] = ["A"];
 
 export const CONCEPT_VARIANT_DISPLAY: Record<ConceptVariant, string> = {
   A: "Variant A",

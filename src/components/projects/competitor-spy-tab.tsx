@@ -10,10 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import { GenerationCard } from "@/components/gallery/generation-card";
-import {
-  CONCEPT_VARIANT_DISPLAY,
-  CONCEPT_VARIANTS,
-} from "@/lib/types";
+import { CONCEPT_VARIANTS } from "@/lib/types";
 import type {
   CompetitorData,
   Concept,
@@ -335,7 +332,7 @@ export function CompetitorSpyTab({
                     return (
                       <GenerationCard
                         key={`${c.id}:${v}`}
-                        conceptName={`${concept.name} - ${CONCEPT_VARIANT_DISPLAY[v]}`}
+                        conceptName={concept.name}
                         latest={latest}
                         attempts={attempts}
                         onRegenerate={async () => {

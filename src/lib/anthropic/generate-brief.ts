@@ -7,20 +7,15 @@ import {
 } from "./brief-context";
 import { buildFewShotSection, type FewShotExample } from "./few-shot";
 import type { Concept, ConceptVariant, Project } from "../types";
-import { CONCEPT_VARIANT_DIRECTION } from "../types";
 
 function buildSystemPrompt(): string {
-  return `You are a senior creative director who writes image generation briefs for paid social ads. Your briefs feed directly into an image model (Gemini Nano Banana or similar). Each brief must be a single self-contained paragraph the image model can render without further context.
+  return `You are a senior creative director who writes image generation briefs for paid social ads. Your brief feeds directly into an image model (Gemini Nano Banana or similar). The brief must be a single self-contained paragraph the image model can render without further context.
 
-For every concept you are given, you write three briefs — variant A, variant B, and variant C. The three briefs must be fundamentally different from each other:
-- A is the most natural interpretation of the concept.
-- B takes a different angle, different headline, different visual composition, different emotional framing.
-- C is the wildcard — an unexpected take on the concept that still serves the product.
-Do not make B or C a small variation of A. They should feel like distinct ad ideas.
+For the concept you are given, write ONE brief: the strongest, most scroll-stopping interpretation of the concept for this product.
 
-Rules that always apply to every brief:
+Rules that always apply:
 - Use the exact product or brand details provided. Do not invent product names, prices, features, claims, or testimonials.
-- Each brief is for ONE static image. Describe composition, subject, lighting, color palette, typography, on-image copy, and aspect ratio.
+- The brief is for ONE static image. Describe composition, subject, lighting, color palette, typography, on-image copy, and aspect ratio.
 - On-image copy must be short and concrete. Quote it verbatim in double quotes so the image model renders it exactly.
 - Match the supplied aggressiveness, tone, visual style, and platform.
 - If brand colors, fonts, or voice are supplied, reference them by hex and name and write copy in the brand voice.
@@ -29,8 +24,7 @@ Rules that always apply to every brief:
 
 Output format:
 - Respond with a single JSON object and nothing else. No prose, no markdown fence, no preamble.
-- Shape: {"variants": [{"variant": "A", "brief_text": "..."}, {"variant": "B", "brief_text": "..."}, {"variant": "C", "brief_text": "..."}]}
-- Return all three variants, in the order A, B, C.`;
+- Shape: {"brief_text": "..."}`;
 }
 
 function buildUserPrompt(
@@ -47,23 +41,13 @@ ${buildConceptSection(concept)}
 
 ## Style direction
 ${buildStyleSection(project.style_settings)}
-
-## Variant directions
-A: ${CONCEPT_VARIANT_DIRECTION.A}
-B: ${CONCEPT_VARIANT_DIRECTION.B}
-C: ${CONCEPT_VARIANT_DIRECTION.C}
 ${fewShot ? `\n${fewShot}\n` : ""}
 ## Your task
-Write the three image generation briefs for this concept. Return only the JSON object.`;
+Write one image generation brief for this concept. Return only the JSON object.`;
 }
 
-const variantSchema = z.object({
-  variant: z.enum(["A", "B", "C"]),
-  brief_text: z.string().min(20),
-});
-
 const responseSchema = z.object({
-  variants: z.array(variantSchema).length(3),
+  brief_text: z.string().min(20),
 });
 
 function extractText(blocks: Array<{ type: string; text?: string }>): string {
@@ -103,7 +87,7 @@ export async function generateBriefsForConcept({
 
   const response = await client.messages.create({
     model: BRIEF_MODEL,
-    max_tokens: 4000,
+    max_tokens: 2000,
     system: buildSystemPrompt(),
     messages: [
       {
@@ -125,13 +109,5 @@ export async function generateBriefsForConcept({
   if (!validated.success) {
     throw new Error("Brief response did not match the expected schema");
   }
-  // Canonicalize order
-  const byVariant = new Map(validated.data.variants.map((v) => [v.variant, v]));
-  const ordered: VariantBrief[] = [];
-  for (const v of ["A", "B", "C"] as const) {
-    const found = byVariant.get(v);
-    if (!found) throw new Error(`Brief response is missing variant ${v}`);
-    ordered.push({ variant: found.variant, brief_text: found.brief_text });
-  }
-  return ordered;
+  return [{ variant: "A", brief_text: validated.data.brief_text }];
 }

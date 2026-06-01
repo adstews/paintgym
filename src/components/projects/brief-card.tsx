@@ -6,10 +6,6 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/componen
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
-import {
-  CONCEPT_VARIANT_DIRECTION,
-  CONCEPT_VARIANT_DISPLAY,
-} from "@/lib/types";
 import type {
   Brief,
   Concept,
@@ -29,7 +25,6 @@ interface Props {
 
 export function BriefCard({
   concept,
-  variant,
   brief,
   latestGeneration,
   onBriefChange,
@@ -100,17 +95,7 @@ export function BriefCard({
       <CardHeader className="pb-3">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <Badge variant="outline" className="font-mono">
-                {variant}
-              </Badge>
-              <CardTitle className="text-sm">
-                {CONCEPT_VARIANT_DISPLAY[variant]}
-              </CardTitle>
-            </div>
-            <p className="mt-1 text-xs text-muted-foreground line-clamp-2">
-              {CONCEPT_VARIANT_DIRECTION[variant]}
-            </p>
+            <CardTitle className="text-sm">Brief</CardTitle>
           </div>
           <div className="flex shrink-0 items-center gap-2">
             {!hasBrief && <Badge variant="outline">Empty</Badge>}
@@ -147,7 +132,7 @@ export function BriefCard({
           />
         ) : (
           <div className="rounded-md border border-dashed py-8 text-center text-xs text-muted-foreground">
-            Generate briefs for {concept.name} to fill in variant {variant}.
+            Generate a brief for {concept.name}.
           </div>
         )}
       </CardContent>
@@ -180,9 +165,9 @@ export function BriefCard({
             variant="outline"
             onClick={handleRegenerate}
             disabled={regen}
-            title="Regenerates all three variants for this concept"
+            title="Regenerate this brief"
           >
-            {regen ? "..." : "Regenerate all 3"}
+            {regen ? "..." : "Regenerate"}
           </Button>
           <Button
             type="button"
