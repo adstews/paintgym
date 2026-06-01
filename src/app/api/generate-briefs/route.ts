@@ -15,6 +15,8 @@ interface BriefOut {
   concept_id: string;
   variant: "A" | "B" | "C";
   brief_text: string;
+  summary: string | null;
+  key_points: string[];
   created_at: string;
   updated_at: string;
 }
@@ -85,6 +87,8 @@ export async function POST(request: Request) {
     concept_id: string;
     variant: "A" | "B" | "C";
     brief_text: string;
+    summary: string;
+    key_points: string[];
     updated_at: string;
   }[] = [];
   const failures: { concept_id: string; message: string }[] = [];
@@ -97,6 +101,8 @@ export async function POST(request: Request) {
           concept_id: item.value.concept.id,
           variant: v.variant,
           brief_text: v.brief_text,
+          summary: v.summary,
+          key_points: v.key_points,
           updated_at: new Date().toISOString(),
         });
       }

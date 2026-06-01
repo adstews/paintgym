@@ -36,7 +36,7 @@ export function BriefCard({
   const [savingEdit, setSavingEdit] = useState(false);
   const [regen, setRegen] = useState(false);
   const [gen, setGen] = useState(false);
-  const [expanded, setExpanded] = useState(false);
+  const [showFull, setShowFull] = useState(false);
 
   function handleEdit(next: string) {
     setDraft(next);
@@ -86,6 +86,8 @@ export function BriefCard({
   }
 
   const hasBrief = brief !== null;
+  const keyPoints = brief?.key_points ?? [];
+  const hasSummary = Boolean(brief?.summary) || keyPoints.length > 0;
   const isGenerating = latestGeneration?.status === "generating";
   const qaStatus = latestGeneration?.qa_status;
   const isReviewing = qaStatus === "reviewing" || qaStatus === "rewriting";
@@ -94,9 +96,7 @@ export function BriefCard({
     <Card>
       <CardHeader className="pb-3">
         <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <CardTitle className="text-sm">Brief</CardTitle>
-          </div>
+          <CardTitle className="text-sm">Brief</CardTitle>
           <div className="flex shrink-0 items-center gap-2">
             {!hasBrief && <Badge variant="outline">Empty</Badge>}
             {hasBrief && dirty && <Badge variant="secondary">Unsaved</Badge>}
@@ -123,41 +123,71 @@ export function BriefCard({
       </CardHeader>
 
       <CardContent className="space-y-3">
-        {hasBrief ? (
-          <Textarea
-            rows={expanded ? 14 : 6}
-            value={draft}
-            onChange={(e) => handleEdit(e.target.value)}
-            className="font-mono text-xs leading-relaxed"
-          />
-        ) : (
+        {!hasBrief ? (
           <div className="rounded-md border border-dashed py-8 text-center text-xs text-muted-foreground">
             Generate a brief for {concept.name}.
+          </div>
+        ) : hasSummary ? (
+          <div className="space-y-3">
+            {brief?.summary && (
+              <p className="text-sm leading-relaxed">{brief.summary}</p>
+            )}
+            {keyPoints.length > 0 && (
+              <ul className="space-y-1.5">
+                {keyPoints.map((point, i) => (
+                  <li
+                    key={i}
+                    className="flex gap-2 text-xs text-muted-foreground"
+                  >
+                    <span aria-hidden className="mt-px text-foreground">
+                      •
+                    </span>
+                    <span>{point}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <button
+              type="button"
+              onClick={() => setShowFull((v) => !v)}
+              className="text-xs font-medium text-muted-foreground underline-offset-2 hover:underline"
+            >
+              {showFull ? "Hide full brief" : "View full brief"}
+            </button>
+            {showFull && (
+              <Textarea
+                rows={12}
+                value={draft}
+                onChange={(e) => handleEdit(e.target.value)}
+                className="font-mono text-xs leading-relaxed"
+              />
+            )}
+          </div>
+        ) : (
+          <div className="space-y-2">
+            <Textarea
+              rows={8}
+              value={draft}
+              onChange={(e) => handleEdit(e.target.value)}
+              className="font-mono text-xs leading-relaxed"
+            />
+            <p className="text-xs text-muted-foreground">
+              Regenerate this brief to get a summary and key points.
+            </p>
           </div>
         )}
       </CardContent>
 
       <CardFooter className="flex flex-wrap items-center justify-between gap-2 pt-0">
-        <div className="flex items-center gap-2">
-          <Button
-            type="button"
-            size="sm"
-            variant="ghost"
-            onClick={() => setExpanded((v) => !v)}
-            disabled={!hasBrief}
-          >
-            {expanded ? "Collapse" : "Expand"}
-          </Button>
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            onClick={saveEdit}
-            disabled={!hasBrief || !dirty || savingEdit}
-          >
-            {savingEdit ? "Saving..." : "Save edit"}
-          </Button>
-        </div>
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          onClick={saveEdit}
+          disabled={!hasBrief || !dirty || savingEdit}
+        >
+          {savingEdit ? "Saving..." : "Save edit"}
+        </Button>
         <div className="flex items-center gap-2">
           <Button
             type="button"

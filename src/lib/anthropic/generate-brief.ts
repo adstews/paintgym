@@ -24,7 +24,10 @@ Rules that always apply:
 
 Output format:
 - Respond with a single JSON object and nothing else. No prose, no markdown fence, no preamble.
-- Shape: {"brief_text": "..."}`;
+- Shape: {"brief_text": "...", "summary": "...", "key_points": ["...", "...", "..."]}
+- "brief_text" is the full image-generation brief described above.
+- "summary" is one short sentence (max ~15 words) describing the ad at a glance.
+- "key_points" is exactly three short phrases (~3 to 6 words each, not full sentences) naming the most important creative decisions: the hook or headline, the core visual, and the format or angle.`;
 }
 
 function buildUserPrompt(
@@ -48,6 +51,8 @@ Write one image generation brief for this concept. Return only the JSON object.`
 
 const responseSchema = z.object({
   brief_text: z.string().min(20),
+  summary: z.string().min(3),
+  key_points: z.array(z.string().min(1)).min(1),
 });
 
 function extractText(blocks: Array<{ type: string; text?: string }>): string {
@@ -70,6 +75,8 @@ function extractJsonObject(text: string): string {
 export interface VariantBrief {
   variant: ConceptVariant;
   brief_text: string;
+  summary: string;
+  key_points: string[];
 }
 
 export interface GenerateBriefOptions {
@@ -109,5 +116,12 @@ export async function generateBriefsForConcept({
   if (!validated.success) {
     throw new Error("Brief response did not match the expected schema");
   }
-  return [{ variant: "A", brief_text: validated.data.brief_text }];
+  return [
+    {
+      variant: "A",
+      brief_text: validated.data.brief_text,
+      summary: validated.data.summary,
+      key_points: validated.data.key_points.slice(0, 3),
+    },
+  ];
 }

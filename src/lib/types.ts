@@ -109,6 +109,8 @@ export interface Brief {
   concept_id: string;
   variant: ConceptVariant;
   brief_text: string;
+  summary: string | null;
+  key_points: string[];
   created_at: string;
   updated_at: string;
 }
