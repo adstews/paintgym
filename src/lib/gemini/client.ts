@@ -1,12 +1,12 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { GoogleGenAI } from "@google/genai";
 
-let cached: GoogleGenerativeAI | null = null;
+let cached: GoogleGenAI | null = null;
 
 export function getGeminiClient() {
   if (cached) return cached;
   const key = process.env.GOOGLE_GENERATIVE_AI_API_KEY;
   if (!key) throw new Error("GOOGLE_GENERATIVE_AI_API_KEY is not set");
-  cached = new GoogleGenerativeAI(key);
+  cached = new GoogleGenAI({ apiKey: key });
   return cached;
 }
 

@@ -2,12 +2,13 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { generateRequestSchema } from "@/lib/validators/schemas";
 import { generateImage } from "@/lib/gemini/generate-image";
+import { collectReferenceImages } from "@/lib/gemini/reference-images";
 import { checkGenerationCredits, deductCredits } from "@/lib/credits";
 import {
   DEFAULT_STYLE_SETTINGS,
   GENERATION_CREDIT_COST,
 } from "@/lib/types";
-import type { StyleSettings } from "@/lib/types";
+import type { ProductData, StyleSettings } from "@/lib/types";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -39,7 +40,7 @@ export async function POST(request: Request) {
 
   const { data: project, error: projErr } = await supabase
     .from("projects")
-    .select("id, user_id, style_settings")
+    .select("id, user_id, style_settings, product_data, logo_url")
     .eq("id", project_id)
     .single();
   if (projErr || !project || project.user_id !== user.id) {
@@ -103,10 +104,16 @@ export async function POST(request: Request) {
     );
   }
 
+  const referenceImages = await collectReferenceImages(
+    (project.product_data as ProductData | null)?.images,
+    project.logo_url as string | null,
+  );
+
   try {
     const { imageDataUrl } = await generateImage({
       prompt: prompt_text,
       platform: style.platform,
+      referenceImages,
     });
 
     // Only deduct after a successful Gemini render so failed generations
