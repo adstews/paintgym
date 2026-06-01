@@ -19,6 +19,24 @@ const FRAMEWORKS = [
   "Sticky Notes",
   "Meme Based",
   "Low-Fi",
+  "Flowchart Ad",
+  "POV Meme Ad",
+  "Reddit Thread Ad",
+  "Instagram Story Screenshot",
+  "iMessage Ad",
+  "Do This, Not That",
+  "Tweet Ad",
+  "TikTok Comment UI",
+  "Us vs Us",
+  "Would You Rather",
+  "Why We Built This",
+  "Copy-Led",
+  "Feature Comparison Table",
+  "In / Out",
+  "Myth vs Fact",
+  "Transformation Timeline",
+  "Claude AI Chat Ad",
+  "ChatGPT Chat Ad",
 ];
 
 export default function LandingPage() {
@@ -49,7 +67,7 @@ export default function LandingPage() {
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
             paintgym turns any product page into a library of static Meta and
             Instagram ad creative, generated with the latest image models.
-            Seventeen proven frameworks, ready to publish.
+            35 proven frameworks, ready to publish.
           </p>
           <div className="flex items-center justify-center gap-3">
             <Link href="/signup" className={buttonVariants({ size: "lg" })}>
@@ -81,7 +99,7 @@ export default function LandingPage() {
 
         <section className="mx-auto max-w-5xl px-4 py-16">
           <h2 className="text-2xl font-semibold tracking-tight mb-6">
-            Seventeen frameworks, ready to remix.
+            35 frameworks, ready to remix.
           </h2>
           <div className="grid gap-2 sm:grid-cols-3 lg:grid-cols-4">
             {FRAMEWORKS.map((f) => (
