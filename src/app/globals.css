@@ -156,6 +156,14 @@
   --headline: var(--font-archivo), sans-serif;
   --ui: var(--font-hanken), system-ui, sans-serif;
   --mono: var(--font-space-mono), monospace;
+  /* shadcn's :root (above) redefines --muted as a near-WHITE surface color,
+     which collides with the Training Floor design system's --muted TEXT color
+     and renders every muted label, hint, and caption nearly invisible. Because
+     shadcn's block is declared after training-floor.css's import, it was
+     winning the cascade. Re-assert the TF value here, after shadcn, so muted
+     text stays legible everywhere. (shadcn surfaces use bg-muted at low alpha,
+     which still reads as a light tint with this value.) */
+  --muted: #5f5f57;
 }
 
 /* Below the desktop breakpoint the app is fullscreen edge-to-edge (no bezel). */
