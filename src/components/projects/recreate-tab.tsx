@@ -142,7 +142,7 @@ export function RecreateTab({
           marginBottom: 10,
         }}
       >
-        // recreate from an example you love
+        {"// recreate from an example you love"}
       </div>
       <div className="pg-h2">Recreate from example</div>
       <p className="pg-muted" style={{ fontSize: 13.5, marginTop: 10, maxWidth: "46ch" }}>

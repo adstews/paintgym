@@ -165,7 +165,7 @@ export function CompetitorSpyTab({
           marginBottom: 10,
         }}
       >
-        // spy on a competitor and position against them
+        {"// spy on a competitor and position against them"}
       </div>
       <div className="pg-h2">Competitor Spy</div>
       <p className="pg-muted" style={{ fontSize: 13.5, marginTop: 10, maxWidth: "46ch" }}>
@@ -196,7 +196,7 @@ export function CompetitorSpyTab({
             {loading ? "Scraping and generating..." : "Generate competitive ads"}
           </Btn>
         </div>
-        <div className="hint">// reads their page · writes briefs that attack their product</div>
+        <div className="hint">{"// reads their page · writes briefs that attack their product"}</div>
       </div>
 
       <div className="pg-control-block">

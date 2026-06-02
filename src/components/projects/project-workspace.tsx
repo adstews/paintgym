@@ -664,8 +664,7 @@ export function ProjectWorkspace({
             className="pg-mono pg-muted"
             style={{ fontSize: 11, letterSpacing: ".08em", textTransform: "uppercase" }}
           >
-            // toggle the concepts you want briefs and images for. each concept
-            produces one brief.
+            {"// toggle the concepts you want briefs and images for — each concept produces one brief."}
           </div>
           <div className="grid gap-2 sm:grid-cols-2">
             {concepts.map((c) => {

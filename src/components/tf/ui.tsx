@@ -154,7 +154,7 @@ export function Stars({
           className="pg-star-btn"
           onClick={(e) => {
             e.stopPropagation();
-            onChange && onChange(s === value ? 0 : s);
+            if (onChange) onChange(s === value ? 0 : s);
           }}
           onMouseEnter={() => setHover(s)}
         >
