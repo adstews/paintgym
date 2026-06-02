@@ -3,7 +3,7 @@
    chalk white · jersey black · electric lime · Archivo athletic
    ============================================================ */
 :root{
-  --paper:#f4f4f0; --ink:#141414; --ink-2:#3a3a36; --muted:#7c7c74;
+  --paper:#f4f4f0; --ink:#141414; --ink-2:#3a3a36; --muted:#5f5f57;
   --line:rgba(20,20,20,0.14); --line-2:rgba(20,20,20,0.28); --hard:#141414;
   --pop:#c2f536; --pop-ink:#141414; --pop-deep:#a6d916;
   --card:#ffffff; --shadow:4px 4px 0 #141414; --shadow-sm:2px 2px 0 #141414;
@@ -62,7 +62,7 @@ body{font-family:var(--ui);color:var(--ink);background:#cfcfc8;line-height:1.5;-
 .pg-btn--ghost{background:transparent;color:var(--ink);}
 .pg-btn--ghost:hover{background:rgba(20,20,20,.05);}
 .pg-btn--block{width:100%;}
-.pg-btn:disabled{opacity:.4;cursor:not-allowed;}
+.pg-btn:disabled{opacity:.5;cursor:not-allowed;}
 .pg-iconbtn{width:44px;height:44px;display:flex;align-items:center;justify-content:center;
   border:1.5px solid var(--line);background:var(--paper);color:var(--ink);cursor:pointer;border-radius:3px;
   transition:transform .08s, background .12s;}
@@ -108,7 +108,7 @@ body{font-family:var(--ui);color:var(--ink);background:#cfcfc8;line-height:1.5;-
 .pg-input::placeholder{color:var(--muted);}
 .pg-input:focus{box-shadow:var(--shadow);}
 .pg-field-label{font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;
-  color:var(--muted);margin-bottom:7px;display:block;}
+  color:var(--ink-2);margin-bottom:7px;display:block;}
 .pg-textarea{min-height:84px;resize:none;line-height:1.45;}
 
 /* ---------------- bottom sheet ---------------- */
@@ -282,7 +282,7 @@ body{font-family:var(--ui);color:var(--ink);background:#cfcfc8;line-height:1.5;-
 .pg-brand-sw.is-on{box-shadow:0 0 0 2px var(--paper),0 0 0 4px var(--ink);}
 
 .pg-control-block{margin-top:18px;}
-.pg-control-block > .lab{font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:9px;display:flex;justify-content:space-between;align-items:center;}
+.pg-control-block > .lab{font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-2);margin-bottom:9px;display:flex;justify-content:space-between;align-items:center;}
 .pg-control-block > .lab b{color:var(--ink);}
 .pg-chiprow{display:flex;flex-wrap:wrap;gap:7px;}
 .pg-fwpick{display:flex;flex-wrap:wrap;gap:7px;max-height:none;}

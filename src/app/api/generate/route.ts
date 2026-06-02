@@ -11,7 +11,9 @@ import {
 import type { ProductData, StyleSettings } from "@/lib/types";
 
 export const runtime = "nodejs";
-export const maxDuration = 60;
+// Long enough for the in-call timeout + retries in generateImage to run without
+// the platform killing the function mid-retry.
+export const maxDuration = 300;
 
 export async function POST(request: Request) {
   const supabase = await createClient();

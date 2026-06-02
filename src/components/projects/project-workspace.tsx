@@ -50,6 +50,71 @@ function variantKey(conceptId: string, variant: ConceptVariant | null): string {
   return `${conceptId}:${variant ?? "A"}`;
 }
 
+// --- batch generation tuning -------------------------------------------------
+// Generate several images at once instead of one giant serial chain, and bound
+// every network call so a single stalled request can never freeze the batch.
+const GEN_CONCURRENCY = 3;
+const QA_CONCURRENCY = 3;
+const GENERATE_TIMEOUT_MS = 170_000;
+const REVIEW_TIMEOUT_MS = 170_000;
+
+interface PostJsonResult {
+  ok: boolean;
+  status: number;
+  json: Record<string, unknown>;
+  timedOut: boolean;
+}
+
+async function postJson(
+  url: string,
+  body: unknown,
+  timeoutMs: number,
+): Promise<PostJsonResult> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    });
+    const json = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+    return { ok: res.ok, status: res.status, json, timedOut: false };
+  } catch (err) {
+    const timedOut = err instanceof DOMException && err.name === "AbortError";
+    return { ok: false, status: 0, json: {}, timedOut };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+// Bounded-concurrency map. Workers pull from a shared cursor; one slow or failing
+// item only ties up its own slot, never the whole queue.
+async function mapWithConcurrency<T, R>(
+  items: T[],
+  limit: number,
+  worker: (item: T, index: number) => Promise<R>,
+): Promise<R[]> {
+  const results: R[] = new Array(items.length);
+  let cursor = 0;
+  async function run() {
+    while (cursor < items.length) {
+      const i = cursor++;
+      try {
+        results[i] = await worker(items[i], i);
+      } catch {
+        // Workers handle their own errors; this is a backstop so one unexpected
+        // throw can't kill a pool slot and stall the rest of the batch.
+        results[i] = undefined as unknown as R;
+      }
+    }
+  }
+  const pool = Array.from({ length: Math.min(limit, items.length) }, run);
+  await Promise.all(pool);
+  return results;
+}
+
 export function ProjectWorkspace({
   project: initialProject,
   concepts,
@@ -201,39 +266,43 @@ export function ProjectWorkspace({
 
   async function runReview(generationId: string) {
     updateGeneration(generationId, { qa_status: "reviewing" });
-    try {
-      const res = await fetch("/api/review-image", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ generation_id: generationId }),
-      });
-      const json = await res.json();
-      if (!res.ok) {
-        throw new Error(json.message ?? json.error ?? "QA review failed");
-      }
-      const updated = (json.generations ?? []) as Generation[];
-      mergeGenerations(updated);
-      if (json.rewrite_error) {
-        toast.error(`Auto-rewrite stopped: ${json.rewrite_error}`);
-      }
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "QA review failed");
+    const { ok, json, timedOut } = await postJson(
+      "/api/review-image",
+      { generation_id: generationId },
+      REVIEW_TIMEOUT_MS,
+    );
+    if (!ok) {
+      toast.error(
+        timedOut
+          ? "QA timed out — the image is fine, re-run QA from the card if you want it checked"
+          : ((json.message as string) ?? (json.error as string) ?? "QA review failed"),
+      );
+      // Never leave the card stuck on "reviewing" — the image is usable.
       updateGeneration(generationId, {
         qa_status: "minor",
         qa_severity: "minor",
-        qa_issues: ["QA review error"],
+        qa_issues: [timedOut ? "QA review timed out" : "QA review error"],
       });
+      return;
+    }
+    const updated = (json.generations ?? []) as Generation[];
+    mergeGenerations(updated);
+    if (json.rewrite_error) {
+      toast.error(`Auto-rewrite stopped: ${json.rewrite_error}`);
     }
   }
 
-  async function generateImageForVariant(
+  // Place a card, call /api/generate (bounded by a timeout), and update the card.
+  // QA is intentionally NOT run here so callers can review separately — that lets
+  // the batch generate fast and keeps a slow review from blocking generation.
+  async function generateOneImage(
     conceptId: string,
     variant: ConceptVariant,
-  ) {
+  ): Promise<{ id: string | null; status: "ok" | "failed" | "paywall" }> {
     const brief = briefsByKey.get(briefKey(conceptId, variant));
     if (!brief) {
       toast.error("Generate briefs for this concept first");
-      return;
+      return { id: null, status: "failed" };
     }
     const tempId = makeTempId(`${conceptId}-${variant}`);
     const existing = attemptsByKey.get(variantKey(conceptId, variant)) ?? [];
@@ -266,45 +335,53 @@ export function ProjectWorkspace({
     };
     setGenerations((g) => [placeholder, ...g]);
 
-    let realId: string | null = null;
-    try {
-      const res = await fetch("/api/generate", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          project_id: project.id,
-          concept_id: conceptId,
-          concept_variant: variant,
-          prompt_text: brief.brief_text,
-        }),
-      });
-      const json = await res.json();
-      if (!res.ok) {
-        if (res.status === 402) {
-          toast.error(json.message ?? "Free preview limit reached");
-        } else {
-          throw new Error(json.message ?? "Generation failed");
-        }
-        updateGeneration(tempId, { status: "failed" });
-        return;
-      }
-      realId = json.id as string;
-      const updatedRow = json.generation as Generation | undefined;
-      updateGeneration(tempId, {
-        id: realId,
-        image_url: updatedRow?.image_url ?? json.image_url,
-        watermarked_url: updatedRow?.watermarked_url ?? null,
-        is_unlocked: updatedRow?.is_unlocked ?? false,
-        status: "completed",
-        qa_status: "reviewing",
-      });
-    } catch (err) {
+    const { ok, status, json, timedOut } = await postJson(
+      "/api/generate",
+      {
+        project_id: project.id,
+        concept_id: conceptId,
+        concept_variant: variant,
+        prompt_text: brief.brief_text,
+      },
+      GENERATE_TIMEOUT_MS,
+    );
+
+    if (!ok) {
       updateGeneration(tempId, { status: "failed" });
-      toast.error(err instanceof Error ? err.message : "Generation failed");
-      return;
+      if (status === 402) {
+        toast.error((json.message as string) ?? "Out of credits");
+        return { id: null, status: "paywall" };
+      }
+      toast.error(
+        timedOut
+          ? "Generation timed out"
+          : ((json.message as string) ?? "Generation failed"),
+      );
+      return { id: null, status: "failed" };
     }
 
-    if (realId) await runReview(realId);
+    const realId = json.id as string;
+    const updatedRow = json.generation as Generation | undefined;
+    updateGeneration(tempId, {
+      id: realId,
+      image_url: updatedRow?.image_url ?? (json.image_url as string | null),
+      watermarked_url: updatedRow?.watermarked_url ?? null,
+      is_unlocked: updatedRow?.is_unlocked ?? false,
+      status: "completed",
+      qa_status: "reviewing",
+    });
+    if (typeof json.new_balance === "number") {
+      setProfile((p) => ({ ...p, credit_balance: json.new_balance as number }));
+    }
+    return { id: realId, status: "ok" };
+  }
+
+  async function generateImageForVariant(
+    conceptId: string,
+    variant: ConceptVariant,
+  ) {
+    const { id } = await generateOneImage(conceptId, variant);
+    if (id) await runReview(id);
   }
 
   async function regenerateVariantImage(
@@ -348,42 +425,41 @@ export function ProjectWorkspace({
     };
     setGenerations((g) => [placeholder, ...g]);
 
-    let realId: string | null = null;
-    try {
-      const res = await fetch("/api/generate", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          project_id: project.id,
-          recreation_id: recreationId,
-          variant_label: variantLabel,
-          prompt_text: promptText,
-        }),
-      });
-      const json = await res.json();
-      if (!res.ok) {
-        if (res.status === 402) {
-          toast.error(json.message ?? "Free preview limit reached");
-        } else {
-          throw new Error(json.message ?? "Generation failed");
-        }
-        updateGeneration(tempId, { status: "failed" });
-        return;
-      }
-      realId = json.id as string;
-      const updatedRow = json.generation as Generation | undefined;
-      updateGeneration(tempId, {
-        id: realId,
-        image_url: updatedRow?.image_url ?? json.image_url,
-        watermarked_url: updatedRow?.watermarked_url ?? null,
-        is_unlocked: updatedRow?.is_unlocked ?? false,
-        status: "completed",
-        qa_status: "reviewing",
-      });
-    } catch (err) {
+    const { ok, status, json, timedOut } = await postJson(
+      "/api/generate",
+      {
+        project_id: project.id,
+        recreation_id: recreationId,
+        variant_label: variantLabel,
+        prompt_text: promptText,
+      },
+      GENERATE_TIMEOUT_MS,
+    );
+    if (!ok) {
       updateGeneration(tempId, { status: "failed" });
-      toast.error(err instanceof Error ? err.message : "Generation failed");
+      if (status === 402) {
+        toast.error((json.message as string) ?? "Free preview limit reached");
+      } else {
+        toast.error(
+          timedOut
+            ? "Generation timed out"
+            : ((json.message as string) ?? "Generation failed"),
+        );
+      }
       return;
+    }
+    const realId = json.id as string;
+    const updatedRow = json.generation as Generation | undefined;
+    updateGeneration(tempId, {
+      id: realId,
+      image_url: updatedRow?.image_url ?? (json.image_url as string | null),
+      watermarked_url: updatedRow?.watermarked_url ?? null,
+      is_unlocked: updatedRow?.is_unlocked ?? false,
+      status: "completed",
+      qa_status: "reviewing",
+    });
+    if (typeof json.new_balance === "number") {
+      setProfile((p) => ({ ...p, credit_balance: json.new_balance as number }));
     }
     if (realId) await runReview(realId);
   }
@@ -394,16 +470,51 @@ export function ProjectWorkspace({
   }
 
   async function generateAllImages() {
-    setBatchImagesLoading(true);
-    try {
-      for (const c of enabledConcepts) {
-        for (const v of CONCEPT_VARIANTS) {
-          if (briefsByKey.has(briefKey(c.id, v))) {
-            await generateImageForVariant(c.id, v);
-          }
+    const jobs: { conceptId: string; variant: ConceptVariant }[] = [];
+    for (const c of enabledConcepts) {
+      for (const v of CONCEPT_VARIANTS) {
+        if (briefsByKey.has(briefKey(c.id, v))) {
+          jobs.push({ conceptId: c.id, variant: v });
         }
       }
-      toast.success("Batch complete");
+    }
+    if (jobs.length === 0) return;
+
+    setBatchImagesLoading(true);
+    let made = 0;
+    let failed = 0;
+    let stopped = false;
+    try {
+      // Phase 1 — generate with bounded concurrency. A stall or failure on one
+      // job never blocks the rest, and we stop scheduling once credits run out.
+      const ids = await mapWithConcurrency(jobs, GEN_CONCURRENCY, async (job) => {
+        if (stopped) return null;
+        const { id, status } = await generateOneImage(job.conceptId, job.variant);
+        if (status === "ok") made += 1;
+        else if (status === "paywall") stopped = true;
+        else failed += 1;
+        return id;
+      });
+
+      const realIds = ids.filter((x): x is string => typeof x === "string");
+
+      if (made === 0) {
+        toast.error(stopped ? "Out of credits" : "No images generated");
+        return;
+      }
+      toast.success(
+        `Generated ${made}${failed > 0 ? `, ${failed} failed` : ""}. Running QA...`,
+      );
+
+      // Phase 2 — QA review, best-effort and bounded. runReview never throws and
+      // each call is timed out, so a slow review can't freeze the batch.
+      await mapWithConcurrency(realIds, QA_CONCURRENCY, (id) => runReview(id));
+
+      toast.success(
+        `Done — ${made} image${made === 1 ? "" : "s"} ready${
+          failed > 0 ? `, ${failed} failed` : ""
+        }`,
+      );
     } finally {
       setBatchImagesLoading(false);
     }
