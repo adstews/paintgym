@@ -10,9 +10,6 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 
 export function NewProjectDialog({
@@ -58,35 +55,52 @@ export function NewProjectDialog({
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger render={trigger ?? <Button>New project</Button>} />
+      <DialogTrigger
+        render={
+          trigger ?? (
+            <button className="pg-btn pg-btn--pop pg-btn--md">New project</button>
+          )
+        }
+      />
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>New project</DialogTitle>
+          <DialogTitle>
+            <span className="pg-h2">New project</span>
+          </DialogTitle>
         </DialogHeader>
         <form onSubmit={handleCreate} className="space-y-4">
-          <div className="space-y-1.5">
-            <Label htmlFor="np-name">Project name</Label>
-            <Input
+          <div className="pg-form-row">
+            <label className="pg-field-label" htmlFor="np-name">
+              Project name
+            </label>
+            <input
               id="np-name"
+              className="pg-input"
               required
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="Spring launch"
             />
           </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="np-client">Client</Label>
-            <Input
+          <div className="pg-form-row">
+            <label className="pg-field-label" htmlFor="np-client">
+              Client
+            </label>
+            <input
               id="np-client"
+              className="pg-input"
               value={clientName}
               onChange={(e) => setClientName(e.target.value)}
               placeholder="Acme Co."
             />
           </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="np-url">Product URL</Label>
-            <Input
+          <div className="pg-form-row">
+            <label className="pg-field-label" htmlFor="np-url">
+              Product URL
+            </label>
+            <input
               id="np-url"
+              className="pg-input"
               type="url"
               value={productUrl}
               onChange={(e) => setProductUrl(e.target.value)}
@@ -94,9 +108,13 @@ export function NewProjectDialog({
             />
           </div>
           <DialogFooter>
-            <Button type="submit" disabled={loading || !name}>
+            <button
+              type="submit"
+              className="pg-btn pg-btn--pop pg-btn--md"
+              disabled={loading || !name}
+            >
               {loading ? "Creating..." : "Create project"}
-            </Button>
+            </button>
           </DialogFooter>
         </form>
       </DialogContent>

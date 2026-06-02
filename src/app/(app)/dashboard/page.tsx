@@ -1,12 +1,13 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { NewProjectDialog } from "@/components/projects/new-project-dialog";
+import { Icon } from "@/components/tf/ui";
 import type { Project } from "@/lib/types";
 
-export const metadata = { title: "Projects — paintgym" };
+export const metadata = { title: "Your gym — paintgym" };
 
+// Training Floor "gym" dashboard. Real projects loaded server-side; real links
+// and the real NewProjectDialog preserved — only the skin changed.
 export default async function DashboardPage() {
   const supabase = await createClient();
   const { data: projects } = await supabase
@@ -16,54 +17,59 @@ export default async function DashboardPage() {
 
   const list = (projects ?? []) as Project[];
 
+  if (list.length === 0) {
+    return (
+      <div className="pg-empty">
+        <div className="ix">
+          <Icon name="dumbbell" size={28} />
+        </div>
+        <h3>Empty gym</h3>
+        <p>No projects yet. Paste a product URL and train your first wall of ads.</p>
+        <NewProjectDialog />
+      </div>
+    );
+  }
+
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div>
+      <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", marginBottom: 16, gap: 12 }}>
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Projects</h1>
-          <p className="text-sm text-muted-foreground">
-            Generate ad creative briefs and images from any product page.
-          </p>
+          <div className="pg-h2" style={{ fontSize: 24 }}>Your gym</div>
+          <div className="pg-mono" style={{ fontSize: 11, color: "var(--muted)", marginTop: 5 }}>
+            {list.length} project{list.length === 1 ? "" : "s"} trained
+          </div>
         </div>
         <NewProjectDialog />
       </div>
 
-      {list.length === 0 ? (
-        <Card>
-          <CardContent className="py-16 text-center space-y-3">
-            <p className="text-muted-foreground">
-              You have no projects yet.
-            </p>
-            <div className="flex justify-center">
-              <NewProjectDialog />
+      <div className="pg-dash-grid" style={{ padding: 0 }}>
+        {list.map((p) => (
+          <Link
+            key={p.id}
+            href={`/projects/${p.id}`}
+            className="pg-proj"
+            style={{ display: "block", textDecoration: "none", color: "inherit" }}
+          >
+            <div className="cover" style={{ display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <span
+                className="pg-mono"
+                style={{ color: "var(--pop)", fontSize: 13, fontWeight: 700, letterSpacing: ".1em", textTransform: "uppercase" }}
+              >
+                {(p.product_name || p.brand_name || p.name || "PG").toString().slice(0, 2).toUpperCase()}
+              </span>
             </div>
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {list.map((p) => (
-            <Link key={p.id} href={`/projects/${p.id}`} className="block">
-              <Card className="h-full transition hover:border-foreground/30">
-                <CardHeader>
-                  <CardTitle className="text-base">{p.name}</CardTitle>
-                  {p.client_name && (
-                    <Badge variant="secondary" className="w-fit">
-                      {p.client_name}
-                    </Badge>
-                  )}
-                </CardHeader>
-                <CardContent className="text-xs text-muted-foreground">
-                  {p.product_url ? (
-                    <span className="truncate block">{p.product_url}</span>
-                  ) : (
-                    <span>No product URL yet</span>
-                  )}
-                </CardContent>
-              </Card>
-            </Link>
-          ))}
-        </div>
-      )}
+            <div className="meta">
+              <h4>{p.name}</h4>
+              <div className="row">
+                <small style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "68%" }}>
+                  {p.product_url || "no product url"}
+                </small>
+                {p.client_name && <span className="pg-badge pg-badge--outline">{p.client_name}</span>}
+              </div>
+            </div>
+          </Link>
+        ))}
+      </div>
     </div>
   );
 }

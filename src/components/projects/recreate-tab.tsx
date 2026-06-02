@@ -2,11 +2,8 @@
 
 import { useMemo, useState } from "react";
 import Image from "next/image";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
+import { Btn, Badge } from "@/components/tf/ui";
 import { ImageUploadField } from "./image-upload-field";
 import { GenerationCard } from "@/components/gallery/generation-card";
 import { VARIANT_DISPLAY, VARIANT_LABELS } from "@/lib/types";
@@ -135,42 +132,60 @@ export function RecreateTab({
   }
 
   return (
-    <div className="space-y-6">
-      <Card>
-        <CardContent className="space-y-4 pt-6">
-          <div>
-            <h2 className="text-base font-semibold">Recreate from example</h2>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Upload an ad you like. Claude analyzes its creative framework and
-              writes five briefs for your product, each taking a different
-              angle. Then Gemini renders all five.
-            </p>
-          </div>
+    <div className="pg-pad" style={{ paddingTop: 16 }}>
+      <div
+        className="pg-mono pg-muted"
+        style={{
+          fontSize: 11,
+          letterSpacing: ".08em",
+          textTransform: "uppercase",
+          marginBottom: 10,
+        }}
+      >
+        // recreate from an example you love
+      </div>
+      <div className="pg-h2">Recreate from example</div>
+      <p className="pg-muted" style={{ fontSize: 13.5, marginTop: 10, maxWidth: "46ch" }}>
+        Upload an ad you like. Claude analyzes its creative framework and writes
+        five briefs for your product, each taking a different angle. Then Gemini
+        renders all five.
+      </p>
 
+      <div className="pg-form-card" style={{ marginTop: 16 }}>
+        <div className="pg-form-row">
           <ImageUploadField
             label="Example ad image"
             urls={sourceUrls}
             onChange={setSourceUrls}
             folder={`recreations-${project.id}`}
           />
+        </div>
 
-          <div className="flex items-center justify-between gap-3">
-            <p className="text-xs text-muted-foreground">
-              Product details and style settings from this project will be used
-              for every variant.
-            </p>
-            <Button
-              type="button"
-              onClick={handleGenerate}
-              disabled={generating || sourceUrls.length === 0}
-            >
-              {generating
-                ? "Analyzing and generating..."
-                : "Analyze and generate 5 versions"}
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 12,
+          }}
+        >
+          <p className="pg-muted" style={{ fontSize: 11.5, lineHeight: 1.4, maxWidth: "40ch" }}>
+            Product details and style settings from this project will be used
+            for every variant.
+          </p>
+          <Btn
+            type="button"
+            variant="pop"
+            icon="bolt"
+            onClick={handleGenerate}
+            disabled={generating || sourceUrls.length === 0}
+          >
+            {generating
+              ? "Analyzing and generating..."
+              : "Analyze and generate 5 versions"}
+          </Btn>
+        </div>
+      </div>
 
       {recreations.map((r) => {
         const recGens = generationsByRecreation.get(r.id) ?? [];
@@ -239,93 +254,132 @@ function RecreationBlock({
   }, [generations]);
 
   return (
-    <Card>
-      <CardContent className="space-y-4 pt-6">
-        <div className="grid gap-4 sm:grid-cols-[180px_1fr] sm:items-start">
-          <div className="relative aspect-[4/5] w-full overflow-hidden rounded-md border bg-muted">
-            <Image
-              src={recreation.source_image_url}
-              alt="Example ad"
-              fill
-              sizes="(min-width: 640px) 180px, 100vw"
-              className="object-contain"
-              unoptimized
-            />
-          </div>
-          <div className="space-y-2">
-            <div className="flex items-center gap-2">
-              <Badge variant="secondary">Original</Badge>
-              <span className="text-xs text-muted-foreground">
-                {new Date(recreation.created_at).toLocaleString()}
-              </span>
-            </div>
-            {recreation.analysis ? (
-              <div className="space-y-1">
-                <button
-                  type="button"
-                  className="text-xs font-medium text-muted-foreground underline decoration-dotted"
-                  onClick={() => setShowAnalysis((v) => !v)}
-                >
-                  {showAnalysis ? "Hide analysis" : "Show Claude's analysis"}
-                </button>
-                {showAnalysis && (
-                  <p className="text-sm leading-relaxed">
-                    {recreation.analysis}
-                  </p>
-                )}
-              </div>
-            ) : (
-              <p className="text-sm text-muted-foreground">
-                Analysis not available.
-              </p>
-            )}
-          </div>
+    <div className="pg-form-card" style={{ marginTop: 18 }}>
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "180px 1fr",
+          gap: 16,
+          alignItems: "start",
+        }}
+      >
+        <div
+          style={{
+            position: "relative",
+            width: "100%",
+            aspectRatio: "4/5",
+            overflow: "hidden",
+            borderRadius: 3,
+            border: "1.5px solid var(--ink)",
+            background: "#eceae3",
+          }}
+        >
+          <Image
+            src={recreation.source_image_url}
+            alt="Example ad"
+            fill
+            sizes="(min-width: 640px) 180px, 100vw"
+            className="object-contain"
+            unoptimized
+          />
         </div>
+        <div>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <Badge tone="ink">Original</Badge>
+            <span className="pg-mono pg-muted" style={{ fontSize: 10.5 }}>
+              {new Date(recreation.created_at).toLocaleString()}
+            </span>
+          </div>
+          {recreation.analysis ? (
+            <div style={{ marginTop: 8 }}>
+              <button
+                type="button"
+                className="pg-mono pg-muted"
+                style={{
+                  fontSize: 11,
+                  letterSpacing: ".04em",
+                  textTransform: "uppercase",
+                  textDecoration: "underline",
+                  textDecorationStyle: "dotted",
+                  background: "none",
+                  border: 0,
+                  padding: 0,
+                  cursor: "pointer",
+                }}
+                onClick={() => setShowAnalysis((v) => !v)}
+              >
+                {showAnalysis ? "Hide analysis" : "Show Claude's analysis"}
+              </button>
+              {showAnalysis && (
+                <p style={{ marginTop: 8, fontSize: 13, lineHeight: 1.5 }}>
+                  {recreation.analysis}
+                </p>
+              )}
+            </div>
+          ) : (
+            <p className="pg-muted" style={{ marginTop: 8, fontSize: 13 }}>
+              Analysis not available.
+            </p>
+          )}
+        </div>
+      </div>
 
-        <Separator />
+      <div className="pg-div">
+        <span>Recreated · 5 takes</span>
+      </div>
 
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
-          {VARIANT_LABELS.map((label) => {
-            const attempts = groupedByVariant.get(label) ?? [];
-            const latest = attempts[0];
-            if (!latest) {
-              return (
-                <Card key={label}>
-                  <CardContent className="py-12 text-center text-xs text-muted-foreground">
-                    {VARIANT_DISPLAY[label]} variant failed.
-                  </CardContent>
-                </Card>
-              );
-            }
+      <div className="pg-wall cols-2" style={{ padding: 0 }}>
+        {VARIANT_LABELS.map((label) => {
+          const attempts = groupedByVariant.get(label) ?? [];
+          const latest = attempts[0];
+          if (!latest) {
             return (
-              <div key={label} className="space-y-2">
-                <GenerationCard
-                  conceptName={VARIANT_DISPLAY[label]}
-                  latest={latest}
-                  attempts={attempts}
-                  onRegenerate={() =>
-                    onRegenerateVariant(label, latest.prompt_text)
-                  }
-                  onReReview={() => onReviewGeneration(latest.id)}
-                  onOverride={() => onOverrideGeneration(latest.id)}
-                  onUnlock={() => onUnlockGeneration(latest.id)}
-                  onRatingChange={onRatingChange}
-                  onRefined={onRefined}
-                />
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  className="w-full"
-                  onClick={() => onCopy(label, latest.prompt_text)}
-                >
-                  Use as starting point
-                </Button>
+              <div
+                key={label}
+                className="pg-mono pg-muted"
+                style={{
+                  border: "1.5px solid var(--line)",
+                  borderRadius: 4,
+                  padding: "32px 16px",
+                  textAlign: "center",
+                  fontSize: 10.5,
+                  letterSpacing: ".04em",
+                  textTransform: "uppercase",
+                  background: "#fff",
+                }}
+              >
+                {VARIANT_DISPLAY[label]} variant failed.
               </div>
             );
-          })}
-        </div>
-      </CardContent>
-    </Card>
+          }
+          return (
+            <div key={label} style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              <GenerationCard
+                conceptName={VARIANT_DISPLAY[label]}
+                latest={latest}
+                attempts={attempts}
+                onRegenerate={() =>
+                  onRegenerateVariant(label, latest.prompt_text)
+                }
+                onReReview={() => onReviewGeneration(latest.id)}
+                onOverride={() => onOverrideGeneration(latest.id)}
+                onUnlock={() => onUnlockGeneration(latest.id)}
+                onRatingChange={onRatingChange}
+                onRefined={onRefined}
+              />
+              <Btn
+                type="button"
+                size="sm"
+                variant="outline"
+                className="pg-btn--block"
+                onClick={() => onCopy(label, latest.prompt_text)}
+              >
+                Use as starting point
+              </Btn>
+            </div>
+          );
+        })}
+      </div>
+    </div>
   );
 }

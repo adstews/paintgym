@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import Image from "next/image";
-import { Loader2Icon, SparklesIcon } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -11,9 +10,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
-import { Label } from "@/components/ui/label";
+import { Btn, Icon, Badge } from "@/components/tf/ui";
 import { toast } from "sonner";
 import type { Generation } from "@/lib/types";
 
@@ -83,13 +80,29 @@ export function RefineDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="max-w-4xl">
+      <DialogContent
+        className="max-w-4xl"
+        style={{
+          background: "var(--paper)",
+          color: "var(--ink)",
+          border: "1.5px solid var(--ink)",
+          borderRadius: 0,
+        }}
+      >
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <SparklesIcon className="size-4" aria-hidden />
+          <DialogTitle
+            className="flex items-center gap-2"
+            style={{
+              fontFamily: "var(--display)",
+              fontWeight: 800,
+              textTransform: "uppercase",
+              letterSpacing: "-.01em",
+            }}
+          >
+            <Icon name="sparkle" size={18} style={{ color: "var(--pop-deep)" }} />
             Refine {conceptName}
           </DialogTitle>
-          <DialogDescription>
+          <DialogDescription style={{ color: "var(--muted)" }}>
             Describe what you would change. Claude rewrites the brief from
             scratch with your feedback in mind, then Gemini renders a fresh
             version. Costs 1 credit.
@@ -97,58 +110,104 @@ export function RefineDialog({
         </DialogHeader>
 
         <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-          <div className="space-y-2">
-            <Label>Current image</Label>
-            <div className="relative w-full aspect-[4/5] overflow-hidden rounded-md bg-muted">
-              {previewUrl ? (
-                <Image
-                  src={previewUrl}
-                  alt={`${conceptName} current`}
-                  fill
-                  sizes="(min-width:1024px) 400px, 100vw"
-                  className="object-contain"
-                  unoptimized
-                />
-              ) : (
-                <div className="flex h-full w-full items-center justify-center text-sm text-muted-foreground">
-                  No image
-                </div>
-              )}
+          <div>
+            <div className="pg-refine-ad">
+              <div className="pg-ad">
+                {previewUrl ? (
+                  <Image
+                    src={previewUrl}
+                    alt={`${conceptName} current`}
+                    fill
+                    sizes="(min-width:1024px) 400px, 100vw"
+                    className="object-contain"
+                    unoptimized
+                  />
+                ) : (
+                  <div
+                    className="flex h-full w-full items-center justify-center"
+                    style={{
+                      fontFamily: "var(--mono)",
+                      fontSize: 10,
+                      letterSpacing: ".04em",
+                      textTransform: "uppercase",
+                      color: "var(--muted)",
+                    }}
+                  >
+                    No image
+                  </div>
+                )}
+              </div>
             </div>
-            <div>
-              <Label className="text-xs text-muted-foreground">
-                Brief that produced this image
-              </Label>
-              <pre className="mt-1 max-h-40 overflow-auto whitespace-pre-wrap rounded-md border bg-muted/30 p-2 text-xs">
-                {source.prompt_text}
-              </pre>
+            <div className="pg-refine-meta">
+              <Badge tone="outline">Current image</Badge>
             </div>
+
+            <div className="pg-div">
+              <span>Brief that produced this image</span>
+            </div>
+            <pre
+              className="max-h-40 overflow-auto whitespace-pre-wrap p-2"
+              style={{
+                fontFamily: "var(--mono)",
+                fontSize: 11,
+                lineHeight: 1.5,
+                color: "var(--ink-2)",
+                background: "#fff",
+                border: "1.5px solid var(--line)",
+                borderRadius: 3,
+              }}
+            >
+              {source.prompt_text}
+            </pre>
+
             {source.refinement_feedback && (
-              <div>
-                <Label className="text-xs text-muted-foreground">
-                  Feedback used to produce this version
-                </Label>
-                <p className="mt-1 rounded-md border bg-muted/30 p-2 text-xs">
+              <>
+                <div className="pg-div">
+                  <span>Feedback used to produce this version</span>
+                </div>
+                <p
+                  className="p-2"
+                  style={{
+                    fontFamily: "var(--mono)",
+                    fontSize: 11,
+                    lineHeight: 1.5,
+                    color: "var(--ink-2)",
+                    background: "#fff",
+                    border: "1.5px solid var(--line)",
+                    borderRadius: 3,
+                  }}
+                >
                   {source.refinement_feedback}
                 </p>
-              </div>
+              </>
             )}
           </div>
 
-          <div className="space-y-3">
-            <div>
-              <Label htmlFor="refine-feedback">What would you change?</Label>
-              <Textarea
-                id="refine-feedback"
-                rows={8}
-                value={feedback}
-                onChange={(e) => setFeedback(e.target.value)}
-                placeholder="make the text bigger, simplify the layout, change the color scheme, drop the model and lead with the product, lean into the brand voice more..."
-                disabled={loading}
-                className="mt-1"
-              />
+          <div>
+            <div className="pg-div" style={{ marginTop: 0 }}>
+              <span>Refine</span>
             </div>
-            <p className="text-xs text-muted-foreground">
+            <label htmlFor="refine-feedback" className="pg-field-label">
+              What would you change?
+            </label>
+            <textarea
+              id="refine-feedback"
+              className="pg-input pg-textarea"
+              rows={8}
+              value={feedback}
+              onChange={(e) => setFeedback(e.target.value)}
+              placeholder="make the text bigger, simplify the layout, change the color scheme, drop the model and lead with the product, lean into the brand voice more..."
+              disabled={loading}
+            />
+            <p
+              className="mt-2"
+              style={{
+                fontFamily: "var(--mono)",
+                fontSize: 10.5,
+                letterSpacing: ".02em",
+                color: "var(--muted)",
+              }}
+            >
               Be concrete. Claude takes your feedback literally and rewrites
               the brief; vague feedback produces vague briefs.
             </p>
@@ -156,27 +215,27 @@ export function RefineDialog({
         </div>
 
         <DialogFooter>
-          <Button
+          <Btn
             type="button"
             variant="ghost"
             onClick={() => handleOpenChange(false)}
             disabled={loading}
           >
             Cancel
-          </Button>
-          <Button
+          </Btn>
+          <Btn
             type="button"
+            variant="pop"
             onClick={handleRefine}
             disabled={loading || !feedback.trim()}
-            className="gap-1"
           >
             {loading ? (
-              <Loader2Icon className="size-4 animate-spin" aria-hidden />
+              <Icon name="refresh" size={17} style={{ animation: "pg-spin .8s linear infinite" }} />
             ) : (
-              <SparklesIcon className="size-4" aria-hidden />
+              <Icon name="sparkle" size={17} />
             )}
             {loading ? "Refining..." : "Generate refined version"}
-          </Button>
+          </Btn>
         </DialogFooter>
       </DialogContent>
     </Dialog>

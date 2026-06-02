@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react";
 import Image from "next/image";
-import { Button } from "@/components/ui/button";
+import { Btn } from "@/components/tf/ui";
 import { toast } from "sonner";
 
 interface Props {
@@ -59,18 +59,28 @@ export function ImageUploadField({
   }
 
   return (
-    <div className="space-y-2">
-      <div className="flex items-center justify-between">
-        <span className="text-sm font-medium">{label}</span>
-        <Button
+    <div>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          marginBottom: 9,
+        }}
+      >
+        <span className="pg-field-label" style={{ marginBottom: 0 }}>
+          {label}
+        </span>
+        <Btn
           type="button"
-          size="sm"
           variant="outline"
+          size="sm"
+          icon={multiple ? "plus" : "image"}
           onClick={() => inputRef.current?.click()}
           disabled={busy}
         >
           {busy ? "Uploading..." : multiple ? "Add image" : "Upload"}
-        </Button>
+        </Btn>
       </div>
       <input
         ref={inputRef}
@@ -81,15 +91,26 @@ export function ImageUploadField({
         onChange={(e) => handleFiles(e.target.files)}
       />
       {urls.length === 0 ? (
-        <div className="rounded-md border border-dashed py-6 text-center text-xs text-muted-foreground">
-          No image uploaded yet
+        <div
+          className="pg-ph"
+          style={{ aspectRatio: "auto", minHeight: 72, borderRadius: 3 }}
+        >
+          <span>No image uploaded yet</span>
         </div>
       ) : (
-        <div className="flex flex-wrap gap-2">
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
           {urls.map((u, i) => (
             <div
               key={u + i}
-              className="relative h-24 w-24 overflow-hidden rounded-md border bg-muted"
+              style={{
+                position: "relative",
+                height: 96,
+                width: 96,
+                overflow: "hidden",
+                borderRadius: 3,
+                border: "1.5px solid var(--ink)",
+                background: "#eceae3",
+              }}
             >
               <Image
                 src={u}
@@ -103,7 +124,22 @@ export function ImageUploadField({
                 type="button"
                 onClick={() => removeAt(i)}
                 aria-label="Remove image"
-                className="absolute right-1 top-1 rounded bg-background/90 px-1.5 py-0.5 text-xs font-medium text-foreground shadow-sm hover:bg-background"
+                style={{
+                  position: "absolute",
+                  right: 4,
+                  top: 4,
+                  border: "1.5px solid var(--ink)",
+                  borderRadius: 2,
+                  background: "rgba(255,255,255,.94)",
+                  color: "var(--ink)",
+                  fontFamily: "var(--mono)",
+                  fontSize: 9,
+                  fontWeight: 700,
+                  letterSpacing: ".04em",
+                  textTransform: "uppercase",
+                  padding: "3px 6px",
+                  cursor: "pointer",
+                }}
               >
                 Remove
               </button>

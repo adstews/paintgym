@@ -1,9 +1,6 @@
 "use client";
 
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
+import { Btn } from "@/components/tf/ui";
 import { cn } from "@/lib/utils";
 import type { BrandColor, BrandFont, Project } from "@/lib/types";
 
@@ -67,128 +64,154 @@ export function BrandKitSection({ project, onChange }: Props) {
   }
 
   return (
-    <div className="space-y-4">
-      <div>
-        <h2 className="text-base font-semibold">Brand kit</h2>
-        <p className="text-xs text-muted-foreground">
-          Auto detected when you paste a product URL. Edit anything Claude got
-          wrong. These get passed to every brief.
-        </p>
-      </div>
+    <div>
+      <h2 className="pg-h2">Brand kit</h2>
+      <p
+        className="pg-muted"
+        style={{ fontSize: 12.5, marginTop: 6, maxWidth: "48ch" }}
+      >
+        Auto detected when you paste a product URL. Edit anything Claude got
+        wrong. These get passed to every brief.
+      </p>
 
-      <div className="space-y-3">
-        <div className="flex items-center justify-between">
-          <Label className="text-xs uppercase tracking-wide text-muted-foreground">
-            Colors
-          </Label>
-          <Button type="button" size="sm" variant="outline" onClick={addColor}>
+      <div className="pg-control-block">
+        <div className="lab">
+          <b>Colors</b>
+          <Btn type="button" variant="outline" size="sm" icon="plus" onClick={addColor}>
             Add color
-          </Button>
+          </Btn>
         </div>
         {colors.length === 0 ? (
-          <p className="text-xs text-muted-foreground">
+          <p className="pg-muted" style={{ fontSize: 12 }}>
             No colors detected yet.
           </p>
         ) : (
-          <div className="space-y-2">
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             {colors.map((c, i) => (
               <div
                 key={i}
-                className="flex items-center gap-2 rounded-md border p-2"
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  border: "1.5px solid var(--line)",
+                  borderRadius: 3,
+                  padding: 8,
+                }}
               >
                 <div
-                  className={cn(
-                    "h-9 w-9 shrink-0 rounded border",
-                    !isValidHex(c.hex) && "border-destructive",
-                  )}
-                  style={{ backgroundColor: isValidHex(c.hex) ? c.hex : "#fff" }}
+                  className={cn("pg-brand-sw", !isValidHex(c.hex) && "border-destructive")}
+                  style={{
+                    backgroundColor: isValidHex(c.hex) ? c.hex : "#fff",
+                    borderColor: isValidHex(c.hex) ? undefined : "var(--red)",
+                  }}
                 />
                 <input
                   type="color"
-                  className="h-9 w-9 cursor-pointer rounded border bg-transparent"
+                  className="pg-brand-sw"
+                  style={{ cursor: "pointer", background: "transparent", padding: 0 }}
                   value={isValidHex(c.hex) ? c.hex : "#000000"}
                   onChange={(e) => patchColor(i, { hex: e.target.value })}
                   aria-label={`${c.label} color picker`}
                 />
-                <Input
-                  className="w-28 font-mono text-xs"
+                <input
+                  className="pg-input"
+                  style={{
+                    width: 110,
+                    fontFamily: "var(--mono)",
+                    fontSize: 12,
+                    padding: "9px 10px",
+                  }}
                   value={c.label}
                   onChange={(e) => patchColor(i, { label: e.target.value })}
                   placeholder="primary"
                 />
-                <Input
-                  className="flex-1 font-mono text-xs"
+                <input
+                  className="pg-input"
+                  style={{
+                    flex: 1,
+                    fontFamily: "var(--mono)",
+                    fontSize: 12,
+                    padding: "9px 10px",
+                  }}
                   value={c.hex}
                   onChange={(e) => patchColor(i, { hex: e.target.value })}
                   placeholder="#E24B4A"
                 />
-                <Button
+                <Btn
                   type="button"
-                  size="sm"
                   variant="ghost"
+                  size="sm"
                   onClick={() => removeColor(i)}
                 >
                   Remove
-                </Button>
+                </Btn>
               </div>
             ))}
           </div>
         )}
       </div>
 
-      <div className="space-y-3">
-        <div className="flex items-center justify-between">
-          <Label className="text-xs uppercase tracking-wide text-muted-foreground">
-            Fonts
-          </Label>
-          <Button type="button" size="sm" variant="outline" onClick={addFont}>
+      <div className="pg-control-block">
+        <div className="lab">
+          <b>Fonts</b>
+          <Btn type="button" variant="outline" size="sm" icon="plus" onClick={addFont}>
             Add font
-          </Button>
+          </Btn>
         </div>
         {fonts.length === 0 ? (
-          <p className="text-xs text-muted-foreground">No fonts detected yet.</p>
+          <p className="pg-muted" style={{ fontSize: 12 }}>
+            No fonts detected yet.
+          </p>
         ) : (
-          <div className="space-y-2">
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             {fonts.map((f, i) => (
               <div
                 key={i}
-                className="flex items-center gap-2 rounded-md border p-2"
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  border: "1.5px solid var(--line)",
+                  borderRadius: 3,
+                  padding: 8,
+                }}
               >
-                <Input
-                  className="w-28 text-xs"
+                <input
+                  className="pg-input"
+                  style={{ width: 110, fontSize: 12, padding: "9px 10px" }}
                   value={f.role}
                   onChange={(e) => patchFont(i, { role: e.target.value })}
                   placeholder="heading"
                 />
-                <Input
-                  className="flex-1 text-xs"
+                <input
+                  className="pg-input"
+                  style={{ flex: 1, fontSize: 12, padding: "9px 10px" }}
                   value={f.family}
                   onChange={(e) => patchFont(i, { family: e.target.value })}
                   placeholder="Fraunces"
                 />
-                <Button
+                <Btn
                   type="button"
-                  size="sm"
                   variant="ghost"
+                  size="sm"
                   onClick={() => removeFont(i)}
                 >
                   Remove
-                </Button>
+                </Btn>
               </div>
             ))}
           </div>
         )}
       </div>
 
-      <div className="space-y-2">
-        <Label
-          htmlFor="brand-voice"
-          className="text-xs uppercase tracking-wide text-muted-foreground"
-        >
+      <div className="pg-control-block">
+        <label htmlFor="brand-voice" className="pg-field-label">
           Voice
-        </Label>
-        <Textarea
+        </label>
+        <textarea
           id="brand-voice"
+          className="pg-input pg-textarea"
           rows={3}
           value={project.brand_voice ?? ""}
           onChange={(e) => onChange({ brand_voice: e.target.value })}

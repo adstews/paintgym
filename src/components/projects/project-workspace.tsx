@@ -1,11 +1,9 @@
 "use client";
 
-import { useMemo, useState, type ReactElement } from "react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { useMemo, useState, type CSSProperties, type ReactElement } from "react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { toast } from "sonner";
+import { Icon, Badge } from "@/components/tf/ui";
 import { GenerationCard } from "@/components/gallery/generation-card";
 import { ProductDetailsForm } from "./product-details-form";
 import { BriefCard } from "./brief-card";
@@ -529,39 +527,63 @@ export function ProjectWorkspace({
     [generations],
   );
 
+  // Training Floor segmented control — restyle shadcn Tabs without touching wiring.
+  const segListStyle: CSSProperties = {
+    display: "flex",
+    border: "1.5px solid var(--ink)",
+    borderRadius: 3,
+    background: "var(--ink)",
+    padding: 0,
+    overflow: "hidden",
+  };
+  const segBtnStyle: CSSProperties = {
+    flex: 1,
+    border: 0,
+    background: "transparent",
+    color: "#fff",
+    fontFamily: "var(--ui)",
+    fontWeight: 700,
+    fontSize: 12.5,
+    letterSpacing: ".01em",
+    padding: "10px 8px",
+    cursor: "pointer",
+    whiteSpace: "nowrap",
+  };
+
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">
-            {project.name}
-          </h1>
-          {(project.brand_name || project.client_name) && (
-            <p className="text-sm text-muted-foreground">
-              {project.brand_name ?? project.client_name}
-            </p>
-          )}
+      <div className="pg-ws-head" style={{ border: 0, padding: 0, background: "transparent" }}>
+        <div className="pg-ws-title">
+          <h2>{project.name}</h2>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <Button
-            variant="outline"
+        {(project.brand_name || project.client_name) && (
+          <div className="pg-ws-stats">
+            <span className="pg-ws-stat">
+              {project.brand_name ?? project.client_name}
+            </span>
+          </div>
+        )}
+        <div className="pg-ws-stats" style={{ gap: 8 }}>
+          <button
+            className="pg-btn pg-btn--outline pg-btn--sm"
             onClick={generateAllBriefs}
             disabled={batchBriefsLoading || enabledConcepts.length === 0}
           >
             {batchBriefsLoading
               ? "Writing briefs..."
               : `Generate briefs (${enabledConcepts.length})`}
-          </Button>
-          <Button
+          </button>
+          <button
+            className="pg-btn pg-btn--pop pg-btn--sm"
             onClick={generateAllImages}
             disabled={batchImagesLoading || briefsCount === 0}
           >
             {batchImagesLoading
               ? "Generating..."
               : `Generate images (${briefsCount})`}
-          </Button>
-          <Button
-            variant="outline"
+          </button>
+          <button
+            className="pg-btn pg-btn--outline pg-btn--sm"
             onClick={downloadAll}
             disabled={
               generations.filter(
@@ -570,7 +592,7 @@ export function ProjectWorkspace({
             }
           >
             Download all
-          </Button>
+          </button>
         </div>
       </div>
 
@@ -582,13 +604,52 @@ export function ProjectWorkspace({
       />
 
       <Tabs defaultValue="product">
-        <TabsList>
-          <TabsTrigger value="product">Product</TabsTrigger>
-          <TabsTrigger value="concepts">Concepts</TabsTrigger>
-          <TabsTrigger value="briefs">Briefs</TabsTrigger>
-          <TabsTrigger value="gallery">Gallery</TabsTrigger>
-          <TabsTrigger value="recreate">Recreate</TabsTrigger>
-          <TabsTrigger value="competitor">Competitor Spy</TabsTrigger>
+        <TabsList
+          className="w-full data-[state=active]:!bg-transparent"
+          style={segListStyle}
+        >
+          <TabsTrigger
+            value="product"
+            className="data-[state=active]:!bg-[var(--pop)] data-[state=active]:!text-[var(--pop-ink)] data-[state=active]:!shadow-none"
+            style={segBtnStyle}
+          >
+            Product
+          </TabsTrigger>
+          <TabsTrigger
+            value="concepts"
+            className="data-[state=active]:!bg-[var(--pop)] data-[state=active]:!text-[var(--pop-ink)] data-[state=active]:!shadow-none"
+            style={segBtnStyle}
+          >
+            Concepts
+          </TabsTrigger>
+          <TabsTrigger
+            value="briefs"
+            className="data-[state=active]:!bg-[var(--pop)] data-[state=active]:!text-[var(--pop-ink)] data-[state=active]:!shadow-none"
+            style={segBtnStyle}
+          >
+            Briefs
+          </TabsTrigger>
+          <TabsTrigger
+            value="gallery"
+            className="data-[state=active]:!bg-[var(--pop)] data-[state=active]:!text-[var(--pop-ink)] data-[state=active]:!shadow-none"
+            style={segBtnStyle}
+          >
+            Gallery
+          </TabsTrigger>
+          <TabsTrigger
+            value="recreate"
+            className="data-[state=active]:!bg-[var(--pop)] data-[state=active]:!text-[var(--pop-ink)] data-[state=active]:!shadow-none"
+            style={segBtnStyle}
+          >
+            Recreate
+          </TabsTrigger>
+          <TabsTrigger
+            value="competitor"
+            className="data-[state=active]:!bg-[var(--pop)] data-[state=active]:!text-[var(--pop-ink)] data-[state=active]:!shadow-none"
+            style={segBtnStyle}
+          >
+            Competitor Spy
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="product" className="pt-4">
@@ -599,8 +660,11 @@ export function ProjectWorkspace({
         </TabsContent>
 
         <TabsContent value="concepts" className="space-y-3 pt-4">
-          <div className="text-sm text-muted-foreground">
-            Toggle the concepts you want briefs and images for. Each concept
+          <div
+            className="pg-mono pg-muted"
+            style={{ fontSize: 11, letterSpacing: ".08em", textTransform: "uppercase" }}
+          >
+            // toggle the concepts you want briefs and images for. each concept
             produces one brief.
           </div>
           <div className="grid gap-2 sm:grid-cols-2">
@@ -611,17 +675,33 @@ export function ProjectWorkspace({
                   key={c.id}
                   type="button"
                   onClick={() => toggleConcept(c.id, !on)}
-                  className={`text-left rounded-lg border p-3 transition ${
-                    on
-                      ? "border-foreground/40 bg-accent"
-                      : "border-border hover:bg-accent/40"
-                  }`}
+                  className="text-left"
+                  style={{
+                    border: `1.5px solid ${on ? "var(--ink)" : "var(--line)"}`,
+                    borderRadius: 4,
+                    padding: 12,
+                    background: on ? "#fff" : "transparent",
+                    boxShadow: on ? "var(--shadow-sm)" : "none",
+                    cursor: "pointer",
+                    transition: "border-color .12s, box-shadow .12s",
+                  }}
                 >
-                  <div className="flex items-center justify-between">
-                    <span className="font-medium text-sm">{c.name}</span>
-                    {on && <Badge>Enabled</Badge>}
+                  <div className="flex items-center justify-between gap-2">
+                    <span
+                      style={{
+                        fontFamily: "var(--headline)",
+                        fontWeight: 800,
+                        fontSize: 13,
+                      }}
+                    >
+                      {c.name}
+                    </span>
+                    {on && <Badge tone="pop">Enabled</Badge>}
                   </div>
-                  <p className="mt-1 text-xs text-muted-foreground line-clamp-2">
+                  <p
+                    className="pg-muted line-clamp-2"
+                    style={{ marginTop: 4, fontSize: 12 }}
+                  >
                     {c.description}
                   </p>
                 </button>
@@ -632,35 +712,41 @@ export function ProjectWorkspace({
 
         <TabsContent value="briefs" className="space-y-6 pt-4">
           {enabledConcepts.length === 0 ? (
-            <Card>
-              <CardContent className="py-16 text-center text-sm text-muted-foreground">
-                Enable at least one concept to start writing briefs.
-              </CardContent>
-            </Card>
+            <div className="pg-empty">
+              <div className="ix">
+                <Icon name="flag" size={26} />
+              </div>
+              <h3>No briefs yet</h3>
+              <p>Enable at least one concept to start writing briefs.</p>
+            </div>
           ) : (
             enabledConcepts.map((c) => (
               <div key={c.id} className="space-y-2">
                 <div className="flex items-center justify-between gap-3">
                   <div>
-                    <h2 className="text-base font-semibold">{c.name}</h2>
-                    <p className="text-xs text-muted-foreground">
+                    <h2 className="pg-h2" style={{ fontSize: 18 }}>
+                      {c.name}
+                    </h2>
+                    <p className="pg-muted" style={{ fontSize: 12, marginTop: 4 }}>
                       {c.description}
                     </p>
                     {informedBy[c.id] > 0 && (
-                      <p className="mt-1 text-xs text-emerald-700 dark:text-emerald-400">
+                      <p
+                        className="pg-mono"
+                        style={{ marginTop: 4, fontSize: 11, color: "var(--green)" }}
+                      >
                         Informed by {informedBy[c.id]} top-rated example
                         {informedBy[c.id] === 1 ? "" : "s"} from your library
                       </p>
                     )}
                   </div>
-                  <Button
+                  <button
                     type="button"
-                    size="sm"
-                    variant="outline"
+                    className="pg-btn pg-btn--outline pg-btn--sm"
                     onClick={() => regenerateBriefsForConcept(c.id)}
                   >
                     Regenerate
-                  </Button>
+                  </button>
                 </div>
                 <div className="grid gap-3">
                   {CONCEPT_VARIANTS.map((v) => {
@@ -691,27 +777,36 @@ export function ProjectWorkspace({
         </TabsContent>
 
         <TabsContent value="gallery" className="space-y-6 pt-4">
-          <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border bg-muted/30 px-3 py-2">
-            <div className="text-xs text-muted-foreground">
+          <div
+            className="flex flex-wrap items-center justify-between gap-2"
+            style={{
+              border: "1.5px solid var(--line)",
+              borderRadius: 4,
+              background: "#fff",
+              padding: "10px 12px",
+            }}
+          >
+            <div className="pg-muted" style={{ fontSize: 12, maxWidth: "52ch" }}>
               Rate the images you like. High-rated briefs are used as
               few-shot examples the next time Claude writes briefs for
               the same concept.
             </div>
-            <Button
+            <button
               type="button"
-              size="sm"
-              variant={topPerformersOnly ? "default" : "outline"}
+              className={`pg-chip ${topPerformersOnly ? "is-on" : ""}`}
               onClick={() => setTopPerformersOnly((v) => !v)}
             >
               {topPerformersOnly ? "Showing top only" : "Top Performers only"}
-            </Button>
+            </button>
           </div>
           {galleryConcepts.length === 0 ? (
-            <Card>
-              <CardContent className="py-16 text-center text-sm text-muted-foreground">
-                No images yet. Generate briefs, then images, to see them here.
-              </CardContent>
-            </Card>
+            <div className="pg-empty">
+              <div className="ix">
+                <Icon name="grid" size={26} />
+              </div>
+              <h3>Empty wall</h3>
+              <p>No images yet. Generate briefs, then images, to see them here.</p>
+            </div>
           ) : (
             galleryConcepts.map((c) => {
               const cards = CONCEPT_VARIANTS.map((v) => {
@@ -747,8 +842,10 @@ export function ProjectWorkspace({
 
               return (
                 <div key={c.id} className="space-y-2">
-                  <h2 className="text-base font-semibold">{c.name}</h2>
-                  <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                  <h2 className="pg-h2" style={{ fontSize: 18 }}>
+                    {c.name}
+                  </h2>
+                  <div className="pg-wall cols-3" style={{ padding: 0 }}>
                     {cards}
                   </div>
                 </div>

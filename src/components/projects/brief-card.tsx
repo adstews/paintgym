@@ -1,10 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import type {
   Brief,
@@ -93,53 +89,75 @@ export function BriefCard({
   const isReviewing = qaStatus === "reviewing" || qaStatus === "rewriting";
 
   return (
-    <Card>
-      <CardHeader className="pb-3">
-        <div className="flex items-start justify-between gap-3">
-          <CardTitle className="text-sm">Brief</CardTitle>
-          <div className="flex shrink-0 items-center gap-2">
-            {!hasBrief && <Badge variant="outline">Empty</Badge>}
-            {hasBrief && dirty && <Badge variant="secondary">Unsaved</Badge>}
-            {isGenerating && <Badge variant="secondary">Generating</Badge>}
-            {!isGenerating && qaStatus === "reviewing" && (
-              <Badge variant="secondary">Reviewing</Badge>
-            )}
-            {!isGenerating && qaStatus === "rewriting" && (
-              <Badge variant="secondary">Rewriting</Badge>
-            )}
-            {!isGenerating && qaStatus === "passed" && <Badge>Approved</Badge>}
-            {!isGenerating && qaStatus === "overridden" && <Badge>Accepted</Badge>}
-            {!isGenerating && qaStatus === "minor" && (
-              <Badge variant="secondary">Minor issues</Badge>
-            )}
-            {!isGenerating && qaStatus === "major" && (
-              <Badge variant="destructive">Flagged</Badge>
-            )}
-            {latestGeneration?.status === "failed" && (
-              <Badge variant="destructive">Failed</Badge>
-            )}
-          </div>
+    <div className="pg-form-card" style={{ marginTop: 0 }}>
+      <div className="flex items-start justify-between gap-3 mb12">
+        <span className="pg-field-label" style={{ marginBottom: 0 }}>
+          Brief
+        </span>
+        <div className="flex shrink-0 flex-wrap items-center gap-2">
+          {!hasBrief && <span className="pg-badge pg-badge--outline">Empty</span>}
+          {hasBrief && dirty && (
+            <span className="pg-badge pg-badge--outline">Unsaved</span>
+          )}
+          {isGenerating && (
+            <span className="pg-badge pg-badge--outline">Generating</span>
+          )}
+          {!isGenerating && qaStatus === "reviewing" && (
+            <span className="pg-badge pg-badge--outline">Reviewing</span>
+          )}
+          {!isGenerating && qaStatus === "rewriting" && (
+            <span className="pg-badge pg-badge--outline">Rewriting</span>
+          )}
+          {!isGenerating && qaStatus === "passed" && (
+            <span className="pg-badge pg-badge--pop">Approved</span>
+          )}
+          {!isGenerating && qaStatus === "overridden" && (
+            <span className="pg-badge pg-badge--ink">Accepted</span>
+          )}
+          {!isGenerating && qaStatus === "minor" && (
+            <span className="pg-badge pg-badge--outline">Minor issues</span>
+          )}
+          {!isGenerating && qaStatus === "major" && (
+            <span className="pg-badge pg-badge--red">Flagged</span>
+          )}
+          {latestGeneration?.status === "failed" && (
+            <span className="pg-badge pg-badge--red">Failed</span>
+          )}
         </div>
-      </CardHeader>
+      </div>
 
-      <CardContent className="space-y-3">
+      <div className="space-y-3">
         {!hasBrief ? (
-          <div className="rounded-md border border-dashed py-8 text-center text-xs text-muted-foreground">
-            Generate a brief for {concept.name}.
+          <div
+            className="pg-ph"
+            style={{
+              padding: "32px 16px",
+              borderRadius: 3,
+              textAlign: "center",
+            }}
+          >
+            <span>Generate a brief for {concept.name}.</span>
           </div>
         ) : hasSummary ? (
           <div className="space-y-3">
             {brief?.summary && (
-              <p className="text-sm leading-relaxed">{brief.summary}</p>
+              <p className="text-sm leading-relaxed" style={{ color: "var(--ink-2)" }}>
+                {brief.summary}
+              </p>
             )}
             {keyPoints.length > 0 && (
               <ul className="space-y-1.5">
                 {keyPoints.map((point, i) => (
                   <li
                     key={i}
-                    className="flex gap-2 text-xs text-muted-foreground"
+                    className="flex gap-2 text-xs"
+                    style={{ color: "var(--muted)" }}
                   >
-                    <span aria-hidden className="mt-px text-foreground">
+                    <span
+                      aria-hidden
+                      className="mt-px"
+                      style={{ color: "var(--pop-deep)" }}
+                    >
                       •
                     </span>
                     <span>{point}</span>
@@ -150,58 +168,71 @@ export function BriefCard({
             <button
               type="button"
               onClick={() => setShowFull((v) => !v)}
-              className="text-xs font-medium text-muted-foreground underline-offset-2 hover:underline"
+              className="pg-mono"
+              style={{
+                fontSize: 10.5,
+                letterSpacing: ".08em",
+                textTransform: "uppercase",
+                color: "var(--muted)",
+                background: "none",
+                border: 0,
+                cursor: "pointer",
+                textDecorationLine: "underline",
+                textUnderlineOffset: 2,
+              }}
             >
               {showFull ? "Hide full brief" : "View full brief"}
             </button>
             {showFull && (
-              <Textarea
+              <textarea
                 rows={12}
                 value={draft}
                 onChange={(e) => handleEdit(e.target.value)}
-                className="font-mono text-xs leading-relaxed"
+                className="pg-input pg-textarea pg-mono"
+                style={{ fontSize: 12, lineHeight: 1.5 }}
               />
             )}
           </div>
         ) : (
           <div className="space-y-2">
-            <Textarea
+            <textarea
               rows={8}
               value={draft}
               onChange={(e) => handleEdit(e.target.value)}
-              className="font-mono text-xs leading-relaxed"
+              className="pg-input pg-textarea pg-mono"
+              style={{ fontSize: 12, lineHeight: 1.5 }}
             />
-            <p className="text-xs text-muted-foreground">
+            <p className="text-xs" style={{ color: "var(--muted)" }}>
               Regenerate this brief to get a summary and key points.
             </p>
           </div>
         )}
-      </CardContent>
+      </div>
 
-      <CardFooter className="flex flex-wrap items-center justify-between gap-2 pt-0">
-        <Button
+      <div className="pg-div" />
+
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <button
           type="button"
-          size="sm"
-          variant="outline"
+          className="pg-btn pg-btn--outline pg-btn--sm"
           onClick={saveEdit}
           disabled={!hasBrief || !dirty || savingEdit}
         >
           {savingEdit ? "Saving..." : "Save edit"}
-        </Button>
+        </button>
         <div className="flex items-center gap-2">
-          <Button
+          <button
             type="button"
-            size="sm"
-            variant="outline"
+            className="pg-btn pg-btn--outline pg-btn--sm"
             onClick={handleRegenerate}
             disabled={regen}
             title="Regenerate this brief"
           >
             {regen ? "..." : "Regenerate"}
-          </Button>
-          <Button
+          </button>
+          <button
             type="button"
-            size="sm"
+            className="pg-btn pg-btn--pop pg-btn--sm"
             onClick={handleGenerate}
             disabled={!hasBrief || dirty || gen || isGenerating || isReviewing}
           >
@@ -210,9 +241,9 @@ export function BriefCard({
               : isReviewing
                 ? "Reviewing..."
                 : "Generate image"}
-          </Button>
+          </button>
         </div>
-      </CardFooter>
-    </Card>
+      </div>
+    </div>
   );
 }

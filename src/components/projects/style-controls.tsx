@@ -1,6 +1,5 @@
 "use client";
 
-import { Label } from "@/components/ui/label";
 import { SegmentedControl } from "./segmented-control";
 import { PLATFORM_DIMENSIONS } from "@/lib/types";
 import type {
@@ -18,11 +17,9 @@ interface Props {
 
 export function StyleControls({ value, onChange }: Props) {
   return (
-    <div className="space-y-5">
-      <div className="space-y-2">
-        <Label className="text-xs uppercase tracking-wide text-muted-foreground">
-          Aggressiveness
-        </Label>
+    <div>
+      <div className="pg-control-block" style={{ marginTop: 0 }}>
+        <div className="lab">Aggressiveness</div>
         <SegmentedControl<Aggressiveness>
           ariaLabel="Aggressiveness"
           value={value.aggressiveness}
@@ -36,11 +33,9 @@ export function StyleControls({ value, onChange }: Props) {
         />
       </div>
 
-      <div className="grid gap-5 sm:grid-cols-3">
-        <div className="space-y-2">
-          <Label className="text-xs uppercase tracking-wide text-muted-foreground">
-            Tone
-          </Label>
+      <div className="pg-grid2" style={{ marginTop: 18 }}>
+        <div className="pg-control-block" style={{ marginTop: 0 }}>
+          <div className="lab">Tone</div>
           <SegmentedControl<Tone>
             ariaLabel="Tone"
             value={value.tone}
@@ -55,10 +50,8 @@ export function StyleControls({ value, onChange }: Props) {
           />
         </div>
 
-        <div className="space-y-2">
-          <Label className="text-xs uppercase tracking-wide text-muted-foreground">
-            Visual style
-          </Label>
+        <div className="pg-control-block" style={{ marginTop: 0 }}>
+          <div className="lab">Visual style</div>
           <SegmentedControl<VisualStyle>
             ariaLabel="Visual style"
             value={value.visual_style}
@@ -72,10 +65,8 @@ export function StyleControls({ value, onChange }: Props) {
           />
         </div>
 
-        <div className="space-y-2">
-          <Label className="text-xs uppercase tracking-wide text-muted-foreground">
-            Platform
-          </Label>
+        <div className="pg-control-block" style={{ marginTop: 0 }}>
+          <div className="lab">Platform</div>
           <SegmentedControl<Platform>
             ariaLabel="Platform"
             value={value.platform}

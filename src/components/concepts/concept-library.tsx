@@ -2,12 +2,6 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog,
   DialogContent,
@@ -94,59 +88,84 @@ export function ConceptLibrary({ concepts }: { concepts: Concept[] }) {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Concepts</h1>
-          <p className="text-sm text-muted-foreground">
+          <h1 className="pg-h2">Concepts</h1>
+          <p className="text-sm" style={{ color: "var(--muted)", marginTop: 6 }}>
             Templates that drive each ad image. Defaults are read-only.
           </p>
         </div>
         <Dialog open={open} onOpenChange={setOpen}>
-          <DialogTrigger render={<Button onClick={openNew}>New concept</Button>} />
+          <DialogTrigger
+            render={
+              <button
+                className="pg-btn pg-btn--pop pg-btn--md"
+                onClick={openNew}
+              >
+                New concept
+              </button>
+            }
+          />
           <DialogContent className="max-w-2xl">
             <DialogHeader>
               <DialogTitle>
-                {editing ? "Edit concept" : "New concept"}
+                <span className="pg-h2">
+                  {editing ? "Edit concept" : "New concept"}
+                </span>
               </DialogTitle>
             </DialogHeader>
             <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="space-y-1.5">
-                <Label htmlFor="c-name">Name</Label>
-                <Input
+              <div className="pg-form-row">
+                <label className="pg-field-label" htmlFor="c-name">
+                  Name
+                </label>
+                <input
                   id="c-name"
+                  className="pg-input"
                   required
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                 />
               </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="c-desc">Description</Label>
-                <Input
+              <div className="pg-form-row">
+                <label className="pg-field-label" htmlFor="c-desc">
+                  Description
+                </label>
+                <input
                   id="c-desc"
+                  className="pg-input"
                   required
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                 />
               </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="c-tpl">Prompt template</Label>
-                <Textarea
+              <div className="pg-form-row">
+                <label className="pg-field-label" htmlFor="c-tpl">
+                  Prompt template
+                </label>
+                <textarea
                   id="c-tpl"
+                  className="pg-input pg-textarea pg-mono"
+                  style={{ fontSize: 12, lineHeight: 1.5 }}
                   required
                   rows={8}
                   value={template}
                   onChange={(e) => setTemplate(e.target.value)}
                   placeholder="Static Meta ad for {{product_name}}..."
                 />
-                <p className="text-xs text-muted-foreground">
+                <p className="text-xs" style={{ color: "var(--muted)", marginTop: 6 }}>
                   Available vars: product_name, client_name, description,
                   features, ingredients, price, product_image_url, logo_url.
                 </p>
               </div>
               <DialogFooter>
-                <Button type="submit" disabled={loading}>
+                <button
+                  type="submit"
+                  className="pg-btn pg-btn--pop pg-btn--md"
+                  disabled={loading}
+                >
                   {loading ? "Saving..." : "Save"}
-                </Button>
+                </button>
               </DialogFooter>
             </form>
           </DialogContent>
@@ -154,63 +173,91 @@ export function ConceptLibrary({ concepts }: { concepts: Concept[] }) {
       </div>
 
       <section className="space-y-3">
-        <h2 className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
-          Defaults
-        </h2>
+        <div className="pg-div" style={{ margin: 0 }}>
+          <span>Defaults</span>
+        </div>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {defaults.map((c) => (
-            <Card key={c.id}>
-              <CardHeader className="pb-2">
-                <div className="flex items-center justify-between gap-2">
-                  <CardTitle className="text-base">{c.name}</CardTitle>
-                  <Badge variant="secondary">default</Badge>
-                </div>
-              </CardHeader>
-              <CardContent className="text-xs text-muted-foreground line-clamp-3">
+            <div key={c.id} className="pg-form-card" style={{ marginTop: 0 }}>
+              <div className="flex items-center justify-between gap-2 mb8">
+                <h4
+                  style={{
+                    fontFamily: "var(--headline)",
+                    fontWeight: 800,
+                    fontSize: 15,
+                    letterSpacing: "-.01em",
+                  }}
+                >
+                  {c.name}
+                </h4>
+                <span className="pg-badge pg-badge--outline">default</span>
+              </div>
+              <p
+                className="text-xs line-clamp-3"
+                style={{ color: "var(--muted)" }}
+              >
                 {c.description}
-              </CardContent>
-            </Card>
+              </p>
+            </div>
           ))}
         </div>
       </section>
 
       <section className="space-y-3">
-        <h2 className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
-          Custom
-        </h2>
+        <div className="pg-div" style={{ margin: 0 }}>
+          <span>Custom</span>
+        </div>
         {custom.length === 0 ? (
-          <Card>
-            <CardContent className="py-12 text-center text-sm text-muted-foreground">
+          <div className="pg-form-card" style={{ marginTop: 0 }}>
+            <p
+              className="text-sm"
+              style={{
+                color: "var(--muted)",
+                textAlign: "center",
+                padding: "32px 0",
+              }}
+            >
               You have not added any custom concepts yet.
-            </CardContent>
-          </Card>
+            </p>
+          </div>
         ) : (
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {custom.map((c) => (
-              <Card key={c.id}>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-base">{c.name}</CardTitle>
-                </CardHeader>
-                <CardContent className="text-xs text-muted-foreground line-clamp-3 space-y-3">
-                  <p>{c.description}</p>
+              <div key={c.id} className="pg-form-card" style={{ marginTop: 0 }}>
+                <h4
+                  className="mb8"
+                  style={{
+                    fontFamily: "var(--headline)",
+                    fontWeight: 800,
+                    fontSize: 15,
+                    letterSpacing: "-.01em",
+                  }}
+                >
+                  {c.name}
+                </h4>
+                <div className="space-y-3">
+                  <p
+                    className="text-xs line-clamp-3"
+                    style={{ color: "var(--muted)" }}
+                  >
+                    {c.description}
+                  </p>
                   <div className="flex gap-2">
-                    <Button
-                      size="sm"
-                      variant="outline"
+                    <button
+                      className="pg-btn pg-btn--outline pg-btn--sm"
                       onClick={() => openEdit(c)}
                     >
                       Edit
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="ghost"
+                    </button>
+                    <button
+                      className="pg-btn pg-btn--ghost pg-btn--sm"
                       onClick={() => handleDelete(c)}
                     >
                       Delete
-                    </Button>
+                    </button>
                   </div>
-                </CardContent>
-              </Card>
+                </div>
+              </div>
             ))}
           </div>
         )}
