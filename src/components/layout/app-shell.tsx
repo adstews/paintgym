@@ -1,14 +1,8 @@
 import Link from "next/link";
-import { buttonVariants } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Icon } from "@/components/tf/ui";
 
+// Training Floor app chrome. Real nav links + real sign-out (POST /api/auth/signout)
+// preserved; only the skin changed.
 export function AppShell({
   email,
   children,
@@ -16,62 +10,43 @@ export function AppShell({
   email: string;
   children: React.ReactNode;
 }) {
-  const initial = email.slice(0, 1).toUpperCase();
   return (
-    <div className="min-h-screen flex flex-col">
-      <header className="border-b">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
-          <Link href="/dashboard" className="font-semibold tracking-tight">
-            paintgym
+    <div
+      style={{
+        minHeight: "100dvh",
+        display: "flex",
+        flexDirection: "column",
+        background: "var(--paper)",
+        fontFamily: "var(--ui)",
+        color: "var(--ink)",
+      }}
+    >
+      <header className="pg-topbar" style={{ position: "sticky", top: 0, zIndex: 30 }}>
+        <Link href="/dashboard" className="pg-wordmark" style={{ textDecoration: "none", color: "inherit" }}>
+          PAINT<span className="slash">/</span>GYM
+        </Link>
+        <nav style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <Link href="/dashboard" className="pg-btn pg-btn--ghost pg-btn--sm" style={{ textDecoration: "none" }}>
+            <Icon name="home" size={15} />
+            Gym
           </Link>
-          <nav className="hidden md:flex items-center gap-1">
-            <Link
-              href="/dashboard"
-              className={buttonVariants({ variant: "ghost" })}
-            >
-              Projects
-            </Link>
-            <Link
-              href="/concepts"
-              className={buttonVariants({ variant: "ghost" })}
-            >
-              Concepts
-            </Link>
-          </nav>
-          <DropdownMenu>
-            <DropdownMenuTrigger
-              className="rounded-full outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              aria-label="Account menu"
-            >
-              <Avatar>
-                <AvatarFallback>{initial}</AvatarFallback>
-              </Avatar>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem disabled className="text-xs text-muted-foreground">
-                {email}
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem
-                render={<Link href="/dashboard">Projects</Link>}
-              />
-              <DropdownMenuItem
-                render={<Link href="/concepts">Concepts</Link>}
-              />
-              <DropdownMenuSeparator />
-              <DropdownMenuItem>
-                <form action="/api/auth/signout" method="post" className="w-full">
-                  <button type="submit" className="w-full text-left">
-                    Sign out
-                  </button>
-                </form>
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
+          <Link href="/concepts" className="pg-btn pg-btn--ghost pg-btn--sm" style={{ textDecoration: "none" }}>
+            Concepts
+          </Link>
+          <Link href="/pricing" className="pg-btn pg-btn--ghost pg-btn--sm" style={{ textDecoration: "none" }}>
+            Pricing
+          </Link>
+          <form action="/api/auth/signout" method="post">
+            <button type="submit" className="pg-btn pg-btn--outline pg-btn--sm" title={email}>
+              Sign out
+            </button>
+          </form>
+        </nav>
       </header>
-      <main className="flex-1">
-        <div className="mx-auto max-w-6xl px-4 py-8">{children}</div>
+      <main style={{ flex: 1 }}>
+        <div style={{ maxWidth: 1180, margin: "0 auto", width: "100%", padding: "22px 18px 48px" }}>
+          {children}
+        </div>
       </main>
     </div>
   );
