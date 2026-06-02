@@ -1,9 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { HeartIcon, StarIcon, MegaphoneIcon } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
+import { HeartIcon, MegaphoneIcon } from "lucide-react";
+import { Icon } from "@/components/tf/ui";
 import { toast } from "sonner";
 import type { Generation } from "@/lib/types";
 
@@ -57,7 +56,7 @@ export function RatingControls({ generation, onUpdated, disabled }: Props) {
   return (
     <div className="flex w-full flex-wrap items-center gap-x-2 gap-y-1">
       <div
-        className="flex items-center"
+        className="pg-stars"
         onMouseLeave={() => setHover(null)}
         role="group"
         aria-label="Star rating"
@@ -68,57 +67,56 @@ export function RatingControls({ generation, onUpdated, disabled }: Props) {
             <button
               key={star}
               type="button"
+              className="pg-star-btn"
+              style={{
+                cursor: isDisabled ? "not-allowed" : "pointer",
+                opacity: isDisabled ? 0.5 : 1,
+              }}
               disabled={isDisabled}
               onClick={() => handleStarClick(star)}
               onMouseEnter={() => setHover(star)}
-              className={cn(
-                "p-0.5 transition disabled:cursor-not-allowed disabled:opacity-50",
-                "text-muted-foreground hover:text-amber-500",
-                filled && "text-amber-500",
-              )}
               aria-label={`Rate ${star} star${star === 1 ? "" : "s"}`}
               title={`${star} star${star === 1 ? "" : "s"}`}
             >
-              <StarIcon
-                className={cn("size-4", filled && "fill-current")}
-                aria-hidden
+              <Icon
+                name="star"
+                size={16}
+                sw={1.5}
+                style={{
+                  color: filled ? "var(--pop)" : "var(--ink)",
+                  fill: filled ? "var(--pop)" : "transparent",
+                  opacity: filled ? 1 : 0.25,
+                }}
               />
             </button>
           );
         })}
       </div>
 
-      <Button
+      <button
         type="button"
-        size="sm"
-        variant="ghost"
+        className="pg-btn pg-btn--ghost pg-btn--sm"
+        style={generation.is_favorited ? { color: "var(--red)" } : undefined}
         disabled={isDisabled}
         onClick={() => patch({ is_favorited: !generation.is_favorited })}
-        className={cn(
-          "h-7 gap-1 px-2 text-xs",
-          generation.is_favorited && "text-rose-500",
-        )}
         title={generation.is_favorited ? "Unfavorite" : "Favorite"}
       >
         <HeartIcon
-          className={cn(
-            "size-4",
-            generation.is_favorited && "fill-current",
-          )}
+          className={generation.is_favorited ? "size-4 fill-current" : "size-4"}
           aria-hidden
         />
         <span className="sr-only sm:not-sr-only">
           {generation.is_favorited ? "Favorited" : "Favorite"}
         </span>
-      </Button>
+      </button>
 
-      <Button
+      <button
         type="button"
-        size="sm"
-        variant={generation.used_in_ad ? "default" : "ghost"}
+        className={`pg-btn pg-btn--sm ${
+          generation.used_in_ad ? "pg-btn--pop" : "pg-btn--ghost"
+        }`}
         disabled={isDisabled}
         onClick={() => patch({ used_in_ad: !generation.used_in_ad })}
-        className="h-7 gap-1 px-2 text-xs"
         title={
           generation.used_in_ad
             ? "Marked as used in ad"
@@ -129,7 +127,7 @@ export function RatingControls({ generation, onUpdated, disabled }: Props) {
         <span className="sr-only sm:not-sr-only">
           {generation.used_in_ad ? "Used in ad" : "Mark used"}
         </span>
-      </Button>
+      </button>
     </div>
   );
 }

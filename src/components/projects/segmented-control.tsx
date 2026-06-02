@@ -1,7 +1,5 @@
 "use client";
 
-import { cn } from "@/lib/utils";
-
 export interface SegmentedOption<T extends string> {
   value: T;
   label: string;
@@ -25,12 +23,19 @@ export function SegmentedControl<T extends string>({
   size = "md",
   columns,
 }: Props<T>) {
-  const cls = columns ? `grid gap-2 grid-cols-${columns}` : "flex flex-wrap gap-2";
   return (
     <div
       role="radiogroup"
       aria-label={ariaLabel}
-      className={cls}
+      className="pg-chiprow"
+      style={
+        columns
+          ? {
+              display: "grid",
+              gridTemplateColumns: `repeat(${columns}, 1fr)`,
+            }
+          : undefined
+      }
     >
       {options.map((opt) => {
         const selected = opt.value === value;
@@ -41,24 +46,26 @@ export function SegmentedControl<T extends string>({
             role="radio"
             aria-checked={selected}
             onClick={() => onChange(opt.value)}
-            className={cn(
-              "rounded-md border px-3 text-left transition focus:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-              size === "sm" ? "py-1.5 text-xs" : "py-2 text-sm",
-              selected
-                ? "border-foreground bg-foreground text-background"
-                : "border-border bg-background hover:bg-accent",
-            )}
+            className={`pg-chip ${selected ? "is-on" : ""}`}
+            style={{
+              flexDirection: "column",
+              alignItems: "flex-start",
+              gap: 2,
+              padding: size === "sm" ? "7px 10px" : "9px 12px",
+              textAlign: "left",
+            }}
           >
-            <div className="font-medium">{opt.label}</div>
+            <span style={{ fontWeight: 700 }}>{opt.label}</span>
             {opt.hint && (
-              <div
-                className={cn(
-                  "mt-0.5 text-xs",
-                  selected ? "text-background/80" : "text-muted-foreground",
-                )}
+              <span
+                style={{
+                  fontSize: 9.5,
+                  letterSpacing: ".02em",
+                  opacity: selected ? 0.85 : 0.7,
+                }}
               >
                 {opt.hint}
-              </div>
+              </span>
             )}
           </button>
         );

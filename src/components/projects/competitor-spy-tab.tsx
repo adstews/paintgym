@@ -2,13 +2,8 @@
 
 import { useMemo, useState } from "react";
 import Image from "next/image";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
+import { Btn, Badge, Icon } from "@/components/tf/ui";
 import { GenerationCard } from "@/components/gallery/generation-card";
 import { CONCEPT_VARIANTS } from "@/lib/types";
 import type {
@@ -160,170 +155,273 @@ export function CompetitorSpyTab({
   }
 
   return (
-    <div className="space-y-6">
-      <Card>
-        <CardContent className="space-y-4 pt-6">
-          <div>
-            <h2 className="text-base font-semibold">Competitor Spy</h2>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Paste a competitor product URL. Claude reads their page, then
-              writes briefs that position your product directly against
-              theirs. Costs 1 credit per generated image.
-            </p>
-          </div>
+    <div className="pg-pad" style={{ paddingTop: 16 }}>
+      <div
+        className="pg-mono pg-muted"
+        style={{
+          fontSize: 11,
+          letterSpacing: ".08em",
+          textTransform: "uppercase",
+          marginBottom: 10,
+        }}
+      >
+        // spy on a competitor and position against them
+      </div>
+      <div className="pg-h2">Competitor Spy</div>
+      <p className="pg-muted" style={{ fontSize: 13.5, marginTop: 10, maxWidth: "46ch" }}>
+        Paste a competitor product URL. Claude reads their page, then writes
+        briefs that position your product directly against theirs. Costs 1
+        credit per generated image.
+      </p>
 
-          <div className="space-y-2">
-            <Label htmlFor="competitor-url">Competitor URL</Label>
-            <div className="flex flex-col gap-2 sm:flex-row">
-              <Input
-                id="competitor-url"
-                type="url"
-                placeholder="https://competitor.com/product/their-thing"
-                value={url}
-                onChange={(e) => setUrl(e.target.value)}
-                disabled={loading}
-                className="flex-1"
-              />
-              <Button
+      <div className="pg-pastebox">
+        <div className="row">
+          <Icon name="target" size={17} />
+          <input
+            id="competitor-url"
+            type="url"
+            placeholder="https://competitor.com/product/their-thing"
+            value={url}
+            onChange={(e) => setUrl(e.target.value)}
+            disabled={loading}
+          />
+          <Btn
+            type="button"
+            variant="pop"
+            size="sm"
+            iconR="arrow"
+            onClick={handleGenerate}
+            disabled={loading || !url.trim() || picked.size === 0}
+          >
+            {loading ? "Scraping and generating..." : "Generate competitive ads"}
+          </Btn>
+        </div>
+        <div className="hint">// reads their page · writes briefs that attack their product</div>
+      </div>
+
+      <div className="pg-control-block">
+        <div className="lab">
+          <span>Concepts to attack with</span>
+          <b>{picked.size} selected</b>
+        </div>
+        <div className="pg-grid2">
+          {concepts.map((c) => {
+            const on = picked.has(c.id);
+            return (
+              <button
+                key={c.id}
                 type="button"
-                onClick={handleGenerate}
-                disabled={loading || !url.trim() || picked.size === 0}
+                onClick={() => togglePick(c.id)}
+                disabled={loading}
+                style={{
+                  textAlign: "left",
+                  border: `1.5px solid ${on ? "var(--ink)" : "var(--line)"}`,
+                  borderRadius: 4,
+                  padding: 12,
+                  background: on ? "var(--pop)" : "#fff",
+                  color: "var(--ink)",
+                  cursor: loading ? "default" : "pointer",
+                  transition: "background .15s, border-color .15s",
+                }}
               >
-                {loading ? "Scraping and generating..." : "Generate competitive ads"}
-              </Button>
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <div className="flex items-center justify-between gap-2">
-              <Label>Concepts to attack with</Label>
-              <span className="text-xs text-muted-foreground">
-                {picked.size} selected
-              </span>
-            </div>
-            <div className="grid gap-2 sm:grid-cols-2">
-              {concepts.map((c) => {
-                const on = picked.has(c.id);
-                return (
-                  <button
-                    key={c.id}
-                    type="button"
-                    onClick={() => togglePick(c.id)}
-                    className={`text-left rounded-lg border p-3 transition ${
-                      on
-                        ? "border-foreground/40 bg-accent"
-                        : "border-border hover:bg-accent/40"
-                    }`}
-                    disabled={loading}
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    gap: 8,
+                  }}
+                >
+                  <span
+                    style={{
+                      fontFamily: "var(--headline)",
+                      fontWeight: 800,
+                      fontSize: 13.5,
+                      letterSpacing: "-.01em",
+                    }}
                   >
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium">{c.name}</span>
-                      {on && <Badge>Selected</Badge>}
-                    </div>
-                    <p className="mt-1 text-xs text-muted-foreground line-clamp-2">
-                      {c.description}
-                    </p>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+                    {c.name}
+                  </span>
+                  {on && (
+                    <Badge tone="ink">
+                      <Icon name="check" size={11} sw={3} /> Selected
+                    </Badge>
+                  )}
+                </div>
+                <p
+                  className="pg-muted"
+                  style={{
+                    marginTop: 5,
+                    fontSize: 11.5,
+                    lineHeight: 1.35,
+                    display: "-webkit-box",
+                    WebkitLineClamp: 2,
+                    WebkitBoxOrient: "vertical",
+                    overflow: "hidden",
+                  }}
+                >
+                  {c.description}
+                </p>
+              </button>
+            );
+          })}
+        </div>
+      </div>
 
       {competitor && (
-        <Card>
-          <CardContent className="space-y-4 pt-6">
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-1">
-                <Badge variant="outline">Your product</Badge>
-                <h3 className="text-sm font-semibold">
-                  {project.product_name ??
-                    project.product_data?.name ??
-                    project.brand_name ??
-                    "Unnamed product"}
-                </h3>
-                {project.price_point && (
-                  <p className="text-xs text-muted-foreground">
-                    Price: {project.price_point}
-                  </p>
-                )}
-                {project.product_description && (
-                  <p className="line-clamp-4 text-xs">
-                    {project.product_description}
-                  </p>
-                )}
-                {project.key_selling_points && (
-                  <div className="text-xs">
-                    <span className="font-medium">Key selling points: </span>
-                    {project.key_selling_points}
-                  </div>
-                )}
-              </div>
-              <div className="space-y-1">
-                <Badge variant="secondary">Competitor</Badge>
-                <h3 className="text-sm font-semibold">
-                  {competitor.brand ?? competitor.name ?? "Unknown brand"}
-                </h3>
-                {competitor.name && competitor.brand !== competitor.name && (
-                  <p className="text-xs text-muted-foreground">
-                    Product: {competitor.name}
-                  </p>
-                )}
-                {competitor.price && (
-                  <p className="text-xs text-muted-foreground">
-                    Price: {competitor.price}
-                  </p>
-                )}
-                {competitor.description && (
-                  <p className="line-clamp-4 text-xs">
-                    {competitor.description}
-                  </p>
-                )}
-                {competitor.features && competitor.features.length > 0 && (
-                  <ul className="mt-1 space-y-0.5 text-xs">
-                    {competitor.features.slice(0, 5).map((f, i) => (
-                      <li key={i} className="line-clamp-1">
-                        • {f}
-                      </li>
-                    ))}
-                  </ul>
-                )}
-                {competitor.images?.[0] && (
-                  <div className="relative mt-2 aspect-[4/5] w-24 overflow-hidden rounded-md border bg-muted">
-                    <Image
-                      src={competitor.images[0]}
-                      alt={competitor.name ?? "Competitor"}
-                      fill
-                      sizes="96px"
-                      className="object-contain"
-                      unoptimized
-                    />
-                  </div>
-                )}
-              </div>
+        <div className="pg-form-card" style={{ marginTop: 18 }}>
+          <div className="pg-grid2">
+            <div>
+              <Badge tone="outline">Your product</Badge>
+              <h3
+                style={{
+                  fontFamily: "var(--headline)",
+                  fontWeight: 800,
+                  fontSize: 14,
+                  letterSpacing: "-.01em",
+                  marginTop: 8,
+                }}
+              >
+                {project.product_name ??
+                  project.product_data?.name ??
+                  project.brand_name ??
+                  "Unnamed product"}
+              </h3>
+              {project.price_point && (
+                <p className="pg-muted" style={{ fontSize: 11.5, marginTop: 4 }}>
+                  Price: {project.price_point}
+                </p>
+              )}
+              {project.product_description && (
+                <p
+                  style={{
+                    fontSize: 11.5,
+                    marginTop: 4,
+                    lineHeight: 1.4,
+                    display: "-webkit-box",
+                    WebkitLineClamp: 4,
+                    WebkitBoxOrient: "vertical",
+                    overflow: "hidden",
+                  }}
+                >
+                  {project.product_description}
+                </p>
+              )}
+              {project.key_selling_points && (
+                <div style={{ fontSize: 11.5, marginTop: 6, lineHeight: 1.4 }}>
+                  <span style={{ fontWeight: 700 }}>Key selling points: </span>
+                  {project.key_selling_points}
+                </div>
+              )}
             </div>
-          </CardContent>
-        </Card>
+            <div>
+              <Badge tone="pop">Competitor</Badge>
+              <h3
+                style={{
+                  fontFamily: "var(--headline)",
+                  fontWeight: 800,
+                  fontSize: 14,
+                  letterSpacing: "-.01em",
+                  marginTop: 8,
+                }}
+              >
+                {competitor.brand ?? competitor.name ?? "Unknown brand"}
+              </h3>
+              {competitor.name && competitor.brand !== competitor.name && (
+                <p className="pg-muted" style={{ fontSize: 11.5, marginTop: 4 }}>
+                  Product: {competitor.name}
+                </p>
+              )}
+              {competitor.price && (
+                <p className="pg-muted" style={{ fontSize: 11.5, marginTop: 4 }}>
+                  Price: {competitor.price}
+                </p>
+              )}
+              {competitor.description && (
+                <p
+                  style={{
+                    fontSize: 11.5,
+                    marginTop: 4,
+                    lineHeight: 1.4,
+                    display: "-webkit-box",
+                    WebkitLineClamp: 4,
+                    WebkitBoxOrient: "vertical",
+                    overflow: "hidden",
+                  }}
+                >
+                  {competitor.description}
+                </p>
+              )}
+              {competitor.features && competitor.features.length > 0 && (
+                <ul style={{ marginTop: 6, fontSize: 11.5, lineHeight: 1.5 }}>
+                  {competitor.features.slice(0, 5).map((f, i) => (
+                    <li
+                      key={i}
+                      style={{
+                        display: "-webkit-box",
+                        WebkitLineClamp: 1,
+                        WebkitBoxOrient: "vertical",
+                        overflow: "hidden",
+                      }}
+                    >
+                      • {f}
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {competitor.images?.[0] && (
+                <div
+                  style={{
+                    position: "relative",
+                    marginTop: 8,
+                    width: 96,
+                    aspectRatio: "4/5",
+                    overflow: "hidden",
+                    borderRadius: 3,
+                    border: "1.5px solid var(--ink)",
+                    background: "#eceae3",
+                  }}
+                >
+                  <Image
+                    src={competitor.images[0]}
+                    alt={competitor.name ?? "Competitor"}
+                    fill
+                    sizes="96px"
+                    className="object-contain"
+                    unoptimized
+                  />
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
       )}
 
       {competitiveConcepts.length > 0 && (
-        <div className="space-y-4">
-          <Separator />
-          <div>
-            <h2 className="text-base font-semibold">Competitive gallery</h2>
-            <p className="text-xs text-muted-foreground">
-              Ads written to position your product against{" "}
-              {competitor?.brand ?? competitor?.name ?? "the competitor"}.
-            </p>
+        <>
+          <div className="pg-div">
+            <span>
+              Competitive gallery · vs{" "}
+              {competitor?.brand ?? competitor?.name ?? "the competitor"}
+            </span>
           </div>
           {competitiveConcepts.map((c) => {
             const concept = conceptsById.get(c.id);
             if (!concept) return null;
             return (
-              <div key={c.id} className="space-y-2">
-                <h3 className="text-sm font-semibold">{concept.name}</h3>
-                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              <div key={c.id} style={{ marginBottom: 18 }}>
+                <h3
+                  style={{
+                    fontFamily: "var(--headline)",
+                    fontWeight: 800,
+                    fontSize: 14,
+                    letterSpacing: "-.01em",
+                    marginBottom: 8,
+                  }}
+                >
+                  {concept.name}
+                </h3>
+                <div className="pg-wall cols-2" style={{ padding: 0 }}>
                   {CONCEPT_VARIANTS.map((v) => {
                     const attempts =
                       competitiveByKey.get(variantKey(c.id, v)) ?? [];
@@ -352,7 +450,7 @@ export function CompetitorSpyTab({
               </div>
             );
           })}
-        </div>
+        </>
       )}
     </div>
   );

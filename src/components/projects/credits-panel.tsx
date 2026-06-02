@@ -1,9 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import {
   Dialog,
   DialogContent,
@@ -70,16 +67,21 @@ export function CreditsPanel({
   }
 
   return (
-    <Card>
-      <CardContent className="flex flex-col gap-3 py-4 sm:flex-row sm:items-center sm:justify-between">
+    <div className="pg-form-card" style={{ marginTop: 0 }}>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex flex-wrap items-center gap-3">
-          <Badge variant={profile.credit_balance > 0 ? "default" : "destructive"}>
+          <span
+            className={cn(
+              "pg-badge",
+              profile.credit_balance > 0 ? "pg-badge--pop" : "pg-badge--red",
+            )}
+          >
             {profile.credit_balance} credit{profile.credit_balance === 1 ? "" : "s"}
-          </Badge>
+          </span>
           {!profile.has_purchased && profile.credit_balance > 0 && (
-            <Badge variant="outline">Free trial</Badge>
+            <span className="pg-badge pg-badge--outline">Free trial</span>
           )}
-          <span className="text-xs text-muted-foreground">
+          <span className="text-xs" style={{ color: "var(--muted)" }}>
             One credit per image generation.
             {lockedCount > 0
               ? ` ${lockedCount} legacy image${lockedCount === 1 ? "" : "s"} need${lockedCount === 1 ? "s" : ""} unlocking.`
@@ -88,27 +90,31 @@ export function CreditsPanel({
         </div>
         <div className="flex flex-wrap gap-2">
           {onUnlockAll && lockedCount > 0 && (
-            <Button
-              size="sm"
-              variant="outline"
+            <button
+              className="pg-btn pg-btn--outline pg-btn--sm"
               onClick={handleUnlockAll}
               disabled={unlockingAll}
             >
               {unlockingAll ? "Unlocking..." : `Unlock legacy (${lockedCount})`}
-            </Button>
+            </button>
           )}
-          <Button size="sm" onClick={() => setDialogOpen(true)}>
+          <button
+            className="pg-btn pg-btn--pop pg-btn--sm"
+            onClick={() => setDialogOpen(true)}
+          >
             Buy credits
-          </Button>
+          </button>
         </div>
-      </CardContent>
+      </div>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-w-3xl">
           <DialogHeader>
-            <DialogTitle>Buy credits</DialogTitle>
+            <DialogTitle>
+              <span className="pg-h2">Buy credits</span>
+            </DialogTitle>
           </DialogHeader>
-          <p className="text-sm text-muted-foreground">
+          <p className="text-sm" style={{ color: "var(--muted)" }}>
             One credit per image generation. Credits never expire. Failed
             renders never cost a credit.
           </p>
@@ -120,35 +126,51 @@ export function CreditsPanel({
                 onClick={() => buyPack(p.id)}
                 disabled={buying !== null}
                 className={cn(
-                  "relative rounded-lg border p-4 text-left transition hover:bg-accent",
-                  p.most_popular && "border-foreground/60 ring-1 ring-foreground/40",
+                  "pg-pack",
+                  p.most_popular && "pop",
                   buying === p.id && "opacity-60",
                 )}
+                style={{
+                  position: "relative",
+                  flexDirection: "column",
+                  alignItems: "flex-start",
+                  textAlign: "left",
+                  marginBottom: 0,
+                }}
               >
                 {p.most_popular && (
-                  <Badge className="absolute -top-2 right-3">
+                  <span
+                    className="pg-badge pg-badge--ink"
+                    style={{ position: "absolute", top: -10, right: 12 }}
+                  >
                     Most popular
-                  </Badge>
+                  </span>
                 )}
-                <div className="text-xs uppercase tracking-wide text-muted-foreground">
+                <div
+                  className="pg-mono"
+                  style={{
+                    fontSize: 10,
+                    letterSpacing: ".08em",
+                    textTransform: "uppercase",
+                    color: "var(--muted)",
+                  }}
+                >
                   {p.label}
                 </div>
-                <div className="mt-1 text-xl font-semibold">
-                  {p.credits} credits
-                </div>
-                <div className="text-sm">{formatPrice(p.amount_cents)}</div>
-                <div className="mt-2 text-xs text-muted-foreground">
+                <h4 style={{ marginTop: 4 }}>{p.credits} credits</h4>
+                <div className="price">{formatPrice(p.amount_cents)}</div>
+                <small style={{ marginTop: 8 }}>
                   {perCreditPrice(p.amount_cents, p.credits)}
-                </div>
+                </small>
               </button>
             ))}
           </div>
-          <p className="text-xs text-muted-foreground">
+          <p className="pg-mono" style={{ fontSize: 10, color: "var(--muted)", letterSpacing: ".04em" }}>
             Secure checkout powered by Stripe. Credits arrive in your balance
             seconds after the payment confirms.
           </p>
         </DialogContent>
       </Dialog>
-    </Card>
+    </div>
   );
 }
