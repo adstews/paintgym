@@ -9,21 +9,17 @@ import {
   Loader2Icon,
   SparklesIcon,
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardFooter } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { RatingControls } from "./rating-controls";
 import { RefineDialog } from "./refine-dialog";
+import type { CSSProperties } from "react";
 import type { Generation, QaStatus } from "@/lib/types";
 
 interface Props {
@@ -48,17 +44,28 @@ const QA_PRESENTATION: Record<QaStatus, QaPresentation> = {
   passed: { label: "QA passed", Icon: CircleCheckIcon, tone: "pass" },
   minor: { label: "Minor issues", Icon: TriangleAlertIcon, tone: "warn" },
   major: { label: "Major issues", Icon: OctagonXIcon, tone: "fail" },
-  overridden: { label: "Accepted by you", Icon: CircleCheckIcon, tone: "pass" },
+  overridden: { label: "Accepted", Icon: CircleCheckIcon, tone: "pass" },
   pending: { label: "QA pending", Icon: Loader2Icon, tone: "neutral" },
-  reviewing: { label: "Reviewing...", Icon: Loader2Icon, tone: "neutral" },
-  rewriting: { label: "Rewriting...", Icon: Loader2Icon, tone: "neutral" },
+  reviewing: { label: "Reviewing", Icon: Loader2Icon, tone: "neutral" },
+  rewriting: { label: "Rewriting", Icon: Loader2Icon, tone: "neutral" },
 };
 
-const TONE_CLASSES: Record<QaPresentation["tone"], string> = {
-  pass: "bg-emerald-500/90 text-white",
-  warn: "bg-amber-500/90 text-white",
-  fail: "bg-red-600/90 text-white",
-  neutral: "bg-foreground/70 text-background",
+const TONE_STYLE: Record<QaPresentation["tone"], CSSProperties> = {
+  pass: { background: "var(--pop)", color: "var(--pop-ink)" },
+  warn: { background: "var(--amber)", color: "#fff" },
+  fail: { background: "var(--red)", color: "#fff" },
+  neutral: { background: "var(--ink)", color: "#fff" },
+};
+
+const cornerBadge: CSSProperties = {
+  position: "absolute",
+  fontFamily: "var(--mono)",
+  fontSize: 8.5,
+  fontWeight: 700,
+  letterSpacing: ".04em",
+  textTransform: "uppercase",
+  padding: "3px 6px",
+  borderRadius: 2,
 };
 
 export function GenerationCard({
@@ -82,8 +89,6 @@ export function GenerationCard({
   const [issuesOpen, setIssuesOpen] = useState(false);
   const [refineOpen, setRefineOpen] = useState(false);
 
-  // Show the user-pinned attempt if they explicitly clicked one and it still
-  // exists; otherwise show the latest. This avoids an effect-driven setState.
   const pinned =
     pinnedId !== null ? attempts.find((a) => a.id === pinnedId) : undefined;
   const selected = pinned ?? latest;
@@ -155,211 +160,185 @@ export function GenerationCard({
 
   return (
     <>
-      <Card className="overflow-hidden">
-        <CardContent className="p-0">
-          <button
-            type="button"
-            onClick={() => selected.image_url && setOpen(true)}
-            className="block w-full aspect-[4/5] bg-muted relative group"
-          >
-            {isInFlight ? (
-              <>
-                <Skeleton className="absolute inset-0" />
-                <span className="absolute inset-0 flex items-center justify-center text-xs text-muted-foreground">
-                  {selected.status === "generating"
-                    ? "Generating..."
-                    : selected.qa_status === "reviewing"
-                      ? "Reviewing..."
-                      : "Rewriting..."}
-                </span>
-              </>
-            ) : displayUrl ? (
-              <Image
-                src={displayUrl}
-                alt={conceptName}
-                fill
-                sizes="(min-width:1024px) 320px, (min-width:640px) 50vw, 100vw"
-                className="object-cover group-hover:scale-[1.02] transition"
-                unoptimized
-              />
-            ) : selected.status === "failed" ? (
-              <div className="absolute inset-0 flex items-center justify-center text-sm text-destructive">
-                Generation failed
-              </div>
-            ) : (
-              <div className="absolute inset-0 flex items-center justify-center text-sm text-muted-foreground">
-                Pending
-              </div>
-            )}
-
-            <div
-              className={cn(
-                "absolute right-2 top-2 inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs font-medium shadow-sm backdrop-blur-sm",
-                TONE_CLASSES[presentation.tone],
-              )}
+      <div className="pg-adcard pg-card-in">
+        <div className="pg-adcard-frame">
+          <div style={{ position: "relative" }}>
+            <button
+              type="button"
+              onClick={() => selected.image_url && setOpen(true)}
+              style={{
+                display: "block",
+                width: "100%",
+                border: 0,
+                padding: 0,
+                background: "none",
+                cursor: selected.image_url ? "pointer" : "default",
+              }}
             >
-              <presentation.Icon
-                className={cn(
-                  "size-3.5",
-                  presentation.Icon === Loader2Icon && "animate-spin",
+              <div className="pg-ad" style={{ background: "var(--paper)" }}>
+                {isInFlight ? (
+                  <div className="pg-ad-load">
+                    <div className="ring" />
+                    <div className="lbl">
+                      {selected.status === "generating"
+                        ? "repping…"
+                        : selected.qa_status === "reviewing"
+                          ? "reviewing…"
+                          : "rewriting…"}
+                    </div>
+                  </div>
+                ) : displayUrl ? (
+                  <Image
+                    src={displayUrl}
+                    alt={conceptName}
+                    fill
+                    sizes="(min-width:1024px) 320px, (min-width:640px) 50vw, 100vw"
+                    className="object-cover"
+                    unoptimized
+                  />
+                ) : selected.status === "failed" ? (
+                  <div className="pg-ad-err">
+                    <TriangleAlertIcon className="size-5" aria-hidden />
+                    <div className="lbl">rep failed</div>
+                  </div>
+                ) : (
+                  <div className="pg-ad-load">
+                    <div className="lbl">pending</div>
+                  </div>
                 )}
-              />
-              <span>{presentation.label}</span>
-            </div>
-            {selected.is_auto_rewrite && (
-              <div className="absolute left-2 top-2 rounded-full bg-background/90 px-2 py-1 text-xs font-medium text-foreground shadow-sm">
-                Auto-rewrite #{selected.auto_rewrite_count}
-              </div>
-            )}
-            {!selected.is_unlocked && selected.image_url && (
-              <div className="absolute bottom-2 left-2 rounded-full bg-background/90 px-2 py-1 text-xs font-medium text-foreground shadow-sm">
-                Watermarked preview
-              </div>
-            )}
-            {selected.is_competitive && (
-              <div className="absolute bottom-2 right-2 rounded-full bg-foreground/90 px-2 py-1 text-xs font-semibold text-background shadow-sm">
-                vs {selected.competitor_name ?? "Competitor"}
-              </div>
-            )}
-          </button>
-        </CardContent>
 
-        <CardFooter className="flex flex-col gap-2 p-3">
-          <div className="flex w-full items-center justify-between gap-2">
-            <div className="flex items-center gap-2 min-w-0">
-              <span className="text-sm font-medium truncate">{conceptName}</span>
-              <Badge variant="outline" className="shrink-0">
-                v{selected.version}
-              </Badge>
-              {attempts.length > 1 && (
-                <Badge variant="secondary" className="shrink-0">
-                  {attempts.length} attempts
-                </Badge>
-              )}
-            </div>
+                {!isInFlight && (
+                  <div
+                    style={{
+                      ...cornerBadge,
+                      ...TONE_STYLE[presentation.tone],
+                      right: 6,
+                      top: 6,
+                      border: "1.5px solid var(--ink)",
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 4,
+                    }}
+                  >
+                    <presentation.Icon
+                      className={cn("size-3", presentation.Icon === Loader2Icon && "animate-spin")}
+                    />
+                    {presentation.label}
+                  </div>
+                )}
+                {selected.is_auto_rewrite && (
+                  <div style={{ ...cornerBadge, left: 6, top: 6, background: "#fff", color: "var(--ink)", border: "1px solid var(--line-2)" }}>
+                    rewrite #{selected.auto_rewrite_count}
+                  </div>
+                )}
+                {!selected.is_unlocked && selected.image_url && (
+                  <div style={{ ...cornerBadge, bottom: 6, left: 6, background: "#fff", color: "var(--ink)", border: "1px solid var(--line-2)" }}>
+                    watermarked
+                  </div>
+                )}
+                {selected.is_competitive && (
+                  <div style={{ ...cornerBadge, bottom: 6, right: 6, background: "var(--ink)", color: "#fff" }}>
+                    vs {selected.competitor_name ?? "Competitor"}
+                  </div>
+                )}
+              </div>
+            </button>
+          </div>
+
+          <div className="pg-ad-meta">
+            <span className="pg-ad-fw">
+              {conceptName}
+              {selected.version > 1 ? ` · v${selected.version}` : ""}
+            </span>
+            {selected.image_url && !isInFlight ? (
+              <RatingControls generation={selected} onUpdated={onRatingChange} />
+            ) : (
+              attempts.length > 1 && <span className="pg-ad-ver">{attempts.length} att</span>
+            )}
           </div>
 
           {hasIssues && (
-            <div className="w-full space-y-1">
+            <div style={{ marginTop: 6 }}>
               <button
                 type="button"
                 onClick={() => setIssuesOpen((v) => !v)}
-                className="text-left text-xs font-medium text-muted-foreground underline decoration-dotted"
+                className="pg-mono"
+                style={{ background: "none", border: 0, cursor: "pointer", fontSize: 9.5, color: "var(--muted)", textDecoration: "underline", textUnderlineOffset: 2 }}
               >
-                {issuesOpen ? "Hide issues" : `Show issues (${selected.qa_issues.length})`}
+                {issuesOpen ? "hide issues" : `issues (${selected.qa_issues.length})`}
               </button>
               {issuesOpen && (
-                <ul className="space-y-1 rounded-md border bg-muted/50 p-2 text-xs">
+                <ul style={{ listStyle: "none", margin: "6px 0 0", padding: 8, border: "1px solid var(--line)", background: "var(--paper)", borderRadius: 2, fontSize: 11, display: "flex", flexDirection: "column", gap: 4 }}>
                   {selected.qa_issues.map((issue, i) => (
-                    <li key={i} className="leading-snug">
-                      {issue}
-                    </li>
+                    <li key={i} style={{ lineHeight: 1.35 }}>{issue}</li>
                   ))}
                 </ul>
               )}
             </div>
           )}
 
-          <div className="flex w-full flex-wrap gap-1">
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 8 }}>
             {!selected.is_unlocked && selected.image_url && onUnlock && (
-              <Button
-                size="sm"
-                onClick={handleUnlock}
-                disabled={unlockLoading || isInFlight}
-              >
-                {unlockLoading ? "..." : "Unlock (1 credit)"}
-              </Button>
+              <button className="pg-btn pg-btn--pop pg-btn--sm" onClick={handleUnlock} disabled={unlockLoading || isInFlight}>
+                {unlockLoading ? "…" : "Unlock · 1cr"}
+              </button>
             )}
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={handleDownload}
-              disabled={!selected.image_url || !selected.is_unlocked}
-            >
+            <button className="pg-btn pg-btn--ghost pg-btn--sm" onClick={handleDownload} disabled={!selected.image_url || !selected.is_unlocked}>
               Download
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={handleRegenerate}
-              disabled={regenLoading || isInFlight}
-            >
-              {regenLoading ? "..." : "Regenerate"}
-            </Button>
+            </button>
+            <button className="pg-btn pg-btn--outline pg-btn--sm" onClick={handleRegenerate} disabled={regenLoading || isInFlight}>
+              {regenLoading ? "…" : "Regenerate"}
+            </button>
             {selected.image_url && !isInFlight && (
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => setRefineOpen(true)}
-                className="gap-1"
-              >
+              <button className="pg-btn pg-btn--outline pg-btn--sm" onClick={() => setRefineOpen(true)} style={{ gap: 5 }}>
                 <SparklesIcon className="size-3.5" aria-hidden />
                 Refine
-              </Button>
+              </button>
             )}
             {isFlagged && selected.image_url && (
               <>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={handleReReview}
-                  disabled={reviewLoading || isInFlight}
-                >
-                  {reviewLoading ? "..." : "Re-review"}
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={handleOverride}
-                  disabled={overrideLoading || isInFlight}
-                >
-                  {overrideLoading ? "..." : "Override"}
-                </Button>
+                <button className="pg-btn pg-btn--outline pg-btn--sm" onClick={handleReReview} disabled={reviewLoading || isInFlight}>
+                  {reviewLoading ? "…" : "Re-review"}
+                </button>
+                <button className="pg-btn pg-btn--outline pg-btn--sm" onClick={handleOverride} disabled={overrideLoading || isInFlight}>
+                  {overrideLoading ? "…" : "Override"}
+                </button>
               </>
             )}
           </div>
 
-          {selected.image_url && !isInFlight && (
-            <div className="w-full border-t pt-2">
-              <RatingControls
-                generation={selected}
-                onUpdated={onRatingChange}
-              />
-              {selected.refined_from && (
-                <div className="mt-1 text-[11px] text-muted-foreground">
-                  Refined from an earlier version
-                </div>
-              )}
+          {selected.refined_from && (
+            <div className="pg-mono" style={{ marginTop: 6, fontSize: 9, color: "var(--muted)" }}>
+              refined from an earlier rep
             </div>
           )}
 
           {attempts.length > 1 && (
-            <div className="w-full">
+            <div style={{ marginTop: 8 }}>
               <button
                 type="button"
                 onClick={() => setShowAttempts((v) => !v)}
-                className="text-xs font-medium text-muted-foreground underline decoration-dotted"
+                className="pg-mono"
+                style={{ background: "none", border: 0, cursor: "pointer", fontSize: 9.5, color: "var(--muted)", textDecoration: "underline", textUnderlineOffset: 2 }}
               >
-                {showAttempts ? "Hide attempts" : "All attempts"}
+                {showAttempts ? "hide attempts" : "all attempts"}
               </button>
               {showAttempts && (
-                <div className="mt-2 flex gap-2 overflow-x-auto pb-1">
+                <div className="pg-version-strip" style={{ marginTop: 8 }}>
                   {attempts.map((a) => (
                     <AttemptThumb
                       key={a.id}
                       attempt={a}
                       isSelected={a.id === selected.id}
-                      onClick={() =>
-                        setPinnedId(a.id === latest.id ? null : a.id)
-                      }
+                      onClick={() => setPinnedId(a.id === latest.id ? null : a.id)}
                     />
                   ))}
                 </div>
               )}
             </div>
           )}
-        </CardFooter>
-      </Card>
+        </div>
+      </div>
 
       <RefineDialog
         open={refineOpen}
@@ -380,19 +359,11 @@ export function GenerationCard({
           {displayUrl && (
             <div className="space-y-3">
               <div className="relative w-full aspect-[4/5] bg-muted rounded-md overflow-hidden">
-                <Image
-                  src={displayUrl}
-                  alt={conceptName}
-                  fill
-                  className="object-contain"
-                  unoptimized
-                />
+                <Image src={displayUrl} alt={conceptName} fill className="object-contain" unoptimized />
               </div>
               {hasIssues && (
                 <div className="space-y-1 rounded-md border bg-muted/50 p-2 text-xs">
-                  <div className="font-medium text-muted-foreground">
-                    QA issues
-                  </div>
+                  <div className="font-medium text-muted-foreground">QA issues</div>
                   <ul className="space-y-1">
                     {selected.qa_issues.map((issue, i) => (
                       <li key={i}>{issue}</li>
@@ -400,7 +371,6 @@ export function GenerationCard({
                   </ul>
                 </div>
               )}
-              <Separator />
               <div>
                 <div className="text-xs font-medium text-muted-foreground">
                   Brief used for this attempt
@@ -435,43 +405,19 @@ interface ThumbProps {
 
 function AttemptThumb({ attempt, isSelected, onClick }: ThumbProps) {
   const presentation = QA_PRESENTATION[attempt.qa_status];
-  const refined = Boolean(attempt.refined_from);
   return (
     <button
       type="button"
       onClick={onClick}
-      className={cn(
-        "relative h-16 w-16 shrink-0 overflow-hidden rounded-md border bg-muted",
-        isSelected
-          ? "border-foreground ring-2 ring-foreground/60"
-          : "border-border hover:border-foreground/40",
-      )}
-      title={
-        refined
-          ? `v${attempt.version} - ${presentation.label} (refined)`
-          : `v${attempt.version} - ${presentation.label}`
-      }
+      className={`pg-vthumb ${isSelected ? "is-on" : ""}`}
+      title={`v${attempt.version} - ${presentation.label}${attempt.refined_from ? " (refined)" : ""}`}
     >
-      {attempt.image_url ? (
-        <Image
-          src={attempt.image_url}
-          alt={`v${attempt.version}`}
-          fill
-          sizes="64px"
-          className="object-cover"
-          unoptimized
-        />
-      ) : (
-        <Skeleton className="absolute inset-0" />
-      )}
-      <span
-        className={cn(
-          "absolute bottom-0 left-0 right-0 px-1 text-[10px] font-medium leading-tight",
-          TONE_CLASSES[presentation.tone],
+      <div className="pg-ad" style={{ background: "var(--paper)" }}>
+        {attempt.image_url && (
+          <Image src={attempt.image_url} alt={`v${attempt.version}`} fill sizes="46px" className="object-cover" unoptimized />
         )}
-      >
-        v{attempt.version}
-      </span>
+      </div>
+      <div className="vlab">v{attempt.version}</div>
     </button>
   );
 }
