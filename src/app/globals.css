@@ -1,6 +1,7 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
+@import "./training-floor.css";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -46,6 +47,25 @@
   --radius-2xl: calc(var(--radius) * 1.8);
   --radius-3xl: calc(var(--radius) * 2.2);
   --radius-4xl: calc(var(--radius) * 2.6);
+}
+
+/* Training Floor design tokens exposed as Tailwind utilities (bg-paper, text-ink, bg-pop, font-display, ...) */
+@theme {
+  --color-paper: #f4f4f0;
+  --color-ink: #141414;
+  --color-ink2: #3a3a36;
+  --color-mutedink: #7c7c74;
+  --color-pop: #c2f536;
+  --color-popink: #141414;
+  --color-popdeep: #a6d916;
+  --color-cardtf: #ffffff;
+  --color-redtf: #e5484d;
+  --color-greentf: #2f9e5e;
+  --color-ambertf: #e6a020;
+  --font-display: var(--font-archivo), sans-serif;
+  --font-headline: var(--font-archivo), sans-serif;
+  --font-ui: var(--font-hanken), system-ui, sans-serif;
+  --font-tfmono: var(--font-space-mono), monospace;
 }
 
 :root {
@@ -126,5 +146,39 @@
   }
   html {
     @apply font-sans;
+  }
+}
+
+/* ===== Training Floor: wire the design's font tokens to next/font, and
+   turn the prototype's fake phone-bezel into a real responsive shell ===== */
+:root {
+  --display: var(--font-archivo), sans-serif;
+  --headline: var(--font-archivo), sans-serif;
+  --ui: var(--font-hanken), system-ui, sans-serif;
+  --mono: var(--font-space-mono), monospace;
+}
+
+/* Below the desktop breakpoint the app is fullscreen edge-to-edge (no bezel). */
+@media (max-width: 999px) {
+  .pg-stage {
+    padding: 0;
+    overflow: visible;
+    align-items: stretch;
+  }
+  .pg-phone {
+    width: 100%;
+    height: auto;
+    min-height: 100dvh;
+    border-radius: 0;
+    padding: 0;
+    box-shadow: none;
+    background: var(--paper);
+  }
+  .pg-screen {
+    position: relative;
+    inset: auto;
+    border-radius: 0;
+    min-height: 100dvh;
+    overflow: visible;
   }
 }

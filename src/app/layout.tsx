@@ -1,25 +1,49 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import {
+  Geist,
+  Geist_Mono,
+  Archivo,
+  Hanken_Grotesk,
+  Space_Mono,
+} from "next/font/google";
 import Script from "next/script";
 import "./globals.css";
 
 const META_PIXEL_ID = "1256753106289269";
 const GTM_ID = "GTM-5KDK42WX";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
+const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
+
+// Training Floor type system
+const archivo = Archivo({
+  variable: "--font-archivo",
   subsets: ["latin"],
+  weight: ["400", "600", "700", "800"],
+});
+const hanken = Hanken_Grotesk({
+  variable: "--font-hanken",
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
+});
+const spaceMono = Space_Mono({
+  variable: "--font-space-mono",
+  subsets: ["latin"],
+  weight: ["400", "700"],
 });
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
+const fontVars = [
+  geistSans.variable,
+  geistMono.variable,
+  archivo.variable,
+  hanken.variable,
+  spaceMono.variable,
+].join(" ");
 
 export const metadata: Metadata = {
-  title: "paintgym — generate ad creative with AI",
+  title: "paintgym — build ad volume",
   description:
-    "Turn any product URL into a library of ad creative concepts, generated with AI.",
+    "A gym for your ad creative. Paste a product URL and train a whole wall of ad concepts across 35 proven frameworks.",
 };
 
 export default function RootLayout({
@@ -28,10 +52,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html
-      lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
-    >
+    <html lang="en" className={`${fontVars} h-full antialiased`}>
       <head>
         <Script id="gtm" strategy="afterInteractive">
           {`(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
@@ -62,7 +83,7 @@ fbq('track', 'PageView');`}
           />
         </noscript>
       </head>
-      <body className="min-h-full flex flex-col">
+      <body className="min-h-full">
         <noscript>
           <iframe
             src={`https://www.googletagmanager.com/ns.html?id=${GTM_ID}`}
