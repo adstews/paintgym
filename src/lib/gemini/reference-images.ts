@@ -1,20 +1,25 @@
-// Loads project product/logo images (public bucket URLs) into inline image
-// data so they can be attached to Gemini generateContent calls as the exact
-// visual reference for the product. Without this the model invents a product.
+// Loads the project's PRIMARY product image as inline data so it can be:
+//  (1) attached to the Gemini image-generation call as the exact reference, and
+//  (2) shown to Claude when it writes the brief (so the brief matches reality).
+// One clean reference beats several scraped images — multiple conflicting refs
+// make the model blend/swap products, which is the "wrong product" bug.
 
 export interface InlineImage {
   mimeType: string;
   data: string;
 }
 
-const MAX_PRODUCT_REFS = 3;
+// Both Gemini and Anthropic accept these as vision input; svg is not supported.
+const SUPPORTED_MIME = new Set(["image/jpeg", "image/png", "image/gif", "image/webp"]);
 
 async function urlToInline(url: string): Promise<InlineImage | null> {
   try {
     const res = await fetch(url);
     if (!res.ok) return null;
-    const contentType = res.headers.get("content-type") || "image/png";
-    if (!contentType.startsWith("image/")) return null;
+    const contentType = (res.headers.get("content-type") || "image/png")
+      .split(";")[0]
+      .trim();
+    if (!SUPPORTED_MIME.has(contentType)) return null;
     const buffer = Buffer.from(await res.arrayBuffer());
     if (buffer.length === 0) return null;
     return { mimeType: contentType, data: buffer.toString("base64") };
@@ -23,21 +28,21 @@ async function urlToInline(url: string): Promise<InlineImage | null> {
   }
 }
 
+/** The single primary product image (first in the list) as inline data, or null. */
+export async function loadPrimaryProductImage(
+  productImageUrls: string[] | null | undefined,
+): Promise<InlineImage | null> {
+  const url = (productImageUrls ?? []).find((u) => typeof u === "string" && u.length > 0);
+  return url ? urlToInline(url) : null;
+}
+
 /**
- * Fetches a project's product images (first few) and logo as inline reference
- * images. Failed/unreachable URLs are skipped silently so a bad reference never
- * breaks a generation.
+ * Reference images for an image generation: just the one clean primary product
+ * shot. A single faithful reference beats several conflicting scraped images.
  */
 export async function collectReferenceImages(
   productImageUrls: string[] | null | undefined,
-  logoUrl: string | null | undefined,
 ): Promise<InlineImage[]> {
-  const urls: string[] = [];
-  for (const url of (productImageUrls ?? []).slice(0, MAX_PRODUCT_REFS)) {
-    if (url) urls.push(url);
-  }
-  if (logoUrl) urls.push(logoUrl);
-
-  const settled = await Promise.all(urls.map(urlToInline));
-  return settled.filter((img): img is InlineImage => img !== null);
+  const primary = await loadPrimaryProductImage(productImageUrls);
+  return primary ? [primary] : [];
 }

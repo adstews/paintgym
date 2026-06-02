@@ -12,6 +12,7 @@ interface Props {
   multiple?: boolean;
   folder: string;
   accept?: string;
+  allowPrimary?: boolean;
 }
 
 export function ImageUploadField({
@@ -21,6 +22,7 @@ export function ImageUploadField({
   multiple = false,
   folder,
   accept = "image/*",
+  allowPrimary = false,
 }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
@@ -143,6 +145,29 @@ export function ImageUploadField({
               >
                 Remove
               </button>
+              {allowPrimary && urls.length > 1 && (
+                <div
+                  style={{
+                    position: "absolute",
+                    left: 4,
+                    bottom: 4,
+                  }}
+                >
+                  {i === 0 ? (
+                    <span className="pg-badge pg-badge--pop">Primary</span>
+                  ) : (
+                    <button
+                      type="button"
+                      className="pg-btn pg-btn--outline pg-btn--sm"
+                      onClick={() =>
+                        onChange([u, ...urls.filter((_, idx) => idx !== i)])
+                      }
+                    >
+                      Set primary
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
           ))}
         </div>

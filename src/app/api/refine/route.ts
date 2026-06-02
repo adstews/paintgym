@@ -4,6 +4,7 @@ import { refineRequestSchema } from "@/lib/validators/schemas";
 import { refineBriefFromFeedback } from "@/lib/anthropic/refine-brief";
 import { reviewImage } from "@/lib/anthropic/review-image";
 import { generateImage } from "@/lib/gemini/generate-image";
+import { collectReferenceImages } from "@/lib/gemini/reference-images";
 import { checkGenerationCredits, deductCredits } from "@/lib/credits";
 import {
   DEFAULT_STYLE_SETTINGS,
@@ -158,11 +159,16 @@ export async function POST(request: Request) {
   }
   const row = inserted as Generation;
 
+  const referenceImages = await collectReferenceImages(
+    (project.product_data as { images?: string[] } | null)?.images,
+  );
+
   let imageDataUrl: string;
   try {
     const result = await generateImage({
       prompt: refinedBrief,
       platform: project.style_settings.platform,
+      referenceImages,
     });
     imageDataUrl = result.imageDataUrl;
   } catch (err) {

@@ -106,7 +106,6 @@ export async function POST(request: Request) {
 
   const referenceImages = await collectReferenceImages(
     (project.product_data as ProductData | null)?.images,
-    project.logo_url as string | null,
   );
 
   try {

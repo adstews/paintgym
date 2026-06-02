@@ -8,7 +8,10 @@ import {
 import { generateCompetitiveBriefsForConcept } from "@/lib/anthropic/competitive-brief";
 import { reviewImage } from "@/lib/anthropic/review-image";
 import { generateImage } from "@/lib/gemini/generate-image";
-import { collectReferenceImages } from "@/lib/gemini/reference-images";
+import {
+  collectReferenceImages,
+  loadPrimaryProductImage,
+} from "@/lib/gemini/reference-images";
 import {
   checkGenerationCredits,
   deductCredits,
@@ -203,7 +206,12 @@ export async function POST(request: Request) {
   // show the real product instead of an invented one.
   const referenceImages = await collectReferenceImages(
     project.product_data?.images,
-    project.logo_url,
+  );
+
+  // The single clean product image Claude sees while writing each brief, so
+  // the competitive copy reproduces the real product rather than inventing one.
+  const productImage = await loadPrimaryProductImage(
+    project.product_data?.images,
   );
 
   // 1) Scrape the competitor URL.
@@ -270,6 +278,7 @@ export async function POST(request: Request) {
         project,
         concept,
         competitor,
+        productImage,
       });
       return { concept, variants };
     }),

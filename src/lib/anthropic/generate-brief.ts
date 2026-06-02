@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type Anthropic from "@anthropic-ai/sdk";
 import { BRIEF_MODEL, getAnthropicClient } from "./client";
 import {
   buildConceptSection,
@@ -7,38 +8,51 @@ import {
 } from "./brief-context";
 import { buildFewShotSection, type FewShotExample } from "./few-shot";
 import type { Concept, ConceptVariant, Project } from "../types";
+import type { InlineImage } from "../gemini/reference-images";
 
-function buildSystemPrompt(): string {
-  return `You are a senior creative director who writes image generation briefs for paid social ads. Your brief feeds directly into an image model (Gemini Nano Banana or similar). The brief must be a single self-contained paragraph the image model can render without further context.
+const SUPPORTED_MIME = new Set(["image/jpeg", "image/png", "image/gif", "image/webp"]);
 
-For the concept you are given, write ONE brief: the strongest, most scroll-stopping interpretation of the concept for this product.
+function buildSystemPrompt(hasImage: boolean): string {
+  return `You are a senior creative director who writes image-generation briefs for paid social ads. Your brief is fed directly to an image model (Gemini "Nano Banana Pro") that ALSO receives the product image. The brief must be a single, vivid, self-contained paragraph the model can render verbatim.
 
-Rules that always apply:
-- Use the exact product or brand details provided. Do not invent product names, prices, features, claims, or testimonials.
-- The brief is for ONE static image. Describe composition, subject, lighting, color palette, typography, on-image copy, and aspect ratio.
-- On-image copy must be short and concrete. Quote it verbatim in double quotes so the image model renders it exactly.
+${
+    hasImage
+      ? `A photo of the ACTUAL product is attached. Study it. The ad must feature THIS EXACT product — same item, packaging, label, shape, proportions, colors, and any text or logo printed on it. In the brief, describe the real product as you actually see it and explicitly instruct the model to reproduce it faithfully from the attached reference. Never invent, restyle, or substitute a different product.`
+      : `No product photo is attached; rely on the product details given and do not invent specific packaging or label artwork.`
+  }
+
+For the concept you are given, write ONE brief — the strongest, most scroll-stopping execution of that concept's framework for this product.
+
+Make the brief concrete and renderable:
+- Lead with the product as the hero unless the framework dictates otherwise; say where it sits in the 4:5 frame.
+- Specify composition, background/scene, lighting, and color palette (reference brand colors by hex when given).
+- Write every piece of on-image copy verbatim in "double quotes" so the model renders it exactly; keep it short and specific.
+- Specify typography (a named typeface family or a faithful description) and the 4:5 / 1080x1350 framing.
+
+Rules:
+- Use the exact product, brand, price, and proof details provided. Do not invent product names, prices, features, claims, or testimonials.
 - Match the supplied aggressiveness, tone, visual style, and platform.
-- If brand colors, fonts, or voice are supplied, reference them by hex and name and write copy in the brand voice.
-- Never use em dashes. Never use exclamation marks. Never use AI cliches like unleash, elevate, revolutionize, game-changer, journey.
-- Do not address the human reader, do not explain your choices in the brief.
+- Never use em dashes. Never use exclamation marks. No AI cliches (unleash, elevate, revolutionize, game-changer, journey).
+- Do not address the reader or explain your choices in the brief.
 
 Output format:
 - Respond with a single JSON object and nothing else. No prose, no markdown fence, no preamble.
 - Shape: {"brief_text": "...", "summary": "...", "key_points": ["...", "...", "..."]}
 - "brief_text" is the full image-generation brief described above.
 - "summary" is one short sentence (max ~15 words) describing the ad at a glance.
-- "key_points" is exactly three short phrases (~3 to 6 words each, not full sentences) naming the most important creative decisions: the hook or headline, the core visual, and the format or angle.`;
+- "key_points" is exactly three short phrases (~3 to 6 words each) naming the most important creative decisions: the hook or headline, the core visual, and the format or angle.`;
 }
 
 function buildUserPrompt(
   project: Project,
   concept: Concept,
   examples: FewShotExample[],
+  hasImage: boolean,
 ): string {
   const fewShot = buildFewShotSection(examples);
   return `## Product context
 ${buildProductContext(project)}
-
+${hasImage ? "\nThe attached image is the actual product this ad must feature. Describe and reproduce THAT product exactly.\n" : ""}
 ## Concept for this ad
 ${buildConceptSection(concept)}
 
@@ -83,25 +97,42 @@ export interface GenerateBriefOptions {
   project: Project;
   concept: Concept;
   fewShotExamples?: FewShotExample[];
+  productImage?: InlineImage | null;
 }
 
 export async function generateBriefsForConcept({
   project,
   concept,
   fewShotExamples = [],
+  productImage = null,
 }: GenerateBriefOptions): Promise<VariantBrief[]> {
   const client = getAnthropicClient();
+
+  const useImage = !!productImage && SUPPORTED_MIME.has(productImage.mimeType);
+  const userText = buildUserPrompt(project, concept, fewShotExamples, useImage);
+  const content: Anthropic.MessageParam["content"] = useImage
+    ? [
+        {
+          type: "image",
+          source: {
+            type: "base64",
+            media_type: productImage!.mimeType as
+              | "image/jpeg"
+              | "image/png"
+              | "image/gif"
+              | "image/webp",
+            data: productImage!.data,
+          },
+        },
+        { type: "text", text: userText },
+      ]
+    : userText;
 
   const response = await client.messages.create({
     model: BRIEF_MODEL,
     max_tokens: 2000,
-    system: buildSystemPrompt(),
-    messages: [
-      {
-        role: "user",
-        content: buildUserPrompt(project, concept, fewShotExamples),
-      },
-    ],
+    system: buildSystemPrompt(useImage),
+    messages: [{ role: "user", content }],
   });
 
   const text = extractText(response.content);

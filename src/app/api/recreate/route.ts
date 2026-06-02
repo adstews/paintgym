@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { recreateRequestSchema } from "@/lib/validators/schemas";
 import { recreateFromExample } from "@/lib/anthropic/recreate-from-example";
 import { generateImage } from "@/lib/gemini/generate-image";
+import { collectReferenceImages } from "@/lib/gemini/reference-images";
 import {
   checkGenerationCredits,
   deductCredits,
@@ -120,6 +121,10 @@ export async function POST(request: Request) {
     recreateResult.briefs.map((b) => [b.label, b.brief_text]),
   );
 
+  const referenceImages = await collectReferenceImages(
+    (project.product_data as { images?: string[] } | null)?.images,
+  );
+
   const settled = await Promise.allSettled(
     VARIANT_LABELS.map(async (label, index): Promise<VariantResult> => {
       const brief_text = briefByLabel.get(label);
@@ -136,6 +141,7 @@ export async function POST(request: Request) {
         const { imageDataUrl } = await generateImage({
           prompt: brief_text,
           platform: project.style_settings.platform,
+          referenceImages,
         });
         const { data: gen, error: insErr } = await supabase
           .from("generations")

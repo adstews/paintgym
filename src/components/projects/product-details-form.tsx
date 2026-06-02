@@ -215,6 +215,7 @@ export function ProductDetailsForm({ project, onProjectChange }: Props) {
           <ImageUploadField
             label="Product images"
             multiple
+            allowPrimary
             folder={`projects-${project.id}`}
             urls={heroImages}
             onChange={(next) => patchProductData({ images: next })}

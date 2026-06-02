@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { generateBriefsSchema } from "@/lib/validators/schemas";
 import { generateBriefsForConcept } from "@/lib/anthropic/generate-brief";
+import { loadPrimaryProductImage } from "@/lib/gemini/reference-images";
 import { loadFewShotExamples } from "@/lib/anthropic/few-shot";
 import { DEFAULT_STYLE_SETTINGS } from "@/lib/types";
 import type { Concept, Project, StyleSettings } from "@/lib/types";
@@ -65,6 +66,13 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "concepts_not_found" }, { status: 404 });
   }
 
+  // Load the primary product image once so Claude can SEE the real product
+  // while writing each brief (otherwise it writes blind and can describe the
+  // wrong product, which the image model then renders).
+  const productImage = await loadPrimaryProductImage(
+    fullProject.product_data?.images ?? null,
+  );
+
   const fewShotByConcept = new Map<string, number>();
   const settled = await Promise.allSettled(
     (concepts as Concept[]).map(async (concept) => {
@@ -77,6 +85,7 @@ export async function POST(request: Request) {
         project: fullProject,
         concept,
         fewShotExamples: examples,
+        productImage,
       });
       return { concept, variants };
     }),
