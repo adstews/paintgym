@@ -1,6 +1,14 @@
 "use client";
 
-import { useMemo, useState, type CSSProperties, type ReactElement } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+  type ReactElement,
+} from "react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { Icon, Badge } from "@/components/tf/ui";
@@ -51,12 +59,43 @@ function variantKey(conceptId: string, variant: ConceptVariant | null): string {
 }
 
 // --- batch generation tuning -------------------------------------------------
-// Generate several images at once instead of one giant serial chain, and bound
-// every network call so a single stalled request can never freeze the batch.
+// The batch runs through a durable DB-backed queue. The browser ticks
+// /api/process-queue with bounded concurrency (each call claims and runs one
+// job) until the queue drains; all state lives in the DB so a closed tab just
+// pauses ticking. Single-image actions still call /api/generate directly.
 const GEN_CONCURRENCY = 3;
-const QA_CONCURRENCY = 3;
 const GENERATE_TIMEOUT_MS = 170_000;
 const REVIEW_TIMEOUT_MS = 170_000;
+const PROCESS_TIMEOUT_MS = 290_000;
+const PROGRESS_POLL_MS = 2_500;
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+interface ProgressJob {
+  id: string;
+  generation_id: string | null;
+  concept_id: string | null;
+  concept_variant: string | null;
+  type: "generate" | "review" | "rewrite";
+  status: "pending" | "processing" | "completed" | "failed";
+  attempts: number;
+  max_attempts: number;
+  error: string | null;
+}
+
+interface ProgressState {
+  counts: {
+    pending: number;
+    processing: number;
+    completed: number;
+    failed: number;
+    total: number;
+  };
+  active: number;
+  jobs: ProgressJob[];
+}
 
 interface PostJsonResult {
   ok: boolean;
@@ -89,32 +128,6 @@ async function postJson(
   }
 }
 
-// Bounded-concurrency map. Workers pull from a shared cursor; one slow or failing
-// item only ties up its own slot, never the whole queue.
-async function mapWithConcurrency<T, R>(
-  items: T[],
-  limit: number,
-  worker: (item: T, index: number) => Promise<R>,
-): Promise<R[]> {
-  const results: R[] = new Array(items.length);
-  let cursor = 0;
-  async function run() {
-    while (cursor < items.length) {
-      const i = cursor++;
-      try {
-        results[i] = await worker(items[i], i);
-      } catch {
-        // Workers handle their own errors; this is a backstop so one unexpected
-        // throw can't kill a pool slot and stall the rest of the batch.
-        results[i] = undefined as unknown as R;
-      }
-    }
-  }
-  const pool = Array.from({ length: Math.min(limit, items.length) }, run);
-  await Promise.all(pool);
-  return results;
-}
-
 export function ProjectWorkspace({
   project: initialProject,
   concepts,
@@ -132,8 +145,12 @@ export function ProjectWorkspace({
   const [profile, setProfile] = useState(initialProfile);
   const [batchBriefsLoading, setBatchBriefsLoading] = useState(false);
   const [batchImagesLoading, setBatchImagesLoading] = useState(false);
+  const [progress, setProgress] = useState<ProgressState | null>(null);
   const [topPerformersOnly, setTopPerformersOnly] = useState(false);
   const [informedBy, setInformedBy] = useState<Record<string, number>>({});
+  // Guards against two drains running at once (e.g. resume-on-mount racing the
+  // button) and against React 18 strict-mode double-invoking the resume effect.
+  const drainingRef = useRef(false);
 
   const conceptsById = useMemo(
     () => new Map(concepts.map((c) => [c.id, c])),
@@ -469,56 +486,150 @@ export function ProjectWorkspace({
     setGenerations((arr) => [...newGens, ...arr]);
   }
 
+  // Drain the DB-backed queue: tick /api/process-queue with bounded concurrency
+  // (each call claims and runs one job) while polling /api/progress for the bar.
+  // Resumable by design — if this stops (tab closed), the jobs stay in the DB and
+  // the next mount picks up where it left off.
+  const startDrain = useCallback(async () => {
+    if (drainingRef.current) return;
+    drainingRef.current = true;
+    setBatchImagesLoading(true);
+    let running = true;
+
+    const mergeRows = (rows: Generation[]) => {
+      if (rows.length === 0) return;
+      setGenerations((arr) => {
+        const byId = new Map(arr.map((g) => [g.id, g]));
+        for (const g of rows) byId.set(g.id, g);
+        return Array.from(byId.values());
+      });
+    };
+
+    const refreshProgress = async () => {
+      try {
+        const res = await fetch(`/api/progress/${project.id}`);
+        if (res.ok) setProgress((await res.json()) as ProgressState);
+      } catch {
+        // Progress is cosmetic; a failed poll just means a stale bar for a beat.
+      }
+    };
+
+    const poll = (async () => {
+      while (running) {
+        await refreshProgress();
+        await sleep(PROGRESS_POLL_MS);
+      }
+    })();
+
+    const tick = async () => {
+      while (running) {
+        const { ok, json, timedOut } = await postJson(
+          "/api/process-queue",
+          { project_id: project.id },
+          PROCESS_TIMEOUT_MS,
+        );
+        if (!ok) {
+          if (timedOut) continue; // a long generate held the request; keep going
+          await sleep(1500);
+          continue;
+        }
+        mergeRows((json.generations as Generation[] | undefined) ?? []);
+        if (typeof json.new_balance === "number") {
+          setProfile((p) => ({ ...p, credit_balance: json.new_balance as number }));
+        }
+        const pending = (json.remaining_pending as number) ?? 0;
+        const processing = (json.remaining_processing as number) ?? 0;
+        if (pending + processing === 0) {
+          running = false;
+          break;
+        }
+        // Nothing claimable this instant but work is still in flight on another
+        // worker (e.g. a generate that will enqueue a review) — wait and retry.
+        if (json.done) await sleep(1200);
+      }
+    };
+
+    try {
+      await Promise.all(Array.from({ length: GEN_CONCURRENCY }, () => tick()));
+    } finally {
+      running = false;
+      await poll;
+      await refreshProgress();
+      setBatchImagesLoading(false);
+      drainingRef.current = false;
+    }
+  }, [project.id]);
+
   async function generateAllImages() {
-    const jobs: { conceptId: string; variant: ConceptVariant }[] = [];
+    const items: { concept_id: string; concept_variant: ConceptVariant }[] = [];
     for (const c of enabledConcepts) {
       for (const v of CONCEPT_VARIANTS) {
         if (briefsByKey.has(briefKey(c.id, v))) {
-          jobs.push({ conceptId: c.id, variant: v });
+          items.push({ concept_id: c.id, concept_variant: v });
         }
       }
     }
-    if (jobs.length === 0) return;
+    if (items.length === 0) return;
+    if (drainingRef.current) {
+      toast("Already generating");
+      return;
+    }
 
     setBatchImagesLoading(true);
-    let made = 0;
-    let failed = 0;
-    let stopped = false;
     try {
-      // Phase 1 — generate with bounded concurrency. A stall or failure on one
-      // job never blocks the rest, and we stop scheduling once credits run out.
-      const ids = await mapWithConcurrency(jobs, GEN_CONCURRENCY, async (job) => {
-        if (stopped) return null;
-        const { id, status } = await generateOneImage(job.conceptId, job.variant);
-        if (status === "ok") made += 1;
-        else if (status === "paywall") stopped = true;
-        else failed += 1;
-        return id;
+      const res = await fetch("/api/queue/enqueue", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ project_id: project.id, items }),
       });
-
-      const realIds = ids.filter((x): x is string => typeof x === "string");
-
-      if (made === 0) {
-        toast.error(stopped ? "Out of credits" : "No images generated");
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        toast.error((json.error as string) ?? "Could not queue images");
+        setBatchImagesLoading(false);
         return;
       }
-      toast.success(
-        `Generated ${made}${failed > 0 ? `, ${failed} failed` : ""}. Running QA...`,
-      );
-
-      // Phase 2 — QA review, best-effort and bounded. runReview never throws and
-      // each call is timed out, so a slow review can't freeze the batch.
-      await mapWithConcurrency(realIds, QA_CONCURRENCY, (id) => runReview(id));
-
-      toast.success(
-        `Done — ${made} image${made === 1 ? "" : "s"} ready${
-          failed > 0 ? `, ${failed} failed` : ""
-        }`,
-      );
-    } finally {
+      if (Array.isArray(json.generations)) {
+        mergeGenerations(json.generations as Generation[]);
+      }
+      const queued = (json.queued as number) ?? 0;
+      if (queued === 0) {
+        toast(
+          (json.skipped as number) > 0
+            ? "Those images are already generating"
+            : "Nothing to generate",
+        );
+        setBatchImagesLoading(false);
+        return;
+      }
+      toast.success(`Queued ${queued} image${queued === 1 ? "" : "s"}`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not queue images");
       setBatchImagesLoading(false);
+      return;
     }
+    await startDrain();
   }
+
+  // Resume on mount: if the project has in-flight jobs (a batch that was running
+  // when the tab closed), show their progress and continue draining.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`/api/progress/${project.id}`);
+        if (!res.ok) return;
+        const json = (await res.json()) as ProgressState;
+        if (cancelled) return;
+        setProgress(json);
+        if (json.active > 0) void startDrain();
+      } catch {
+        // Best-effort resume; the button is always available as a fallback.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [project.id, startDrain]);
 
   async function overrideGeneration(generationId: string) {
     try {
@@ -638,6 +749,38 @@ export function ProjectWorkspace({
     [generations],
   );
 
+  // Derive a human progress line + bar from the queue. Headline counts only the
+  // generate jobs ("image 3 of 35"); QA runs as a follow-on phase.
+  const queueView = useMemo(() => {
+    if (!progress) return null;
+    const gen = progress.jobs.filter((j) => j.type === "generate");
+    const imagesTotal = gen.length;
+    const imagesDone = gen.filter(
+      (j) => j.status === "completed" || j.status === "failed",
+    ).length;
+    const imagesFailed = gen.filter((j) => j.status === "failed").length;
+    const reviewsActive = progress.jobs.filter(
+      (j) =>
+        j.type === "review" &&
+        (j.status === "pending" || j.status === "processing"),
+    ).length;
+    let label: string;
+    if (imagesDone < imagesTotal) {
+      label = `Generating image ${Math.min(imagesDone + 1, imagesTotal)} of ${imagesTotal}...`;
+    } else if (reviewsActive > 0) {
+      label = `Running QA on ${reviewsActive} image${reviewsActive === 1 ? "" : "s"}...`;
+    } else {
+      label = `Done — ${imagesTotal - imagesFailed} ready${imagesFailed > 0 ? `, ${imagesFailed} failed` : ""}`;
+    }
+    const pct = imagesTotal === 0 ? 0 : Math.round((imagesDone / imagesTotal) * 100);
+    return { imagesTotal, imagesDone, imagesFailed, reviewsActive, label, pct };
+  }, [progress]);
+
+  const showQueueBar =
+    !!queueView &&
+    queueView.imagesTotal > 0 &&
+    (batchImagesLoading || (progress?.active ?? 0) > 0);
+
   // Training Floor segmented control — restyle shadcn Tabs without touching wiring.
   const segListStyle: CSSProperties = {
     display: "flex",
@@ -706,6 +849,52 @@ export function ProjectWorkspace({
           </button>
         </div>
       </div>
+
+      {showQueueBar && queueView && (
+        <div
+          aria-live="polite"
+          style={{
+            border: "1.5px solid var(--ink)",
+            borderRadius: 4,
+            background: "#fff",
+            padding: "10px 12px",
+            boxShadow: "var(--shadow-sm)",
+          }}
+        >
+          <div className="flex items-center justify-between gap-3">
+            <span
+              className="pg-mono"
+              style={{ fontSize: 12, fontWeight: 700 }}
+            >
+              {queueView.label}
+            </span>
+            <span className="pg-mono pg-muted" style={{ fontSize: 11 }}>
+              {queueView.imagesDone}/{queueView.imagesTotal}
+              {queueView.imagesFailed > 0
+                ? ` · ${queueView.imagesFailed} failed`
+                : ""}
+            </span>
+          </div>
+          <div
+            style={{
+              marginTop: 8,
+              height: 6,
+              borderRadius: 999,
+              background: "var(--line)",
+              overflow: "hidden",
+            }}
+          >
+            <div
+              style={{
+                width: `${queueView.pct}%`,
+                height: "100%",
+                background: "var(--pop)",
+                transition: "width .3s ease",
+              }}
+            />
+          </div>
+        </div>
+      )}
 
       <CreditsPanel
         profile={profile}

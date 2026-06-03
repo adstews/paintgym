@@ -122,6 +122,23 @@ export const reviewImageSchema = z.object({
   generation_id: z.string().uuid(),
 });
 
+export const enqueueImagesSchema = z.object({
+  project_id: z.string().uuid(),
+  items: z
+    .array(
+      z.object({
+        concept_id: z.string().uuid(),
+        concept_variant: conceptVariantEnum.default("A"),
+      }),
+    )
+    .min(1)
+    .max(200),
+});
+
+export const processQueueSchema = z.object({
+  project_id: z.string().uuid(),
+});
+
 export const ratingPatchSchema = z
   .object({
     rating: z.number().int().min(1).max(5).nullable().optional(),
