@@ -49,13 +49,15 @@ const VISIBLE_TABS = [
   { value: "product", label: "Product" },
   { value: "concepts", label: "Concepts" },
   { value: "briefs", label: "Briefs" },
-  { value: "gallery", label: "Gallery" },
+  { value: "gemini-gallery", label: "Gemini Gallery" },
+  { value: "gpt-gallery", label: "GPT Gallery" },
 ] as const;
 const ALL_TAB_VALUES = [
   "product",
   "concepts",
   "briefs",
-  "gallery",
+  "gemini-gallery",
+  "gpt-gallery",
   "recreate",
   "competitor",
 ] as const;
@@ -168,9 +170,6 @@ export function ProjectWorkspace({
   const [batchImagesLoading, setBatchImagesLoading] = useState(false);
   const [progress, setProgress] = useState<ProgressState | null>(null);
   const [topPerformersOnly, setTopPerformersOnly] = useState(false);
-  const [galleryModelFilter, setGalleryModelFilter] = useState<
-    "all" | "gemini" | "openai"
-  >("all");
   // Few-shot attribution returned by the brief API; tracked for future surfacing.
   const [, setInformedBy] = useState<Record<string, number>>({});
   // Guards against two drains running at once (e.g. resume-on-mount racing the
@@ -184,6 +183,11 @@ export function ProjectWorkspace({
   // Confirm-before-generate prompts (item 11).
   const [confirmBriefs, setConfirmBriefs] = useState(false);
   const [confirmImages, setConfirmImages] = useState(false);
+  // When set, the pending batch forces this model (the "Generate via GPT"
+  // button sets "openai"); null falls back to the project's model preference.
+  const [pendingImageModel, setPendingImageModel] = useState<"openai" | null>(
+    null,
+  );
   // Tinder-style review overlay (item 13).
   const [reviewOpen, setReviewOpen] = useState(false);
 
@@ -260,6 +264,10 @@ export function ProjectWorkspace({
 
   // Drives whether the gallery shows paired (Gemini + OpenAI) cards per concept.
   const galleryModelPref = project.style_settings.image_model ?? "gemini";
+
+  // The two gallery tabs each pin to a single model; the active tab decides it.
+  const galleryModel: "gemini" | "openai" =
+    activeTab === "gpt-gallery" ? "openai" : "gemini";
 
   function applyBriefs(newBriefs: Brief[]) {
     if (newBriefs.length === 0) return;
@@ -718,7 +726,11 @@ export function ProjectWorkspace({
       const res = await fetch("/api/queue/enqueue", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ project_id: project.id, items }),
+        body: JSON.stringify({
+          project_id: project.id,
+          items,
+          ...(pendingImageModel ? { model: pendingImageModel } : {}),
+        }),
       });
       const json = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -989,7 +1001,10 @@ export function ProjectWorkspace({
           </button>
           <button
             className="pg-btn pg-btn--pop pg-btn--sm"
-            onClick={() => setConfirmImages(true)}
+            onClick={() => {
+              setPendingImageModel(null);
+              setConfirmImages(true);
+            }}
             disabled={batchImagesLoading || briefsCount === 0 || hasAnyImages}
             title={
               hasAnyImages
@@ -1000,6 +1015,24 @@ export function ProjectWorkspace({
             {batchImagesLoading
               ? "Generating..."
               : `Generate images (${imagesToGenerate})`}
+          </button>
+          <button
+            className="pg-btn pg-btn--outline pg-btn--sm"
+            onClick={() => {
+              setPendingImageModel("openai");
+              setConfirmImages(true);
+            }}
+            disabled={batchImagesLoading || briefsCount === 0 || hasAnyImages}
+            title={
+              hasAnyImages
+                ? "Images already generated. Use Regenerate on individual images."
+                : "Generate every image with OpenAI/GPT instead of the project model"
+            }
+            style={{ borderColor: "var(--green)", color: "var(--green)" }}
+          >
+            {batchImagesLoading
+              ? "Generating..."
+              : `Generate via GPT (${briefsCount})`}
           </button>
           {batchImagesLoading && (
             <button
@@ -1192,7 +1225,7 @@ export function ProjectWorkspace({
         </div>
         )}
 
-        {activeTab === "gallery" && (
+        {(activeTab === "gemini-gallery" || activeTab === "gpt-gallery") && (
         <div className="space-y-6 pt-4">
           <div
             className="flex flex-wrap items-center justify-between gap-2"
@@ -1227,125 +1260,82 @@ export function ProjectWorkspace({
               </button>
             </div>
           </div>
-          <div className="pg-chiprow" aria-label="Filter by image model">
-            {(
-              [
-                ["all", "All"],
-                ["gemini", "Gemini"],
-                ["openai", "GPT-4o"],
-              ] as const
-            ).map(([val, label]) => (
-              <button
-                key={val}
-                type="button"
-                className={`pg-chip ${galleryModelFilter === val ? "is-on" : ""}`}
-                onClick={() => setGalleryModelFilter(val)}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-          {galleryConcepts.length === 0 ? (
-            <div className="pg-empty">
-              <div className="ix">
-                <Icon name="grid" size={26} />
-              </div>
-              <h3>Empty wall</h3>
-              <p>No images yet. Generate briefs, then images, to see them here.</p>
-            </div>
-          ) : (
-            (() => {
-              // Build the gallery cards for a single concept (handles "both"
-              // mode by splitting attempts per model).
-              const buildCards = (c: Concept): ReactElement[] =>
-                CONCEPT_VARIANTS.flatMap((v) => {
-                  let allAttempts =
-                    attemptsByKey.get(variantKey(c.id, v)) ?? [];
-                  if (galleryModelFilter === "gemini") {
-                    allAttempts = allAttempts.filter(
-                      (a) => (a.model_used ?? "gemini") === "gemini",
-                    );
-                  } else if (galleryModelFilter === "openai") {
-                    allAttempts = allAttempts.filter(
-                      (a) => a.model_used === "openai",
-                    );
-                  }
-                  if (allAttempts.length === 0) return [];
-                  const groups: { suffix: string; attempts: Generation[] }[] =
-                    galleryModelPref === "both"
-                      ? [
-                          {
-                            suffix: "gemini",
-                            attempts: allAttempts.filter(
-                              (a) => (a.model_used ?? "gemini") === "gemini",
-                            ),
-                          },
-                          {
-                            suffix: "openai",
-                            attempts: allAttempts.filter(
-                              (a) => a.model_used === "openai",
-                            ),
-                          },
-                        ]
-                      : [{ suffix: "all", attempts: allAttempts }];
+          {(() => {
+            // Each gallery tab shows only its own model's images.
+            const matchesModel = (g: Generation): boolean =>
+              galleryModel === "gemini"
+                ? (g.model_used ?? "gemini") === "gemini"
+                : g.model_used === "openai";
 
-                  return groups.flatMap(({ suffix, attempts }) => {
-                    const latest = attempts[0];
-                    if (!latest) return [];
-                    if (
-                      topPerformersOnly &&
-                      (latest.rating ?? 0) < 4 &&
-                      !latest.is_favorited &&
-                      !latest.used_in_ad
-                    ) {
-                      return [];
-                    }
-                    return [
-                      <div className="pg-catcard" key={`${c.id}:${v}:${suffix}`}>
-                        <GenerationCard
-                          conceptName={c.name}
-                          latest={latest}
-                          attempts={attempts}
-                          onRegenerate={() => generateImageForVariant(c.id, v)}
-                          onReReview={() => runReview(latest.id)}
-                          onOverride={() => overrideGeneration(latest.id)}
-                          onUnlock={() => unlockGeneration(latest.id)}
-                          onRatingChange={applyRatingUpdate}
-                          onRefined={applyRefinedGeneration}
-                        />
-                      </div>,
-                    ];
-                  });
-                }) as ReactElement[];
+            // Build the gallery cards for a single concept, filtered to the
+            // active tab's model.
+            const buildCards = (c: Concept): ReactElement[] =>
+              CONCEPT_VARIANTS.flatMap((v) => {
+                const attempts = (
+                  attemptsByKey.get(variantKey(c.id, v)) ?? []
+                ).filter(matchesModel);
+                const latest = attempts[0];
+                if (!latest) return [];
+                if (
+                  topPerformersOnly &&
+                  (latest.rating ?? 0) < 4 &&
+                  !latest.is_favorited &&
+                  !latest.used_in_ad
+                ) {
+                  return [];
+                }
+                return [
+                  <div className="pg-catcard" key={`${c.id}:${v}:${galleryModel}`}>
+                    <GenerationCard
+                      conceptName={c.name}
+                      latest={latest}
+                      attempts={attempts}
+                      onRegenerate={() => generateImageForVariant(c.id, v)}
+                      onReReview={() => runReview(latest.id)}
+                      onOverride={() => overrideGeneration(latest.id)}
+                      onUnlock={() => unlockGeneration(latest.id)}
+                      onRatingChange={applyRatingUpdate}
+                      onRefined={applyRefinedGeneration}
+                    />
+                  </div>,
+                ];
+              }) as ReactElement[];
 
-              // item 17: group concepts into Netflix-style horizontal rows.
-              const rows = CATEGORY_ORDER.map((cat) => {
-                const inCat = galleryConcepts.filter(
-                  (c) => categoryForConcept(c.name) === cat.key,
-                );
-                const cards = inCat.flatMap(buildCards);
-                return { cat, cards };
-              }).filter((r) => r.cards.length > 0);
+            // item 17: group concepts into Netflix-style horizontal rows.
+            const rows = CATEGORY_ORDER.map((cat) => {
+              const inCat = galleryConcepts.filter(
+                (c) => categoryForConcept(c.name) === cat.key,
+              );
+              const cards = inCat.flatMap(buildCards);
+              return { cat, cards };
+            }).filter((r) => r.cards.length > 0);
 
-              if (rows.length === 0) {
-                return (
-                  <div className="pg-empty">
-                    <div className="ix">
-                      <Icon name="grid" size={26} />
-                    </div>
-                    <h3>Nothing here</h3>
-                    <p>No images match this filter.</p>
+            if (rows.length === 0) {
+              return (
+                <div className="pg-empty">
+                  <div className="ix">
+                    <Icon name="grid" size={26} />
                   </div>
-                );
-              }
+                  <h3>
+                    {galleryModel === "openai"
+                      ? "No GPT images yet"
+                      : "No Gemini images yet"}
+                  </h3>
+                  <p>
+                    {galleryModel === "openai"
+                      ? "No GPT images yet. Generate some using the Generate via GPT button."
+                      : "No Gemini images yet. Generate some using the Generate images button."}
+                  </p>
+                </div>
+              );
+            }
 
-              return rows.map(({ cat, cards }) => (
-                <CategoryRow key={cat.key} title={cat.title} count={cards.length}>
-                  {cards}
-                </CategoryRow>
-              ));
-            })()
-          )}
+            return rows.map(({ cat, cards }) => (
+              <CategoryRow key={cat.key} title={cat.title} count={cards.length}>
+                {cards}
+              </CategoryRow>
+            ));
+          })()}
         </div>
         )}
 
@@ -1399,8 +1389,12 @@ export function ProjectWorkspace({
       <ConfirmDialog
         open={confirmImages}
         onOpenChange={setConfirmImages}
-        title="Generate images"
-        body={`This will use ${imagesToGenerate} credit${imagesToGenerate === 1 ? "" : "s"} to generate ${imagesToGenerate} image${imagesToGenerate === 1 ? "" : "s"}. Continue?`}
+        title={pendingImageModel === "openai" ? "Generate via GPT" : "Generate images"}
+        body={(() => {
+          const n = pendingImageModel === "openai" ? briefsCount : imagesToGenerate;
+          const via = pendingImageModel === "openai" ? " with GPT" : "";
+          return `This will use ${n} credit${n === 1 ? "" : "s"} to generate ${n} image${n === 1 ? "" : "s"}${via}. Continue?`;
+        })()}
         confirmLabel="Generate"
         onConfirm={generateAllImages}
       />

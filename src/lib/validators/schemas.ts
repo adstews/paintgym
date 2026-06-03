@@ -128,6 +128,9 @@ export const reviewImageSchema = z.object({
 
 export const enqueueImagesSchema = z.object({
   project_id: z.string().uuid(),
+  // When set, every item renders with this model regardless of the project's
+  // image_model preference (the "Generate via GPT" button forces "openai").
+  model: z.enum(["gemini", "openai"]).optional(),
   items: z
     .array(
       z.object({

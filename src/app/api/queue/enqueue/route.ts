@@ -25,7 +25,7 @@ export async function POST(request: Request) {
   if (!parsed.success) {
     return NextResponse.json({ error: "invalid_request" }, { status: 400 });
   }
-  const { project_id, items } = parsed.data;
+  const { project_id, items, model: forcedModel } = parsed.data;
 
   const { data: project } = await supabase
     .from("projects")
@@ -87,7 +87,9 @@ export async function POST(request: Request) {
     }
 
     // One render per resolved model — "both" yields two rows + two jobs.
-    const models = modelsForConcept(pref, index);
+    // A forced model (the GPT button) overrides the project preference and
+    // renders every concept with that single model.
+    const models = forcedModel ? [forcedModel] : modelsForConcept(pref, index);
     for (const model of models) {
       if (activeKeys.has(activeKey(item.concept_id, item.concept_variant, model))) {
         skipped += 1;
