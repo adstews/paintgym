@@ -1,5 +1,35 @@
 export type GenerationStatus = "pending" | "generating" | "completed" | "failed";
 
+export type JobType = "generate" | "review" | "rewrite";
+export type JobStatus = "pending" | "processing" | "completed" | "failed";
+
+export interface Job {
+  id: string;
+  project_id: string;
+  generation_id: string | null;
+  concept_id: string | null;
+  concept_variant: string | null;
+  type: JobType;
+  status: JobStatus;
+  payload: Record<string, unknown>;
+  attempts: number;
+  max_attempts: number;
+  error: string | null;
+  next_run_at: string;
+  created_at: string;
+  started_at: string | null;
+  completed_at: string | null;
+}
+
+// Per-job retry budgets. Gemini already retries transient errors internally
+// (see generate-image.ts), so these cover harder failures. Reviews are
+// best-effort and the image is usable even if QA never succeeds.
+export const JOB_MAX_ATTEMPTS: Record<JobType, number> = {
+  generate: 3,
+  review: 2,
+  rewrite: 2,
+};
+
 export type ImageType = "product" | "logo" | "reference";
 
 export type Aggressiveness = "less" | "average" | "more" | "maximum";
