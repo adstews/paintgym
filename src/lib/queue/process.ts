@@ -1,6 +1,6 @@
 import { createAdminClient } from "@/lib/supabase/admin";
-import { generateImage } from "@/lib/gemini/generate-image";
 import { collectReferenceImages } from "@/lib/gemini/reference-images";
+import { generateWithModel, singleModel, modelPreference } from "@/lib/image-gen/router";
 import { reviewGeneration } from "@/lib/qa/review-generation";
 import { checkGenerationCredits, deductCredits } from "@/lib/credits";
 import {
@@ -10,6 +10,7 @@ import {
 } from "@/lib/types";
 import type {
   Generation,
+  ImageModel,
   Job,
   ProductData,
   Project,
@@ -111,9 +112,15 @@ async function processGenerate(
     (project.product_data as ProductData | null)?.images,
   );
 
+  // The model is pinned on the job payload at enqueue time (so "both"/alternating
+  // routing is decided once); fall back to the project preference for older jobs.
+  const model: ImageModel =
+    (job.payload?.model as ImageModel | undefined) ??
+    singleModel(modelPreference(style));
+
   let imageDataUrl: string;
   try {
-    const out = await generateImage({
+    const out = await generateWithModel(model, {
       prompt,
       platform: style.platform,
       referenceImages,
@@ -141,7 +148,12 @@ async function processGenerate(
 
   const { data: updated } = await admin
     .from("generations")
-    .update({ status: "completed", image_url: imageDataUrl, qa_status: "reviewing" })
+    .update({
+      status: "completed",
+      image_url: imageDataUrl,
+      model_used: model,
+      qa_status: "reviewing",
+    })
     .eq("id", job.generation_id)
     .select("*")
     .single();

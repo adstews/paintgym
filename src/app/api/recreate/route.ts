@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { recreateRequestSchema } from "@/lib/validators/schemas";
 import { recreateFromExample } from "@/lib/anthropic/recreate-from-example";
-import { generateImage } from "@/lib/gemini/generate-image";
+import { generateWithModel, modelPreference, singleModel } from "@/lib/image-gen/router";
 import { collectReferenceImages } from "@/lib/gemini/reference-images";
 import {
   checkGenerationCredits,
@@ -125,6 +125,8 @@ export async function POST(request: Request) {
     (project.product_data as { images?: string[] } | null)?.images,
   );
 
+  const pref = modelPreference(project.style_settings);
+
   const settled = await Promise.allSettled(
     VARIANT_LABELS.map(async (label, index): Promise<VariantResult> => {
       const brief_text = briefByLabel.get(label);
@@ -137,8 +139,11 @@ export async function POST(request: Request) {
           error: "missing_brief",
         };
       }
+      // One image per variant label; "both" collapses to a single model, while
+      // "alternating" flips model across the five variants.
+      const model = singleModel(pref, index);
       try {
-        const { imageDataUrl } = await generateImage({
+        const { imageDataUrl } = await generateWithModel(model, {
           prompt: brief_text,
           platform: project.style_settings.platform,
           referenceImages,
@@ -154,6 +159,7 @@ export async function POST(request: Request) {
             image_url: imageDataUrl,
             status: "completed",
             version: index + 1,
+            model_used: model,
             qa_status: "pending",
             qa_issues: [],
             is_unlocked: true,

@@ -37,11 +37,24 @@ export type Tone = "professional" | "casual" | "edgy" | "playful";
 export type VisualStyle = "clean" | "bold" | "organic";
 export type Platform = "meta" | "tiktok" | "linkedin";
 
+// A concrete image generator. Stored on each generation row (model_used) so the
+// gallery can show which model produced an image.
+export type ImageModel = "gemini" | "openai";
+
+// The project-level routing preference. "gemini"/"openai" pin a single model,
+// "alternating" flips per concept, and "both" renders with both models side by
+// side for comparison. Resolved to one or more ImageModel via the image-gen
+// router. See src/lib/image-gen/router.ts.
+export type ModelPreference = "gemini" | "openai" | "alternating" | "both";
+
 export interface StyleSettings {
   aggressiveness: Aggressiveness;
   tone: Tone;
   visual_style: VisualStyle;
   platform: Platform;
+  // Which image model(s) to generate with. Defaults to "gemini" for existing
+  // projects whose style_settings predate this field.
+  image_model?: ModelPreference;
 }
 
 export const DEFAULT_STYLE_SETTINGS: StyleSettings = {
@@ -49,6 +62,18 @@ export const DEFAULT_STYLE_SETTINGS: StyleSettings = {
   tone: "professional",
   visual_style: "clean",
   platform: "meta",
+  image_model: "gemini",
+};
+
+// Short single-letter badge shown on each gallery image card.
+export const MODEL_BADGE: Record<ImageModel, string> = {
+  gemini: "G",
+  openai: "O",
+};
+
+export const MODEL_LABEL: Record<ImageModel, string> = {
+  gemini: "Gemini",
+  openai: "GPT-4o",
 };
 
 export const PLATFORM_DIMENSIONS: Record<Platform, { width: number; height: number; aspect: string }> = {
@@ -200,6 +225,9 @@ export interface Generation {
   is_unlocked: boolean;
   status: GenerationStatus;
   version: number;
+  // Which model rendered this image. Null for rows generated before model
+  // tracking existed (treated as Gemini in the UI).
+  model_used: ImageModel | null;
   created_at: string;
   qa_status: QaStatus;
   qa_issues: string[];

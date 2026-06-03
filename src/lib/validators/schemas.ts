@@ -5,6 +5,10 @@ export const styleSettingsSchema = z.object({
   tone: z.enum(["professional", "casual", "edgy", "playful"]),
   visual_style: z.enum(["clean", "bold", "organic"]),
   platform: z.enum(["meta", "tiktok", "linkedin"]),
+  image_model: z
+    .enum(["gemini", "openai", "alternating", "both"])
+    .optional()
+    .default("gemini"),
 });
 
 export const brandColorSchema = z.object({

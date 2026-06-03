@@ -2,8 +2,9 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { enqueueImagesSchema } from "@/lib/validators/schemas";
+import { modelPreference, modelsForConcept } from "@/lib/image-gen/router";
 import { JOB_MAX_ATTEMPTS } from "@/lib/types";
-import type { Brief, Generation } from "@/lib/types";
+import type { Brief, Generation, StyleSettings } from "@/lib/types";
 
 export const runtime = "nodejs";
 
@@ -28,12 +29,13 @@ export async function POST(request: Request) {
 
   const { data: project } = await supabase
     .from("projects")
-    .select("id, user_id")
+    .select("id, user_id, style_settings")
     .eq("id", project_id)
     .single();
   if (!project || project.user_id !== user.id) {
     return NextResponse.json({ error: "not_found" }, { status: 404 });
   }
+  const pref = modelPreference(project.style_settings as StyleSettings | null);
 
   const admin = createAdminClient();
 
@@ -45,75 +47,104 @@ export async function POST(request: Request) {
   const briefByKey = new Map<string, Brief>();
   for (const b of briefs) briefByKey.set(`${b.concept_id}:${b.variant}`, b);
 
-  // Concepts with an already-active generate job — never enqueue twice.
+  // (concept, variant, model) tuples with an already-active generate job — never
+  // enqueue the same one twice. Keyed by model too so "both" mode can run a
+  // Gemini and an OpenAI job for the same concept without one blocking the other.
   const { data: activeJobs } = await admin
     .from("jobs")
-    .select("concept_id")
+    .select("concept_id, concept_variant, payload")
     .eq("project_id", project_id)
     .eq("type", "generate")
     .in("status", ["pending", "processing"]);
-  const activeConceptIds = new Set(
-    (activeJobs ?? []).map((j) => j.concept_id as string),
+  const activeKey = (
+    conceptId: string,
+    variant: string,
+    model: string,
+  ): string => `${conceptId}:${variant}:${model}`;
+  const activeKeys = new Set(
+    (activeJobs ?? []).map((j) => {
+      const model =
+        ((j.payload as { model?: string } | null)?.model as string) ?? "gemini";
+      return activeKey(
+        j.concept_id as string,
+        (j.concept_variant as string) ?? "A",
+        model,
+      );
+    }),
   );
 
   const created: Generation[] = [];
   let skipped = 0;
 
+  // Index over items drives "alternating" mode (1st concept Gemini, 2nd OpenAI…).
+  let index = 0;
   for (const item of items) {
     const brief = briefByKey.get(`${item.concept_id}:${item.concept_variant}`);
-    if (!brief || activeConceptIds.has(item.concept_id)) {
+    if (!brief) {
       skipped += 1;
+      index += 1;
       continue;
     }
 
-    const { count } = await admin
-      .from("generations")
-      .select("id", { count: "exact", head: true })
-      .eq("project_id", project_id)
-      .eq("concept_id", item.concept_id)
-      .eq("concept_variant", item.concept_variant);
-    const version = (count ?? 0) + 1;
+    // One render per resolved model — "both" yields two rows + two jobs.
+    const models = modelsForConcept(pref, index);
+    for (const model of models) {
+      if (activeKeys.has(activeKey(item.concept_id, item.concept_variant, model))) {
+        skipped += 1;
+        continue;
+      }
 
-    const { data: gen } = await admin
-      .from("generations")
-      .insert({
+      const { count } = await admin
+        .from("generations")
+        .select("id", { count: "exact", head: true })
+        .eq("project_id", project_id)
+        .eq("concept_id", item.concept_id)
+        .eq("concept_variant", item.concept_variant);
+      const version = (count ?? 0) + 1;
+
+      const { data: gen } = await admin
+        .from("generations")
+        .insert({
+          project_id,
+          concept_id: item.concept_id,
+          concept_variant: item.concept_variant,
+          prompt_text: brief.brief_text,
+          status: "generating",
+          version,
+          model_used: model,
+          qa_status: "pending",
+          qa_issues: [],
+          is_unlocked: true,
+        })
+        .select("*")
+        .single();
+      if (!gen) {
+        skipped += 1;
+        continue;
+      }
+
+      const { error: jobErr } = await admin.from("jobs").insert({
         project_id,
+        generation_id: (gen as Generation).id,
         concept_id: item.concept_id,
         concept_variant: item.concept_variant,
-        prompt_text: brief.brief_text,
-        status: "generating",
-        version,
-        qa_status: "pending",
-        qa_issues: [],
-        is_unlocked: true,
-      })
-      .select("*")
-      .single();
-    if (!gen) {
-      skipped += 1;
-      continue;
-    }
+        type: "generate",
+        status: "pending",
+        max_attempts: JOB_MAX_ATTEMPTS.generate,
+        payload: { prompt_text: brief.brief_text, model },
+      });
+      if (jobErr) {
+        // Roll the placeholder back so we don't leave an orphan stuck on
+        // 'generating' with no job to drive it.
+        await admin.from("generations").delete().eq("id", (gen as Generation).id);
+        skipped += 1;
+        continue;
+      }
 
-    const { error: jobErr } = await admin.from("jobs").insert({
-      project_id,
-      generation_id: (gen as Generation).id,
-      concept_id: item.concept_id,
-      concept_variant: item.concept_variant,
-      type: "generate",
-      status: "pending",
-      max_attempts: JOB_MAX_ATTEMPTS.generate,
-      payload: { prompt_text: brief.brief_text },
-    });
-    if (jobErr) {
-      // Roll the placeholder back so we don't leave an orphan stuck on
-      // 'generating' with no job to drive it.
-      await admin.from("generations").delete().eq("id", (gen as Generation).id);
-      skipped += 1;
-      continue;
+      activeKeys.add(activeKey(item.concept_id, item.concept_variant, model));
+      created.push(gen as Generation);
     }
-
-    activeConceptIds.add(item.concept_id);
-    created.push(gen as Generation);
+    index += 1;
   }
 
   return NextResponse.json({

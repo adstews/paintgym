@@ -3,7 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { refineRequestSchema } from "@/lib/validators/schemas";
 import { refineBriefFromFeedback } from "@/lib/anthropic/refine-brief";
 import { reviewImage } from "@/lib/anthropic/review-image";
-import { generateImage } from "@/lib/gemini/generate-image";
+import { generateWithModel, modelPreference, singleModel } from "@/lib/image-gen/router";
 import { collectReferenceImages } from "@/lib/gemini/reference-images";
 import { checkGenerationCredits, deductCredits } from "@/lib/credits";
 import {
@@ -13,6 +13,7 @@ import {
 import type {
   Concept,
   Generation,
+  ImageModel,
   Project,
   StyleSettings,
 } from "@/lib/types";
@@ -71,6 +72,11 @@ export async function POST(request: Request) {
       ((projectRow as Project).style_settings as StyleSettings | null) ??
       DEFAULT_STYLE_SETTINGS,
   };
+
+  // Refine on the same model that produced the source image so a comparison
+  // stays apples-to-apples; fall back to the project preference for older rows.
+  const model: ImageModel =
+    source.model_used ?? singleModel(modelPreference(project.style_settings));
 
   let concept: Concept | null = null;
   if (source.concept_id) {
@@ -143,6 +149,7 @@ export async function POST(request: Request) {
       prompt_text: refinedBrief,
       status: "generating",
       version,
+      model_used: model,
       qa_status: "pending",
       qa_issues: [],
       is_unlocked: true,
@@ -165,7 +172,7 @@ export async function POST(request: Request) {
 
   let imageDataUrl: string;
   try {
-    const result = await generateImage({
+    const result = await generateWithModel(model, {
       prompt: refinedBrief,
       platform: project.style_settings.platform,
       referenceImages,
@@ -179,7 +186,7 @@ export async function POST(request: Request) {
     return NextResponse.json(
       {
         error: "generation_failed",
-        message: err instanceof Error ? err.message : "Gemini failed",
+        message: err instanceof Error ? err.message : "Image generation failed",
         id: row.id,
       },
       { status: 502 },

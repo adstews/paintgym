@@ -1,9 +1,10 @@
 "use client";
 
 import { SegmentedControl } from "./segmented-control";
-import { PLATFORM_DIMENSIONS } from "@/lib/types";
+import { DEFAULT_STYLE_SETTINGS, PLATFORM_DIMENSIONS } from "@/lib/types";
 import type {
   Aggressiveness,
+  ModelPreference,
   Platform,
   StyleSettings,
   Tone,
@@ -88,6 +89,22 @@ export function StyleControls({ value, onChange }: Props) {
             })}
           />
         </div>
+      </div>
+
+      <div className="pg-control-block" style={{ marginTop: 18 }}>
+        <div className="lab">Image model</div>
+        <SegmentedControl<ModelPreference>
+          ariaLabel="Image model"
+          value={value.image_model ?? DEFAULT_STYLE_SETTINGS.image_model ?? "gemini"}
+          onChange={(next) => onChange({ ...value, image_model: next })}
+          size="sm"
+          options={[
+            { value: "gemini", label: "Gemini", hint: "Nano Banana Pro" },
+            { value: "openai", label: "GPT-4o", hint: "gpt-image-1" },
+            { value: "alternating", label: "Alternating", hint: "Flip per concept" },
+            { value: "both", label: "Both", hint: "Side by side" },
+          ]}
+        />
       </div>
     </div>
   );

@@ -1,11 +1,12 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { reviewImage } from "@/lib/anthropic/review-image";
 import { rewriteBriefAfterFailure } from "@/lib/anthropic/rewrite-brief";
-import { generateImage } from "@/lib/gemini/generate-image";
+import { generateWithModel } from "@/lib/image-gen/router";
 import { DEFAULT_STYLE_SETTINGS } from "@/lib/types";
 import type {
   Concept,
   Generation,
+  ImageModel,
   Project,
   StyleSettings,
 } from "@/lib/types";
@@ -142,6 +143,7 @@ async function insertAutoRewriteRow(
     image_url: string;
     version: number;
     auto_rewrite_count: number;
+    model_used: ImageModel;
   },
 ): Promise<Generation | null> {
   // Auto-rewrites are QA-driven retries on a generation the user already paid
@@ -156,6 +158,7 @@ async function insertAutoRewriteRow(
       image_url: base.image_url,
       status: "completed",
       version: base.version,
+      model_used: base.model_used,
       qa_status: "pending",
       qa_issues: [],
       auto_rewrite_count: base.auto_rewrite_count,
@@ -257,9 +260,11 @@ export async function reviewGeneration(
       };
     }
 
+    // Rewrite on the same model that produced the failed image.
+    const model: ImageModel = generation.model_used ?? "gemini";
     let newImage;
     try {
-      newImage = await generateImage({
+      newImage = await generateWithModel(model, {
         prompt: newBrief,
         platform: project.style_settings.platform,
       });
@@ -289,6 +294,7 @@ export async function reviewGeneration(
       image_url: newImage.imageDataUrl,
       version: nextV,
       auto_rewrite_count: generation.auto_rewrite_count + 1,
+      model_used: model,
     });
     if (!inserted) {
       return { generations: touched, error: "rewrite_save_failed" };

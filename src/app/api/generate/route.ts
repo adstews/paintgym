@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { generateRequestSchema } from "@/lib/validators/schemas";
-import { generateImage } from "@/lib/gemini/generate-image";
 import { collectReferenceImages } from "@/lib/gemini/reference-images";
+import { generateWithModel, singleModel, modelPreference } from "@/lib/image-gen/router";
 import { checkGenerationCredits, deductCredits } from "@/lib/credits";
 import {
   DEFAULT_STYLE_SETTINGS,
@@ -50,6 +50,9 @@ export async function POST(request: Request) {
   }
   const style =
     (project.style_settings as StyleSettings | null) ?? DEFAULT_STYLE_SETTINGS;
+  // A single render produces one image, so "both" collapses to Gemini here; the
+  // batch path is where side-by-side comparison happens.
+  const model = singleModel(modelPreference(style));
 
   const tier = await checkGenerationCredits(user.id, 1);
   if (!tier.allowed) {
@@ -93,6 +96,7 @@ export async function POST(request: Request) {
       prompt_text,
       status: "generating",
       version,
+      model_used: model,
       qa_status: "pending",
       qa_issues: [],
       is_unlocked: true,
@@ -111,13 +115,13 @@ export async function POST(request: Request) {
   );
 
   try {
-    const { imageDataUrl } = await generateImage({
+    const { imageDataUrl } = await generateWithModel(model, {
       prompt: prompt_text,
       platform: style.platform,
       referenceImages,
     });
 
-    // Only deduct after a successful Gemini render so failed generations
+    // Only deduct after a successful render so failed generations
     // don't burn a credit.
     const deducted = await deductCredits(user.id, GENERATION_CREDIT_COST);
     if (!deducted.ok) {
