@@ -143,6 +143,14 @@ export const processQueueSchema = z.object({
   project_id: z.string().uuid(),
 });
 
+export const cancelQueueSchema = z.object({
+  project_id: z.string().uuid(),
+});
+
+export const generationsByIdsSchema = z.object({
+  ids: z.array(z.string().uuid()).min(1).max(200),
+});
+
 export const ratingPatchSchema = z
   .object({
     rating: z.number().int().min(1).max(5).nullable().optional(),

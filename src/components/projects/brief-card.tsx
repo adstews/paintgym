@@ -33,6 +33,8 @@ export function BriefCard({
   const [regen, setRegen] = useState(false);
   const [gen, setGen] = useState(false);
   const [showFull, setShowFull] = useState(false);
+  // item 16: collapsed by default — tap the header to expand.
+  const [expanded, setExpanded] = useState(false);
 
   function handleEdit(next: string) {
     setDraft(next);
@@ -88,45 +90,113 @@ export function BriefCard({
   const qaStatus = latestGeneration?.qa_status;
   const isReviewing = qaStatus === "reviewing" || qaStatus === "rewriting";
 
-  return (
-    <div className="pg-form-card" style={{ marginTop: 0 }}>
-      <div className="flex items-start justify-between gap-3 mb12">
-        <span className="pg-field-label" style={{ marginBottom: 0 }}>
-          Brief
-        </span>
-        <div className="flex shrink-0 flex-wrap items-center gap-2">
-          {!hasBrief && <span className="pg-badge pg-badge--outline">Empty</span>}
-          {hasBrief && dirty && (
-            <span className="pg-badge pg-badge--outline">Unsaved</span>
-          )}
-          {isGenerating && (
-            <span className="pg-badge pg-badge--outline">Generating</span>
-          )}
-          {!isGenerating && qaStatus === "reviewing" && (
-            <span className="pg-badge pg-badge--outline">Reviewing</span>
-          )}
-          {!isGenerating && qaStatus === "rewriting" && (
-            <span className="pg-badge pg-badge--outline">Rewriting</span>
-          )}
-          {!isGenerating && qaStatus === "passed" && (
-            <span className="pg-badge pg-badge--pop">Approved</span>
-          )}
-          {!isGenerating && qaStatus === "overridden" && (
-            <span className="pg-badge pg-badge--ink">Accepted</span>
-          )}
-          {!isGenerating && qaStatus === "minor" && (
-            <span className="pg-badge pg-badge--outline">Minor issues</span>
-          )}
-          {!isGenerating && qaStatus === "major" && (
-            <span className="pg-badge pg-badge--red">Flagged</span>
-          )}
-          {latestGeneration?.status === "failed" && (
-            <span className="pg-badge pg-badge--red">Failed</span>
-          )}
-        </div>
-      </div>
+  // One-line preview (~60 chars) shown while collapsed.
+  const previewSource = brief?.summary ?? brief?.brief_text ?? "";
+  const preview =
+    previewSource.length > 60
+      ? `${previewSource.slice(0, 60).trimEnd()}...`
+      : previewSource;
 
-      <div className="space-y-3">
+  const statusBadges = (
+    <>
+      {!hasBrief && <span className="pg-badge pg-badge--outline">Empty</span>}
+      {hasBrief && dirty && (
+        <span className="pg-badge pg-badge--outline">Unsaved</span>
+      )}
+      {isGenerating && (
+        <span className="pg-badge pg-badge--outline">Generating</span>
+      )}
+      {!isGenerating && qaStatus === "reviewing" && (
+        <span className="pg-badge pg-badge--outline">Reviewing</span>
+      )}
+      {!isGenerating && qaStatus === "rewriting" && (
+        <span className="pg-badge pg-badge--outline">Rewriting</span>
+      )}
+      {!isGenerating && qaStatus === "passed" && (
+        <span className="pg-badge pg-badge--pop">Approved</span>
+      )}
+      {!isGenerating && qaStatus === "overridden" && (
+        <span className="pg-badge pg-badge--ink">Accepted</span>
+      )}
+      {!isGenerating && qaStatus === "minor" && (
+        <span className="pg-badge pg-badge--outline">Minor issues</span>
+      )}
+      {!isGenerating && qaStatus === "major" && (
+        <span className="pg-badge pg-badge--red">Flagged</span>
+      )}
+      {latestGeneration?.status === "failed" && (
+        <span className="pg-badge pg-badge--red">Failed</span>
+      )}
+    </>
+  );
+
+  return (
+    <div className="pg-form-card" style={{ marginTop: 0, padding: expanded ? 16 : 12 }}>
+      {/* Collapsed header — tap to expand (item 16) */}
+      <button
+        type="button"
+        onClick={() => setExpanded((v) => !v)}
+        className="w-full text-left"
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 10,
+          background: "none",
+          border: 0,
+          padding: 0,
+          cursor: "pointer",
+        }}
+        aria-expanded={expanded}
+      >
+        <span
+          aria-hidden
+          style={{
+            transition: "transform .15s",
+            transform: expanded ? "rotate(90deg)" : "none",
+            flex: "0 0 auto",
+            color: "var(--muted)",
+            display: "inline-flex",
+          }}
+        >
+          <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+            <path d="M9 6l6 6-6 6" />
+          </svg>
+        </span>
+        <span style={{ flex: 1, minWidth: 0 }}>
+          <span
+            style={{
+              fontFamily: "var(--headline)",
+              fontWeight: 800,
+              fontSize: 14,
+              display: "block",
+            }}
+          >
+            {concept.name}
+          </span>
+          {!expanded && (
+            <span
+              className="pg-muted"
+              style={{
+                fontSize: 12,
+                display: "block",
+                marginTop: 2,
+                whiteSpace: "nowrap",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+              }}
+            >
+              {hasBrief ? preview : `Generate a brief for ${concept.name}.`}
+            </span>
+          )}
+        </span>
+        <span className="flex shrink-0 flex-wrap items-center gap-2">
+          {statusBadges}
+        </span>
+      </button>
+
+      {!expanded ? null : (
+      <>
+      <div className="space-y-3" style={{ marginTop: 12 }}>
         {!hasBrief ? (
           <div
             className="pg-ph"
@@ -244,6 +314,8 @@ export function BriefCard({
           </button>
         </div>
       </div>
+      </>
+      )}
     </div>
   );
 }
