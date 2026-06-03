@@ -472,3 +472,119 @@ body{font-family:var(--ui);color:var(--ink);background:#cfcfc8;line-height:1.5;-
 /* hide page-level scrollbar on the stage */
 .pg-stage{overflow:hidden;}
 
+/* ===================================================================
+   MOBILE-FIRST APP CHROME + RESPONSIVE PASS  (items 2,3,4,5,13,17)
+   =================================================================== */
+
+/* never let anything force the page to scroll sideways */
+html,body{max-width:100%;overflow-x:hidden;}
+
+.pg-shell-main{max-width:1180px;margin:0 auto;width:100%;padding:22px 18px 48px;}
+@media (max-width:640px){
+  .pg-shell-main{padding:16px 14px 64px;}
+}
+
+/* ---- top nav: inline links vs hamburger ---- */
+.pg-nav-desktop{display:flex;align-items:center;gap:6px;}
+.pg-nav-burger{display:none;width:44px;height:44px;align-items:center;justify-content:center;
+  border:1.5px solid var(--ink);border-radius:3px;background:#fff;color:var(--ink);cursor:pointer;}
+.pg-nav-burger:active{transform:translate(1px,1px);}
+.pg-nav-scrim{position:fixed;inset:0;top:0;background:rgba(20,18,14,.45);z-index:39;animation:pg-fade .16s ease;}
+.pg-nav-drawer{position:fixed;top:0;right:0;left:0;z-index:40;background:var(--paper);
+  border-bottom:1.5px solid var(--ink);box-shadow:var(--shadow);padding:14px 16px calc(16px + env(safe-area-inset-bottom));
+  display:flex;flex-direction:column;gap:6px;animation:pg-drawer-in .2s cubic-bezier(.2,.9,.3,1);}
+@keyframes pg-drawer-in{from{transform:translateY(-12px);opacity:0;}to{transform:none;opacity:1;}}
+.pg-nav-drawer-link{display:flex;align-items:center;gap:12px;min-height:48px;padding:10px 12px;border-radius:3px;
+  font-family:var(--ui);font-weight:700;font-size:15px;color:var(--ink);text-decoration:none;border:1.5px solid var(--line);background:#fff;}
+.pg-nav-drawer-link:active{transform:translate(1px,1px);}
+
+@media (max-width:767px){
+  .pg-nav-desktop{display:none;}
+  .pg-nav-burger{display:flex;}
+}
+
+/* ---- workspace tab bar (item 3 scroll, item 8 active state) ---- */
+.pg-tabbar{display:flex;gap:0;border:1.5px solid var(--ink);border-radius:3px;background:var(--ink);
+  overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;}
+.pg-tabbar::-webkit-scrollbar{height:0;}
+.pg-tab{flex:1 0 auto;min-width:84px;border:0;background:transparent;color:#fff;font-family:var(--ui);
+  font-weight:700;font-size:12.5px;letter-spacing:.01em;padding:11px 12px;cursor:pointer;white-space:nowrap;
+  transition:background .12s,color .12s;}
+.pg-tab.is-on{background:var(--pop);color:var(--pop-ink);}
+
+/* ---- generic mobile stacking + touch targets (item 5) ---- */
+@media (max-width:640px){
+  .pg-grid2{grid-template-columns:1fr;}
+  /* generous tap targets */
+  .pg-btn--sm{padding:11px 14px;min-height:44px;}
+  .pg-btn--md{min-height:48px;}
+  .pg-input{padding:13px 14px;font-size:16px;}  /* 16px stops iOS zoom-on-focus */
+  .pg-chip{padding:10px 13px;min-height:40px;}
+  .pg-iconbtn{width:44px;height:44px;}
+  /* header action rows wrap instead of overflowing */
+  .pg-ws-stats{width:100%;}
+  .pg-ws-stats .pg-btn{flex:1 1 auto;}
+}
+
+/* ---- gallery: full-width cards on small screens (item 4) ---- */
+@media (max-width:640px){
+  .pg-wall.cols-3,.pg-wall{grid-template-columns:1fr;gap:14px;}
+}
+
+/* ===================================================================
+   GALLERY CATEGORY ROWS — Netflix/Spotify horizontal strips (item 17)
+   =================================================================== */
+.pg-catrow{margin-bottom:22px;}
+.pg-catrow-head{display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin-bottom:10px;}
+.pg-catrow-head h3{font-family:var(--display);font-weight:800;font-size:18px;text-transform:uppercase;letter-spacing:-.01em;}
+.pg-catrow-head .count{font-family:var(--mono);font-size:10.5px;color:var(--muted);}
+.pg-catrow-track{display:flex;gap:12px;overflow-x:auto;-webkit-overflow-scrolling:touch;scroll-snap-type:x mandatory;
+  padding:4px 4px 12px;margin:0 -4px;scrollbar-width:none;}
+.pg-catrow-track::-webkit-scrollbar{height:0;}
+.pg-catcard{flex:0 0 auto;width:280px;scroll-snap-align:start;}
+/* mobile: one card fills most of the viewport, next peeks ~half from the right */
+@media (max-width:640px){
+  .pg-catcard{width:78vw;max-width:320px;}
+}
+@media (min-width:1000px){
+  /* on wide screens give the strips a touch more room per card */
+  .pg-catcard{width:300px;}
+}
+
+/* ===================================================================
+   TINDER-STYLE REVIEW MODE (item 13)
+   =================================================================== */
+.pg-review{position:fixed;inset:0;z-index:120;background:rgba(12,12,12,.96);display:flex;flex-direction:column;
+  animation:pg-fade .18s ease;}
+.pg-review-top{flex:0 0 auto;display:flex;align-items:center;justify-content:space-between;gap:12px;
+  padding:calc(12px + env(safe-area-inset-top)) 16px 12px;color:#fff;}
+.pg-review-top .counter{font-family:var(--mono);font-size:13px;font-weight:700;letter-spacing:.04em;}
+.pg-review-close{width:42px;height:42px;display:flex;align-items:center;justify-content:center;border:1.5px solid rgba(255,255,255,.35);
+  border-radius:3px;background:transparent;color:#fff;cursor:pointer;}
+.pg-review-close:active{transform:translate(1px,1px);}
+.pg-review-stage{flex:1;position:relative;display:flex;align-items:center;justify-content:center;overflow:hidden;padding:0 8px;}
+.pg-review-card{position:relative;width:100%;max-width:520px;height:100%;display:flex;align-items:center;justify-content:center;
+  touch-action:pan-y;}
+.pg-review-img{position:relative;width:100%;max-height:100%;aspect-ratio:4/5;background:#000;border-radius:6px;overflow:hidden;
+  box-shadow:0 24px 60px -20px rgba(0,0,0,.7);}
+.pg-review-swipe{animation:pg-swipe-in .26s cubic-bezier(.2,.9,.3,1);}
+@keyframes pg-swipe-in{from{transform:translateX(var(--from,40px));opacity:0;}to{transform:none;opacity:1;}}
+.pg-review-arrow{position:absolute;top:50%;transform:translateY(-50%);width:44px;height:44px;border-radius:50%;
+  border:1.5px solid rgba(255,255,255,.4);background:rgba(0,0,0,.4);color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;z-index:5;}
+.pg-review-arrow:active{transform:translateY(-50%) scale(.94);}
+.pg-review-arrow.left{left:10px;}
+.pg-review-arrow.right{right:10px;}
+.pg-review-arrow:disabled{opacity:.25;cursor:not-allowed;}
+.pg-review-bottom{flex:0 0 auto;background:var(--paper);border-top:1.5px solid var(--ink);
+  padding:14px 16px calc(16px + env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:12px;}
+.pg-review-bottom .title{font-family:var(--headline);font-weight:800;font-size:15px;letter-spacing:-.01em;}
+.pg-review-rate{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;}
+.pg-review-feedback{display:flex;gap:8px;}
+.pg-review-feedback input{flex:1;min-width:0;}
+.pg-review-actions{display:flex;gap:8px;flex-wrap:wrap;}
+.pg-review-actions .pg-btn{flex:1 1 auto;}
+@media (min-width:1000px){
+  .pg-review-bottom{flex-direction:row;align-items:center;}
+  .pg-review-bottom > *{flex:1;}
+}
+

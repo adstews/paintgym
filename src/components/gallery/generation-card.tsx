@@ -89,6 +89,8 @@ export function GenerationCard({
   const [open, setOpen] = useState(false);
   const [issuesOpen, setIssuesOpen] = useState(false);
   const [refineOpen, setRefineOpen] = useState(false);
+  // Detail view: brief + QA collapsed by default (item 14).
+  const [detailsOpen, setDetailsOpen] = useState(false);
 
   const pinned =
     pinnedId !== null ? attempts.find((a) => a.id === pinnedId) : undefined;
@@ -373,44 +375,133 @@ export function GenerationCard({
       />
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-w-3xl">
+        <DialogContent
+          className="max-w-lg"
+          style={{
+            background: "var(--paper)",
+            color: "var(--ink)",
+            border: "1.5px solid var(--ink)",
+            borderRadius: 0,
+          }}
+        >
+          {/* item 15: a clear, obvious back/close. DialogContent already renders
+              an X top-right; this header gives a labelled fallback too. */}
           <DialogHeader>
-            <DialogTitle>
-              {conceptName} (v{selected.version}
-              {selected.is_auto_rewrite ? `, auto-rewrite ${selected.auto_rewrite_count}` : ""})
+            <DialogTitle
+              className="flex items-center gap-2 pr-8"
+              style={{
+                fontFamily: "var(--display)",
+                fontWeight: 800,
+                textTransform: "uppercase",
+                letterSpacing: "-.01em",
+              }}
+            >
+              {conceptName}
+              {selected.version > 1 ? ` · v${selected.version}` : ""}
             </DialogTitle>
           </DialogHeader>
           {displayUrl && (
             <div className="space-y-3">
-              <div className="relative w-full aspect-[4/5] bg-muted rounded-md overflow-hidden">
+              <div
+                className="relative w-full aspect-[4/5] overflow-hidden"
+                style={{ background: "#000", border: "1.5px solid var(--ink)" }}
+              >
                 <Image src={displayUrl} alt={conceptName} fill className="object-contain" unoptimized />
               </div>
-              {hasIssues && (
-                <div className="space-y-1 rounded-md border bg-muted/50 p-2 text-xs">
-                  <div className="font-medium text-muted-foreground">QA issues</div>
-                  <ul className="space-y-1">
-                    {selected.qa_issues.map((issue, i) => (
-                      <li key={i}>{issue}</li>
-                    ))}
-                  </ul>
-                </div>
+
+              {selected.image_url && !isInFlight && (
+                <RatingControls generation={selected} onUpdated={onRatingChange} />
               )}
-              <div>
-                <div className="text-xs font-medium text-muted-foreground">
-                  Brief used for this attempt
-                </div>
-                <pre className="mt-1 max-h-48 overflow-auto whitespace-pre-wrap rounded-md border bg-muted/30 p-2 text-xs">
-                  {selected.prompt_text}
-                </pre>
+
+              {/* item 14: just the core actions — download, regenerate, refine */}
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                <button
+                  className="pg-btn pg-btn--outline pg-btn--sm"
+                  onClick={handleDownload}
+                  disabled={!selected.image_url || !selected.is_unlocked}
+                >
+                  Download
+                </button>
+                <button
+                  className="pg-btn pg-btn--outline pg-btn--sm"
+                  onClick={handleRegenerate}
+                  disabled={regenLoading || isInFlight}
+                >
+                  {regenLoading ? "…" : "Regenerate"}
+                </button>
+                {selected.image_url && !isInFlight && (
+                  <button
+                    className="pg-btn pg-btn--pop pg-btn--sm"
+                    onClick={() => setRefineOpen(true)}
+                    style={{ gap: 5 }}
+                  >
+                    <SparklesIcon className="size-3.5" aria-hidden />
+                    Refine
+                  </button>
+                )}
               </div>
-              {selected.refinement_feedback && (
-                <div>
-                  <div className="text-xs font-medium text-muted-foreground">
-                    Feedback that produced this version
+
+              {/* brief + QA hidden behind a toggle, collapsed by default */}
+              <button
+                type="button"
+                onClick={() => setDetailsOpen((v) => !v)}
+                className="pg-mono"
+                style={{
+                  fontSize: 10.5,
+                  letterSpacing: ".08em",
+                  textTransform: "uppercase",
+                  color: "var(--muted)",
+                  background: "none",
+                  border: 0,
+                  cursor: "pointer",
+                  textDecorationLine: "underline",
+                  textUnderlineOffset: 2,
+                }}
+              >
+                {detailsOpen ? "Hide details" : "Show details"}
+              </button>
+
+              {detailsOpen && (
+                <div className="space-y-3">
+                  {hasIssues && (
+                    <div
+                      className="space-y-1 p-2 text-xs"
+                      style={{ border: "1px solid var(--line)", background: "#fff", borderRadius: 3 }}
+                    >
+                      <div className="pg-mono pg-muted" style={{ fontSize: 10 }}>
+                        QA issues
+                      </div>
+                      <ul className="space-y-1">
+                        {selected.qa_issues.map((issue, i) => (
+                          <li key={i}>{issue}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  <div>
+                    <div className="pg-mono pg-muted" style={{ fontSize: 10 }}>
+                      Brief used for this attempt
+                    </div>
+                    <pre
+                      className="mt-1 max-h-48 overflow-auto whitespace-pre-wrap p-2 text-xs"
+                      style={{ border: "1px solid var(--line)", background: "#fff", borderRadius: 3 }}
+                    >
+                      {selected.prompt_text}
+                    </pre>
                   </div>
-                  <p className="mt-1 rounded-md border bg-muted/30 p-2 text-xs">
-                    {selected.refinement_feedback}
-                  </p>
+                  {selected.refinement_feedback && (
+                    <div>
+                      <div className="pg-mono pg-muted" style={{ fontSize: 10 }}>
+                        Feedback that produced this version
+                      </div>
+                      <p
+                        className="mt-1 p-2 text-xs"
+                        style={{ border: "1px solid var(--line)", background: "#fff", borderRadius: 3 }}
+                      >
+                        {selected.refinement_feedback}
+                      </p>
+                    </div>
+                  )}
                 </div>
               )}
             </div>

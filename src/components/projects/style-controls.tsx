@@ -16,6 +16,13 @@ interface Props {
   onChange: (next: StyleSettings) => void;
 }
 
+const MODEL_PREF_LABEL: Record<ModelPreference, string> = {
+  gemini: "Gemini",
+  openai: "GPT-4o",
+  alternating: "Alternating",
+  both: "Both",
+};
+
 export function StyleControls({ value, onChange }: Props) {
   return (
     <div>
@@ -91,13 +98,26 @@ export function StyleControls({ value, onChange }: Props) {
         </div>
       </div>
 
-      <div className="pg-control-block" style={{ marginTop: 18 }}>
-        <div className="lab">Image model</div>
+      <div
+        className="pg-control-block"
+        style={{
+          marginTop: 18,
+          border: "1.5px solid var(--ink)",
+          borderRadius: 4,
+          background: "#fff",
+          padding: 14,
+          boxShadow: "var(--shadow-sm)",
+        }}
+      >
+        <div className="lab">
+          Image model <b>{MODEL_PREF_LABEL[value.image_model ?? "gemini"]}</b>
+        </div>
         <SegmentedControl<ModelPreference>
           ariaLabel="Image model"
           value={value.image_model ?? DEFAULT_STYLE_SETTINGS.image_model ?? "gemini"}
           onChange={(next) => onChange({ ...value, image_model: next })}
           size="sm"
+          columns={2}
           options={[
             { value: "gemini", label: "Gemini", hint: "Nano Banana Pro" },
             { value: "openai", label: "GPT-4o", hint: "gpt-image-1" },

@@ -6,19 +6,20 @@ import {
   useMemo,
   useRef,
   useState,
-  type CSSProperties,
   type ReactElement,
 } from "react";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { Icon, Badge } from "@/components/tf/ui";
 import { GenerationCard } from "@/components/gallery/generation-card";
+import { ReviewMode, type ReviewItem } from "@/components/gallery/review-mode";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { ProductDetailsForm } from "./product-details-form";
 import { BriefCard } from "./brief-card";
 import { RecreateTab } from "./recreate-tab";
 import { CompetitorSpyTab } from "./competitor-spy-tab";
 import { CreditsPanel } from "./credits-panel";
 import { CONCEPT_VARIANTS } from "@/lib/types";
+import { CATEGORY_ORDER, categoryForConcept } from "@/lib/concept-categories";
 import type {
   Brief,
   Concept,
@@ -39,6 +40,25 @@ interface Props {
   enabledConceptIds: Set<string>;
   userProfile: UserProfile;
 }
+
+// Visible workspace tabs (item 9 removed Recreate + Competitor Spy from the
+// bar). Those panels still exist and stay reachable via the URL hash
+// (#recreate / #competitor) so they can be surfaced elsewhere later.
+const VISIBLE_TABS = [
+  { value: "product", label: "Product" },
+  { value: "concepts", label: "Concepts" },
+  { value: "briefs", label: "Briefs" },
+  { value: "gallery", label: "Gallery" },
+] as const;
+const ALL_TAB_VALUES = [
+  "product",
+  "concepts",
+  "briefs",
+  "gallery",
+  "recreate",
+  "competitor",
+] as const;
+type TabValue = (typeof ALL_TAB_VALUES)[number];
 
 let tempCounter = 0;
 function makeTempId(prefix: string): string {
@@ -147,10 +167,51 @@ export function ProjectWorkspace({
   const [batchImagesLoading, setBatchImagesLoading] = useState(false);
   const [progress, setProgress] = useState<ProgressState | null>(null);
   const [topPerformersOnly, setTopPerformersOnly] = useState(false);
-  const [informedBy, setInformedBy] = useState<Record<string, number>>({});
+  // Few-shot attribution returned by the brief API; tracked for future surfacing.
+  const [, setInformedBy] = useState<Record<string, number>>({});
   // Guards against two drains running at once (e.g. resume-on-mount racing the
   // button) and against React 18 strict-mode double-invoking the resume effect.
   const drainingRef = useRef(false);
+  // Set true by the Stop button so in-flight drain ticks bail out early.
+  const stopRef = useRef(false);
+
+  // Active workspace tab, persisted to the URL hash (item 7).
+  const [activeTab, setActiveTab] = useState<TabValue>("product");
+  // Confirm-before-generate prompts (item 11).
+  const [confirmBriefs, setConfirmBriefs] = useState(false);
+  const [confirmImages, setConfirmImages] = useState(false);
+  // Tinder-style review overlay (item 13).
+  const [reviewOpen, setReviewOpen] = useState(false);
+
+  // Restore the tab from the hash on mount, and keep it in sync with the hash.
+  useEffect(() => {
+    const fromHash = (): TabValue | null => {
+      const h = window.location.hash.replace(/^#/, "");
+      return (ALL_TAB_VALUES as readonly string[]).includes(h)
+        ? (h as TabValue)
+        : null;
+    };
+    const initial = fromHash();
+    if (initial) setActiveTab(initial);
+    const onHash = () => {
+      const v = fromHash();
+      if (v) setActiveTab(v);
+    };
+    window.addEventListener("hashchange", onHash);
+    return () => window.removeEventListener("hashchange", onHash);
+  }, []);
+
+  const changeTab = useCallback((next: TabValue) => {
+    setActiveTab(next);
+    if (typeof window !== "undefined") {
+      // Default tab gets a clean URL (no hash) per the spec.
+      if (next === "product") {
+        history.replaceState(null, "", window.location.pathname + window.location.search);
+      } else {
+        window.location.hash = next;
+      }
+    }
+  }, []);
 
   const conceptsById = useMemo(
     () => new Map(concepts.map((c) => [c.id, c])),
@@ -498,6 +559,7 @@ export function ProjectWorkspace({
   const startDrain = useCallback(async () => {
     if (drainingRef.current) return;
     drainingRef.current = true;
+    stopRef.current = false;
     setBatchImagesLoading(true);
     let running = true;
 
@@ -510,10 +572,44 @@ export function ProjectWorkspace({
       });
     };
 
+    // Generations we've already pulled in via the poll, so we fetch each
+    // finished image exactly once (item 6 — progressive loading).
+    const fetchedGens = new Set<string>();
+
     const refreshProgress = async () => {
       try {
         const res = await fetch(`/api/progress/${project.id}`);
-        if (res.ok) setProgress((await res.json()) as ProgressState);
+        if (!res.ok) return;
+        const state = (await res.json()) as ProgressState;
+        setProgress(state);
+        // Pull in any generation whose generate job has finished but that we
+        // haven't rendered yet, so cards appear one by one as they complete
+        // rather than only when the long process-queue tick returns.
+        const ready = state.jobs
+          .filter(
+            (j) =>
+              j.type === "generate" &&
+              j.status === "completed" &&
+              j.generation_id &&
+              !fetchedGens.has(j.generation_id),
+          )
+          .map((j) => j.generation_id as string);
+        if (ready.length > 0) {
+          ready.forEach((id) => fetchedGens.add(id));
+          try {
+            const r = await fetch("/api/generations/by-ids", {
+              method: "POST",
+              headers: { "content-type": "application/json" },
+              body: JSON.stringify({ ids: ready }),
+            });
+            if (r.ok) {
+              const j = (await r.json()) as { generations: Generation[] };
+              mergeRows(j.generations ?? []);
+            }
+          } catch {
+            // Best-effort; the process-queue tick will merge these too.
+          }
+        }
       } catch {
         // Progress is cosmetic; a failed poll just means a stale bar for a beat.
       }
@@ -527,12 +623,13 @@ export function ProjectWorkspace({
     })();
 
     const tick = async () => {
-      while (running) {
+      while (running && !stopRef.current) {
         const { ok, json, timedOut } = await postJson(
           "/api/process-queue",
           { project_id: project.id },
           PROCESS_TIMEOUT_MS,
         );
+        if (stopRef.current) break;
         if (!ok) {
           if (timedOut) continue; // a long generate held the request; keep going
           await sleep(1500);
@@ -564,6 +661,38 @@ export function ProjectWorkspace({
       drainingRef.current = false;
     }
   }, [project.id]);
+
+  // Stop button (item 12): cancel pending jobs server-side, flip their
+  // placeholders to failed locally, and signal the drain loop to wind down.
+  async function stopGeneration() {
+    stopRef.current = true;
+    try {
+      const res = await fetch("/api/queue/cancel", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ project_id: project.id }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        toast.error((json.error as string) ?? "Could not stop generation");
+        return;
+      }
+      const cancelledIds = (json.cancelled_generation_ids as string[]) ?? [];
+      if (cancelledIds.length > 0) {
+        const idSet = new Set(cancelledIds);
+        setGenerations((arr) =>
+          arr.map((g) =>
+            idSet.has(g.id) ? { ...g, status: "failed" as const } : g,
+          ),
+        );
+      }
+      const completed = (json.completed as number) ?? 0;
+      const total = (json.total as number) ?? 0;
+      toast(`Generation stopped. ${completed} of ${total} images completed.`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not stop generation");
+    }
+  }
 
   async function generateAllImages() {
     const items: { concept_id: string; concept_variant: ConceptVariant }[] = [];
@@ -754,6 +883,46 @@ export function ProjectWorkspace({
     [generations],
   );
 
+  // "both" mode renders two images per brief; every other mode renders one.
+  const imagesToGenerate =
+    briefsCount * (galleryModelPref === "both" ? 2 : 1);
+
+  // item 10: once images exist for the enabled concepts, the batch button is
+  // disabled (use per-image Regenerate instead). Briefs likewise.
+  const hasAnyImages = useMemo(
+    () =>
+      generations.some(
+        (g) =>
+          g.concept_id &&
+          g.image_url &&
+          g.status === "completed" &&
+          enabled.has(g.concept_id),
+      ),
+    [generations, enabled],
+  );
+  const hasAnyBriefs = briefsCount > 0;
+
+  // Flat list of the latest image per concept/variant, for the swipe review
+  // overlay (item 13). Only rendered images are included.
+  const reviewableItems = useMemo<ReviewItem[]>(() => {
+    const out: ReviewItem[] = [];
+    for (const c of galleryConcepts) {
+      for (const v of CONCEPT_VARIANTS) {
+        const attempts = attemptsByKey.get(variantKey(c.id, v)) ?? [];
+        const latest = attempts[0];
+        if (latest && latest.image_url) {
+          out.push({
+            generation: latest,
+            conceptName: c.name,
+            conceptId: c.id,
+            variant: v,
+          });
+        }
+      }
+    }
+    return out;
+  }, [galleryConcepts, attemptsByKey]);
+
   // Derive a human progress line + bar from the queue. Headline counts only the
   // generate jobs ("image 3 of 35"); QA runs as a follow-on phase.
   const queueView = useMemo(() => {
@@ -786,29 +955,6 @@ export function ProjectWorkspace({
     queueView.imagesTotal > 0 &&
     (batchImagesLoading || (progress?.active ?? 0) > 0);
 
-  // Training Floor segmented control — restyle shadcn Tabs without touching wiring.
-  const segListStyle: CSSProperties = {
-    display: "flex",
-    border: "1.5px solid var(--ink)",
-    borderRadius: 3,
-    background: "var(--ink)",
-    padding: 0,
-    overflow: "hidden",
-  };
-  const segBtnStyle: CSSProperties = {
-    flex: 1,
-    border: 0,
-    background: "transparent",
-    color: "#fff",
-    fontFamily: "var(--ui)",
-    fontWeight: 700,
-    fontSize: 12.5,
-    letterSpacing: ".01em",
-    padding: "10px 8px",
-    cursor: "pointer",
-    whiteSpace: "nowrap",
-  };
-
   return (
     <div className="space-y-6">
       <div className="pg-ws-head" style={{ border: 0, padding: 0, background: "transparent" }}>
@@ -825,8 +971,13 @@ export function ProjectWorkspace({
         <div className="pg-ws-stats" style={{ gap: 8 }}>
           <button
             className="pg-btn pg-btn--outline pg-btn--sm"
-            onClick={generateAllBriefs}
-            disabled={batchBriefsLoading || enabledConcepts.length === 0}
+            onClick={() => setConfirmBriefs(true)}
+            disabled={batchBriefsLoading || enabledConcepts.length === 0 || hasAnyBriefs}
+            title={
+              hasAnyBriefs
+                ? "Briefs already generated. Use Regenerate on individual briefs."
+                : undefined
+            }
           >
             {batchBriefsLoading
               ? "Writing briefs..."
@@ -834,13 +985,27 @@ export function ProjectWorkspace({
           </button>
           <button
             className="pg-btn pg-btn--pop pg-btn--sm"
-            onClick={generateAllImages}
-            disabled={batchImagesLoading || briefsCount === 0}
+            onClick={() => setConfirmImages(true)}
+            disabled={batchImagesLoading || briefsCount === 0 || hasAnyImages}
+            title={
+              hasAnyImages
+                ? "Images already generated. Use Regenerate on individual images."
+                : undefined
+            }
           >
             {batchImagesLoading
               ? "Generating..."
-              : `Generate images (${briefsCount})`}
+              : `Generate images (${imagesToGenerate})`}
           </button>
+          {batchImagesLoading && (
+            <button
+              className="pg-btn pg-btn--outline pg-btn--sm"
+              onClick={stopGeneration}
+              style={{ color: "var(--red)", borderColor: "var(--red)" }}
+            >
+              Stop
+            </button>
+          )}
           <button
             className="pg-btn pg-btn--outline pg-btn--sm"
             onClick={downloadAll}
@@ -908,63 +1073,35 @@ export function ProjectWorkspace({
         onUnlockAll={lockedCount > 0 ? unlockAll : undefined}
       />
 
-      <Tabs defaultValue="product">
-        <TabsList
-          className="w-full data-[state=active]:!bg-transparent"
-          style={segListStyle}
-        >
-          <TabsTrigger
-            value="product"
-            className="data-[state=active]:!bg-[var(--pop)] data-[state=active]:!text-[var(--pop-ink)] data-[state=active]:!shadow-none"
-            style={segBtnStyle}
-          >
-            Product
-          </TabsTrigger>
-          <TabsTrigger
-            value="concepts"
-            className="data-[state=active]:!bg-[var(--pop)] data-[state=active]:!text-[var(--pop-ink)] data-[state=active]:!shadow-none"
-            style={segBtnStyle}
-          >
-            Concepts
-          </TabsTrigger>
-          <TabsTrigger
-            value="briefs"
-            className="data-[state=active]:!bg-[var(--pop)] data-[state=active]:!text-[var(--pop-ink)] data-[state=active]:!shadow-none"
-            style={segBtnStyle}
-          >
-            Briefs
-          </TabsTrigger>
-          <TabsTrigger
-            value="gallery"
-            className="data-[state=active]:!bg-[var(--pop)] data-[state=active]:!text-[var(--pop-ink)] data-[state=active]:!shadow-none"
-            style={segBtnStyle}
-          >
-            Gallery
-          </TabsTrigger>
-          <TabsTrigger
-            value="recreate"
-            className="data-[state=active]:!bg-[var(--pop)] data-[state=active]:!text-[var(--pop-ink)] data-[state=active]:!shadow-none"
-            style={segBtnStyle}
-          >
-            Recreate
-          </TabsTrigger>
-          <TabsTrigger
-            value="competitor"
-            className="data-[state=active]:!bg-[var(--pop)] data-[state=active]:!text-[var(--pop-ink)] data-[state=active]:!shadow-none"
-            style={segBtnStyle}
-          >
-            Competitor Spy
-          </TabsTrigger>
-        </TabsList>
+      <div>
+        {/* item 3: scrollable on small screens. item 8: active tab is filled
+            with the pop color, driven directly off state. */}
+        <div className="pg-tabbar" role="tablist" aria-label="Workspace sections">
+          {VISIBLE_TABS.map((t) => (
+            <button
+              key={t.value}
+              type="button"
+              role="tab"
+              aria-selected={activeTab === t.value}
+              className={`pg-tab ${activeTab === t.value ? "is-on" : ""}`}
+              onClick={() => changeTab(t.value)}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
 
-        <TabsContent value="product" className="pt-4">
-          <ProductDetailsForm
-            project={project}
-            onProjectChange={setProject}
-          />
-        </TabsContent>
+        {activeTab === "product" && (
+          <div className="pt-4">
+            <ProductDetailsForm
+              project={project}
+              onProjectChange={setProject}
+            />
+          </div>
+        )}
 
-        <TabsContent value="concepts" className="space-y-3 pt-4">
+        {activeTab === "concepts" && (
+        <div className="space-y-3 pt-4">
           <div
             className="pg-mono pg-muted"
             style={{ fontSize: 11, letterSpacing: ".08em", textTransform: "uppercase" }}
@@ -1012,9 +1149,11 @@ export function ProjectWorkspace({
               );
             })}
           </div>
-        </TabsContent>
+        </div>
+        )}
 
-        <TabsContent value="briefs" className="space-y-6 pt-4">
+        {activeTab === "briefs" && (
+        <div className="space-y-6 pt-4">
           {enabledConcepts.length === 0 ? (
             <div className="pg-empty">
               <div className="ix">
@@ -1024,63 +1163,33 @@ export function ProjectWorkspace({
               <p>Enable at least one concept to start writing briefs.</p>
             </div>
           ) : (
-            enabledConcepts.map((c) => (
-              <div key={c.id} className="space-y-2">
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <h2 className="pg-h2" style={{ fontSize: 18 }}>
-                      {c.name}
-                    </h2>
-                    <p className="pg-muted" style={{ fontSize: 12, marginTop: 4 }}>
-                      {c.description}
-                    </p>
-                    {informedBy[c.id] > 0 && (
-                      <p
-                        className="pg-mono"
-                        style={{ marginTop: 4, fontSize: 11, color: "var(--green)" }}
-                      >
-                        Informed by {informedBy[c.id]} top-rated example
-                        {informedBy[c.id] === 1 ? "" : "s"} from your library
-                      </p>
-                    )}
-                  </div>
-                  <button
-                    type="button"
-                    className="pg-btn pg-btn--outline pg-btn--sm"
-                    onClick={() => regenerateBriefsForConcept(c.id)}
-                  >
-                    Regenerate
-                  </button>
-                </div>
-                <div className="grid gap-3">
-                  {CONCEPT_VARIANTS.map((v) => {
-                    const brief =
-                      briefsByKey.get(briefKey(c.id, v)) ?? null;
-                    const attempts =
-                      attemptsByKey.get(variantKey(c.id, v)) ?? [];
-                    const latest = attempts[0] ?? null;
-                    return (
-                      <BriefCard
-                        key={`${c.id}:${v}`}
-                        concept={c}
-                        variant={v}
-                        brief={brief}
-                        latestGeneration={latest}
-                        onBriefChange={replaceBrief}
-                        onRegenerateConcept={() =>
-                          regenerateBriefsForConcept(c.id)
-                        }
-                        onGenerateImage={() => generateImageForVariant(c.id, v)}
-                      />
-                    );
-                  })}
-                </div>
-              </div>
-            ))
+            <div className="grid gap-2">
+              {enabledConcepts.flatMap((c) =>
+                CONCEPT_VARIANTS.map((v) => {
+                  const brief = briefsByKey.get(briefKey(c.id, v)) ?? null;
+                  const attempts = attemptsByKey.get(variantKey(c.id, v)) ?? [];
+                  const latest = attempts[0] ?? null;
+                  return (
+                    <BriefCard
+                      key={`${c.id}:${v}`}
+                      concept={c}
+                      variant={v}
+                      brief={brief}
+                      latestGeneration={latest}
+                      onBriefChange={replaceBrief}
+                      onRegenerateConcept={() => regenerateBriefsForConcept(c.id)}
+                      onGenerateImage={() => generateImageForVariant(c.id, v)}
+                    />
+                  );
+                }),
+              )}
+            </div>
           )}
-        </TabsContent>
+        </div>
+        )}
 
-        <TabsContent value="gallery" className="space-y-6 pt-4">
+        {activeTab === "gallery" && (
+        <div className="space-y-6 pt-4">
           <div
             className="flex flex-wrap items-center justify-between gap-2"
             style={{
@@ -1095,13 +1204,24 @@ export function ProjectWorkspace({
               few-shot examples the next time Claude writes briefs for
               the same concept.
             </div>
-            <button
-              type="button"
-              className={`pg-chip ${topPerformersOnly ? "is-on" : ""}`}
-              onClick={() => setTopPerformersOnly((v) => !v)}
-            >
-              {topPerformersOnly ? "Showing top only" : "Top Performers only"}
-            </button>
+            <div className="flex items-center gap-2">
+              {reviewableItems.length > 0 && (
+                <button
+                  type="button"
+                  className="pg-btn pg-btn--pop pg-btn--sm"
+                  onClick={() => setReviewOpen(true)}
+                >
+                  Review ({reviewableItems.length})
+                </button>
+              )}
+              <button
+                type="button"
+                className={`pg-chip ${topPerformersOnly ? "is-on" : ""}`}
+                onClick={() => setTopPerformersOnly((v) => !v)}
+              >
+                {topPerformersOnly ? "Showing top only" : "Top Performers only"}
+              </button>
+            </div>
           </div>
           {galleryConcepts.length === 0 ? (
             <div className="pg-empty">
@@ -1112,77 +1232,100 @@ export function ProjectWorkspace({
               <p>No images yet. Generate briefs, then images, to see them here.</p>
             </div>
           ) : (
-            galleryConcepts.map((c) => {
-              const cards = CONCEPT_VARIANTS.flatMap((v) => {
-                const allAttempts =
-                  attemptsByKey.get(variantKey(c.id, v)) ?? [];
-                if (allAttempts.length === 0) return [];
-                // In "both" mode each concept rendered with both models, so split
-                // the attempts per model and show a card for each side by side.
-                // Every other mode shows a single card with all attempts.
-                const groups: { suffix: string; attempts: Generation[] }[] =
-                  galleryModelPref === "both"
-                    ? [
-                        {
-                          suffix: "gemini",
-                          attempts: allAttempts.filter(
-                            (a) => (a.model_used ?? "gemini") === "gemini",
-                          ),
-                        },
-                        {
-                          suffix: "openai",
-                          attempts: allAttempts.filter(
-                            (a) => a.model_used === "openai",
-                          ),
-                        },
-                      ]
-                    : [{ suffix: "all", attempts: allAttempts }];
+            (() => {
+              // Build the gallery cards for a single concept (handles "both"
+              // mode by splitting attempts per model).
+              const buildCards = (c: Concept): ReactElement[] =>
+                CONCEPT_VARIANTS.flatMap((v) => {
+                  const allAttempts =
+                    attemptsByKey.get(variantKey(c.id, v)) ?? [];
+                  if (allAttempts.length === 0) return [];
+                  const groups: { suffix: string; attempts: Generation[] }[] =
+                    galleryModelPref === "both"
+                      ? [
+                          {
+                            suffix: "gemini",
+                            attempts: allAttempts.filter(
+                              (a) => (a.model_used ?? "gemini") === "gemini",
+                            ),
+                          },
+                          {
+                            suffix: "openai",
+                            attempts: allAttempts.filter(
+                              (a) => a.model_used === "openai",
+                            ),
+                          },
+                        ]
+                      : [{ suffix: "all", attempts: allAttempts }];
 
-                return groups.flatMap(({ suffix, attempts }) => {
-                  const latest = attempts[0];
-                  if (!latest) return [];
-                  if (
-                    topPerformersOnly &&
-                    (latest.rating ?? 0) < 4 &&
-                    !latest.is_favorited &&
-                    !latest.used_in_ad
-                  ) {
-                    return [];
-                  }
-                  return [
-                    <GenerationCard
-                      key={`${c.id}:${v}:${suffix}`}
-                      conceptName={c.name}
-                      latest={latest}
-                      attempts={attempts}
-                      onRegenerate={() => generateImageForVariant(c.id, v)}
-                      onReReview={() => runReview(latest.id)}
-                      onOverride={() => overrideGeneration(latest.id)}
-                      onUnlock={() => unlockGeneration(latest.id)}
-                      onRatingChange={applyRatingUpdate}
-                      onRefined={applyRefinedGeneration}
-                    />,
-                  ];
-                });
-              }) as ReactElement[];
+                  return groups.flatMap(({ suffix, attempts }) => {
+                    const latest = attempts[0];
+                    if (!latest) return [];
+                    if (
+                      topPerformersOnly &&
+                      (latest.rating ?? 0) < 4 &&
+                      !latest.is_favorited &&
+                      !latest.used_in_ad
+                    ) {
+                      return [];
+                    }
+                    return [
+                      <div className="pg-catcard" key={`${c.id}:${v}:${suffix}`}>
+                        <GenerationCard
+                          conceptName={c.name}
+                          latest={latest}
+                          attempts={attempts}
+                          onRegenerate={() => generateImageForVariant(c.id, v)}
+                          onReReview={() => runReview(latest.id)}
+                          onOverride={() => overrideGeneration(latest.id)}
+                          onUnlock={() => unlockGeneration(latest.id)}
+                          onRatingChange={applyRatingUpdate}
+                          onRefined={applyRefinedGeneration}
+                        />
+                      </div>,
+                    ];
+                  });
+                }) as ReactElement[];
 
-              if (cards.length === 0) return null;
+              // item 17: group concepts into Netflix-style horizontal rows.
+              const rows = CATEGORY_ORDER.map((cat) => {
+                const inCat = galleryConcepts.filter(
+                  (c) => categoryForConcept(c.name) === cat.key,
+                );
+                const cards = inCat.flatMap(buildCards);
+                return { cat, cards };
+              }).filter((r) => r.cards.length > 0);
 
-              return (
-                <div key={c.id} className="space-y-2">
-                  <h2 className="pg-h2" style={{ fontSize: 18 }}>
-                    {c.name}
-                  </h2>
-                  <div className="pg-wall cols-3" style={{ padding: 0 }}>
-                    {cards}
+              if (rows.length === 0) {
+                return (
+                  <div className="pg-empty">
+                    <div className="ix">
+                      <Icon name="grid" size={26} />
+                    </div>
+                    <h3>Nothing here</h3>
+                    <p>No images match this filter.</p>
                   </div>
-                </div>
-              );
-            })
-          )}
-        </TabsContent>
+                );
+              }
 
-        <TabsContent value="recreate" className="pt-4">
+              return rows.map(({ cat, cards }) => (
+                <div key={cat.key} className="pg-catrow">
+                  <div className="pg-catrow-head">
+                    <h3>{cat.title}</h3>
+                    <span className="count">
+                      {cards.length} image{cards.length === 1 ? "" : "s"}
+                    </span>
+                  </div>
+                  <div className="pg-catrow-track">{cards}</div>
+                </div>
+              ));
+            })()
+          )}
+        </div>
+        )}
+
+        {activeTab === "recreate" && (
+        <div className="pt-4">
           <RecreateTab
             project={project}
             recreations={recreations}
@@ -1196,9 +1339,11 @@ export function ProjectWorkspace({
             onRatingChange={applyRatingUpdate}
             onRefined={applyRefinedGeneration}
           />
-        </TabsContent>
+        </div>
+        )}
 
-        <TabsContent value="competitor" className="pt-4">
+        {activeTab === "competitor" && (
+        <div className="pt-4">
           <CompetitorSpyTab
             project={project}
             concepts={concepts}
@@ -1214,8 +1359,36 @@ export function ProjectWorkspace({
             onRatingChange={applyRatingUpdate}
             onRefined={applyRefinedGeneration}
           />
-        </TabsContent>
-      </Tabs>
+        </div>
+        )}
+      </div>
+
+      <ConfirmDialog
+        open={confirmBriefs}
+        onOpenChange={setConfirmBriefs}
+        title="Generate briefs"
+        body={`This will generate briefs for ${enabledConcepts.length} concept${enabledConcepts.length === 1 ? "" : "s"}. Continue?`}
+        confirmLabel="Generate"
+        onConfirm={generateAllBriefs}
+      />
+      <ConfirmDialog
+        open={confirmImages}
+        onOpenChange={setConfirmImages}
+        title="Generate images"
+        body={`This will use ${imagesToGenerate} credit${imagesToGenerate === 1 ? "" : "s"} to generate ${imagesToGenerate} image${imagesToGenerate === 1 ? "" : "s"}. Continue?`}
+        confirmLabel="Generate"
+        onConfirm={generateAllImages}
+      />
+
+      {reviewOpen && (
+        <ReviewMode
+          items={reviewableItems}
+          onClose={() => setReviewOpen(false)}
+          onRatingChange={applyRatingUpdate}
+          onRefined={applyRefinedGeneration}
+          onRegenerate={generateImageForVariant}
+        />
+      )}
     </div>
   );
 }
