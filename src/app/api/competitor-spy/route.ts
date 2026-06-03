@@ -7,7 +7,7 @@ import {
 } from "@/lib/scrape";
 import { generateCompetitiveBriefsForConcept } from "@/lib/anthropic/competitive-brief";
 import { reviewImage } from "@/lib/anthropic/review-image";
-import { generateImage } from "@/lib/gemini/generate-image";
+import { generateWithModel, modelPreference, singleModel } from "@/lib/image-gen/router";
 import {
   collectReferenceImages,
   loadPrimaryProductImage,
@@ -26,6 +26,7 @@ import type {
   Concept,
   ConceptVariant,
   Generation,
+  ImageModel,
   Project,
   StyleSettings,
 } from "@/lib/types";
@@ -71,6 +72,7 @@ async function renderOne(
     variant: ConceptVariant;
     brief_text: string;
     platform: StyleSettings["platform"];
+    model: ImageModel;
     competitor_name: string | null;
     version: number;
     logo_url: string | null;
@@ -86,6 +88,7 @@ async function renderOne(
       prompt_text: args.brief_text,
       status: "generating",
       version: args.version,
+      model_used: args.model,
       qa_status: "pending",
       qa_issues: [],
       is_unlocked: true,
@@ -100,7 +103,7 @@ async function renderOne(
 
   let imageDataUrl: string;
   try {
-    const result = await generateImage({
+    const result = await generateWithModel(args.model, {
       prompt: args.brief_text,
       platform: args.platform,
       referenceImages: args.referenceImages,
@@ -305,9 +308,13 @@ export async function POST(request: Request) {
   // 5) Render an image per (concept, variant). Compute next version per
   //    (concept_id, variant) inside the worker so concurrent inserts get
   //    distinct version numbers based on what is already in the table.
+  const pref = modelPreference(project.style_settings);
   const renders: Promise<RenderResult>[] = [];
   const competitor_label = competitor.brand ?? competitor.name ?? null;
-  for (const { concept, variants } of conceptBriefs) {
+  conceptBriefs.forEach(({ concept, variants }, conceptIndex) => {
+    // One competitive render per (concept, variant); "both" collapses to a single
+    // model here (alternating still flips model per concept).
+    const model = singleModel(pref, conceptIndex);
     for (const v of variants) {
       renders.push(
         (async () => {
@@ -324,6 +331,7 @@ export async function POST(request: Request) {
             variant: v.variant,
             brief_text: v.brief_text,
             platform: project.style_settings.platform,
+            model,
             competitor_name: competitor_label,
             version,
             logo_url: project.logo_url,
@@ -332,7 +340,7 @@ export async function POST(request: Request) {
         })(),
       );
     }
-  }
+  });
 
   const renderResults = await Promise.all(renders);
   const generations: Generation[] = [];

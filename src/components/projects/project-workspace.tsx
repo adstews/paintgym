@@ -193,6 +193,9 @@ export function ProjectWorkspace({
     [concepts, attemptsByKey],
   );
 
+  // Drives whether the gallery shows paired (Gemini + OpenAI) cards per concept.
+  const galleryModelPref = project.style_settings.image_model ?? "gemini";
+
   function applyBriefs(newBriefs: Brief[]) {
     if (newBriefs.length === 0) return;
     const m = new Map(briefs.map((b) => [b.id, b]));
@@ -336,6 +339,7 @@ export function ProjectWorkspace({
       is_unlocked: false,
       status: "generating",
       version: (existing[0]?.version ?? 0) + 1,
+      model_used: null,
       created_at: new Date().toISOString(),
       qa_status: "pending",
       qa_issues: [],
@@ -426,6 +430,7 @@ export function ProjectWorkspace({
       is_unlocked: false,
       status: "generating",
       version: nextVersion,
+      model_used: null,
       created_at: new Date().toISOString(),
       qa_status: "pending",
       qa_issues: [],
@@ -1108,34 +1113,58 @@ export function ProjectWorkspace({
             </div>
           ) : (
             galleryConcepts.map((c) => {
-              const cards = CONCEPT_VARIANTS.map((v) => {
-                const attempts =
+              const cards = CONCEPT_VARIANTS.flatMap((v) => {
+                const allAttempts =
                   attemptsByKey.get(variantKey(c.id, v)) ?? [];
-                const latest = attempts[0];
-                if (!latest) return null;
-                if (
-                  topPerformersOnly &&
-                  (latest.rating ?? 0) < 4 &&
-                  !latest.is_favorited &&
-                  !latest.used_in_ad
-                ) {
-                  return null;
-                }
-                return (
-                  <GenerationCard
-                    key={`${c.id}:${v}`}
-                    conceptName={c.name}
-                    latest={latest}
-                    attempts={attempts}
-                    onRegenerate={() => generateImageForVariant(c.id, v)}
-                    onReReview={() => runReview(latest.id)}
-                    onOverride={() => overrideGeneration(latest.id)}
-                    onUnlock={() => unlockGeneration(latest.id)}
-                    onRatingChange={applyRatingUpdate}
-                    onRefined={applyRefinedGeneration}
-                  />
-                );
-              }).filter(Boolean) as ReactElement[];
+                if (allAttempts.length === 0) return [];
+                // In "both" mode each concept rendered with both models, so split
+                // the attempts per model and show a card for each side by side.
+                // Every other mode shows a single card with all attempts.
+                const groups: { suffix: string; attempts: Generation[] }[] =
+                  galleryModelPref === "both"
+                    ? [
+                        {
+                          suffix: "gemini",
+                          attempts: allAttempts.filter(
+                            (a) => (a.model_used ?? "gemini") === "gemini",
+                          ),
+                        },
+                        {
+                          suffix: "openai",
+                          attempts: allAttempts.filter(
+                            (a) => a.model_used === "openai",
+                          ),
+                        },
+                      ]
+                    : [{ suffix: "all", attempts: allAttempts }];
+
+                return groups.flatMap(({ suffix, attempts }) => {
+                  const latest = attempts[0];
+                  if (!latest) return [];
+                  if (
+                    topPerformersOnly &&
+                    (latest.rating ?? 0) < 4 &&
+                    !latest.is_favorited &&
+                    !latest.used_in_ad
+                  ) {
+                    return [];
+                  }
+                  return [
+                    <GenerationCard
+                      key={`${c.id}:${v}:${suffix}`}
+                      conceptName={c.name}
+                      latest={latest}
+                      attempts={attempts}
+                      onRegenerate={() => generateImageForVariant(c.id, v)}
+                      onReReview={() => runReview(latest.id)}
+                      onOverride={() => overrideGeneration(latest.id)}
+                      onUnlock={() => unlockGeneration(latest.id)}
+                      onRatingChange={applyRatingUpdate}
+                      onRefined={applyRefinedGeneration}
+                    />,
+                  ];
+                });
+              }) as ReactElement[];
 
               if (cards.length === 0) return null;
 
