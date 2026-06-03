@@ -8,7 +8,7 @@ import { Landing } from "@/components/tf/screens";
 export function TfLanding() {
   const router = useRouter();
   return (
-    <div className="pg-stage">
+    <div className="pg-stage pg-stage--landing">
       <div className="pg-phone">
         <div className="pg-screen">
           <div className="pg-app">

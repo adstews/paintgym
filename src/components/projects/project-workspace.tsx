@@ -11,6 +11,7 @@ import {
 import { toast } from "sonner";
 import { Icon, Badge } from "@/components/tf/ui";
 import { GenerationCard } from "@/components/gallery/generation-card";
+import { CategoryRow } from "@/components/gallery/category-row";
 import { ReviewMode, type ReviewItem } from "@/components/gallery/review-mode";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { ProductDetailsForm } from "./product-details-form";
@@ -167,6 +168,9 @@ export function ProjectWorkspace({
   const [batchImagesLoading, setBatchImagesLoading] = useState(false);
   const [progress, setProgress] = useState<ProgressState | null>(null);
   const [topPerformersOnly, setTopPerformersOnly] = useState(false);
+  const [galleryModelFilter, setGalleryModelFilter] = useState<
+    "all" | "gemini" | "openai"
+  >("all");
   // Few-shot attribution returned by the brief API; tracked for future surfacing.
   const [, setInformedBy] = useState<Record<string, number>>({});
   // Guards against two drains running at once (e.g. resume-on-mount racing the
@@ -1223,6 +1227,24 @@ export function ProjectWorkspace({
               </button>
             </div>
           </div>
+          <div className="pg-chiprow" aria-label="Filter by image model">
+            {(
+              [
+                ["all", "All"],
+                ["gemini", "Gemini"],
+                ["openai", "GPT-4o"],
+              ] as const
+            ).map(([val, label]) => (
+              <button
+                key={val}
+                type="button"
+                className={`pg-chip ${galleryModelFilter === val ? "is-on" : ""}`}
+                onClick={() => setGalleryModelFilter(val)}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
           {galleryConcepts.length === 0 ? (
             <div className="pg-empty">
               <div className="ix">
@@ -1237,8 +1259,17 @@ export function ProjectWorkspace({
               // mode by splitting attempts per model).
               const buildCards = (c: Concept): ReactElement[] =>
                 CONCEPT_VARIANTS.flatMap((v) => {
-                  const allAttempts =
+                  let allAttempts =
                     attemptsByKey.get(variantKey(c.id, v)) ?? [];
+                  if (galleryModelFilter === "gemini") {
+                    allAttempts = allAttempts.filter(
+                      (a) => (a.model_used ?? "gemini") === "gemini",
+                    );
+                  } else if (galleryModelFilter === "openai") {
+                    allAttempts = allAttempts.filter(
+                      (a) => a.model_used === "openai",
+                    );
+                  }
                   if (allAttempts.length === 0) return [];
                   const groups: { suffix: string; attempts: Generation[] }[] =
                     galleryModelPref === "both"
@@ -1309,15 +1340,9 @@ export function ProjectWorkspace({
               }
 
               return rows.map(({ cat, cards }) => (
-                <div key={cat.key} className="pg-catrow">
-                  <div className="pg-catrow-head">
-                    <h3>{cat.title}</h3>
-                    <span className="count">
-                      {cards.length} image{cards.length === 1 ? "" : "s"}
-                    </span>
-                  </div>
-                  <div className="pg-catrow-track">{cards}</div>
-                </div>
+                <CategoryRow key={cat.key} title={cat.title} count={cards.length}>
+                  {cards}
+                </CategoryRow>
               ));
             })()
           )}

@@ -257,6 +257,31 @@ body{font-family:var(--ui);color:var(--ink);background:#cfcfc8;line-height:1.5;-
 .pg-land-cta h3{font-family:var(--display);font-weight:800;font-size:30px;text-transform:uppercase;line-height:.95;letter-spacing:-.01em;}
 .pg-land-foot{margin-top:30px;padding:18px;font-family:var(--mono);font-size:10px;color:var(--muted);text-align:center;letter-spacing:.04em;}
 
+/* ---- landing: drop the phone frame on desktop, go full-width ---- */
+@media (min-width:768px){
+  .pg-stage--landing{display:block;overflow:visible;padding:0;align-items:stretch;
+    justify-content:flex-start;min-height:100vh;}
+  .pg-stage--landing .pg-phone{position:relative;width:100%;max-width:none;height:auto;
+    min-height:100vh;border-radius:0;padding:0;background:transparent;box-shadow:none;}
+  .pg-stage--landing .pg-screen{position:relative;inset:auto;width:100%;height:auto;
+    border-radius:0;overflow:visible;background:transparent;}
+  .pg-stage--landing .pg-app{position:relative;inset:auto;height:auto;min-height:100vh;
+    background:transparent;}
+  .pg-stage--landing .pg-scroll{overflow:visible;}
+  .pg-stage--landing .pg-land-nav{max-width:1080px;margin:0 auto;width:100%;padding:18px 32px;}
+  .pg-stage--landing .pg-hero{max-width:1080px;margin:0 auto;width:100%;padding:56px 32px 8px;}
+  .pg-stage--landing .pg-hero h1{font-size:clamp(64px,8vw,108px);}
+  .pg-stage--landing .pg-hero .sub{max-width:48ch;font-size:18px;}
+  .pg-stage--landing .pg-pastebox{max-width:560px;}
+  .pg-stage--landing .pg-section{max-width:1080px;margin:0 auto;width:100%;padding:52px 32px 0;}
+  .pg-stage--landing .pg-steps{flex-direction:row;}
+  .pg-stage--landing .pg-step{flex:1;border-bottom:0;border-right:1.5px solid var(--ink);}
+  .pg-stage--landing .pg-step:last-child{border-right:0;}
+  .pg-stage--landing .pg-statband{max-width:1080px;margin:52px auto 0;}
+  .pg-stage--landing .pg-land-cta{max-width:680px;margin:52px auto 0;}
+  .pg-stage--landing .pg-land-foot{max-width:1080px;margin:30px auto 0;}
+}
+
 /* ===================================================================
    NEW PROJECT / SCRAPING
    =================================================================== */
@@ -534,14 +559,26 @@ html,body{max-width:100%;overflow-x:hidden;}
 /* ===================================================================
    GALLERY CATEGORY ROWS — Netflix/Spotify horizontal strips (item 17)
    =================================================================== */
-.pg-catrow{margin-bottom:22px;}
-.pg-catrow-head{display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin-bottom:10px;}
+.pg-catrow{margin-bottom:30px;}
+.pg-catrow-head{display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin-bottom:14px;}
 .pg-catrow-head h3{font-family:var(--display);font-weight:800;font-size:18px;text-transform:uppercase;letter-spacing:-.01em;}
 .pg-catrow-head .count{font-family:var(--mono);font-size:10.5px;color:var(--muted);}
-.pg-catrow-track{display:flex;gap:12px;overflow-x:auto;-webkit-overflow-scrolling:touch;scroll-snap-type:x mandatory;
-  padding:4px 4px 12px;margin:0 -4px;scrollbar-width:none;}
+.pg-catrow-wrap{position:relative;}
+.pg-catrow-track{display:flex;gap:20px;overflow-x:auto;-webkit-overflow-scrolling:touch;scroll-snap-type:x mandatory;
+  padding:6px 4px 14px;margin:0 -4px;scrollbar-width:none;scroll-behavior:smooth;}
 .pg-catrow-track::-webkit-scrollbar{height:0;}
 .pg-catcard{flex:0 0 auto;width:280px;scroll-snap-align:start;}
+/* desktop nav arrows on each strip (hidden on touch-first small screens) */
+.pg-catrow-arrow{position:absolute;top:calc(50% - 9px);transform:translateY(-50%);z-index:5;
+  width:40px;height:40px;display:none;align-items:center;justify-content:center;
+  border:1.5px solid var(--ink);border-radius:50%;background:#fff;color:var(--ink);
+  font-size:26px;line-height:1;padding-bottom:3px;cursor:pointer;box-shadow:var(--shadow-sm);
+  transition:opacity .12s ease,background .12s ease,transform .08s ease;}
+.pg-catrow-arrow.left{left:-8px;}
+.pg-catrow-arrow.right{right:-8px;}
+.pg-catrow-arrow:hover{background:var(--pop);}
+.pg-catrow-arrow:active{transform:translateY(-50%) translate(1px,1px);}
+.pg-catrow-arrow.is-hidden{opacity:0;pointer-events:none;}
 /* mobile: one card fills most of the viewport, next peeks ~half from the right */
 @media (max-width:640px){
   .pg-catcard{width:78vw;max-width:320px;}
@@ -549,6 +586,7 @@ html,body{max-width:100%;overflow-x:hidden;}
 @media (min-width:1000px){
   /* on wide screens give the strips a touch more room per card */
   .pg-catcard{width:300px;}
+  .pg-catrow-arrow{display:flex;}
 }
 
 /* ===================================================================
