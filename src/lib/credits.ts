@@ -3,6 +3,7 @@ import {
   CREDIT_PACKS,
   GENERATION_CREDIT_COST,
   INITIAL_FREE_CREDITS,
+  REGENERATION_CREDIT_COST,
   UNLOCK_ALL_DISCOUNT,
 } from "@/lib/types";
 import type { CreditPack, UserProfile } from "@/lib/types";
@@ -80,15 +81,14 @@ export interface CreditCheck {
   required: number;
 }
 
-// Ensures the user has at least `count` * GENERATION_CREDIT_COST credits to
-// run that many generations. The actual deduction happens after the
+// Ensures the user has at least `required` credits (a credit amount, which may
+// be fractional for regenerations). The actual deduction happens after the
 // generation succeeds via deductCredits.
 export async function checkGenerationCredits(
   userId: string,
-  count = 1,
+  required: number = GENERATION_CREDIT_COST,
 ): Promise<CreditCheck> {
   const profile = await ensureProfile(userId);
-  const required = count * GENERATION_CREDIT_COST;
   if (profile.credit_balance < required) {
     return {
       allowed: false,
@@ -98,6 +98,13 @@ export async function checkGenerationCredits(
     };
   }
   return { allowed: true, balance: profile.credit_balance, required };
+}
+
+// First image of a concept/variant costs a full credit; any later version
+// (regenerate, refine, retry) costs half. Version is 1-based and scoped to the
+// concept/variant, so version > 1 means an image already existed.
+export function generationCreditCost(version: number): number {
+  return version > 1 ? REGENERATION_CREDIT_COST : GENERATION_CREDIT_COST;
 }
 
 export interface DeductResult {

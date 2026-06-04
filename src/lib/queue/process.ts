@@ -2,12 +2,12 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { collectReferenceImages } from "@/lib/gemini/reference-images";
 import { generateWithModel, singleModel, modelPreference } from "@/lib/image-gen/router";
 import { reviewGeneration } from "@/lib/qa/review-generation";
-import { checkGenerationCredits, deductCredits } from "@/lib/credits";
 import {
-  DEFAULT_STYLE_SETTINGS,
-  GENERATION_CREDIT_COST,
-  JOB_MAX_ATTEMPTS,
-} from "@/lib/types";
+  checkGenerationCredits,
+  deductCredits,
+  generationCreditCost,
+} from "@/lib/credits";
+import { DEFAULT_STYLE_SETTINGS, JOB_MAX_ATTEMPTS } from "@/lib/types";
 import type {
   Generation,
   ImageModel,
@@ -98,7 +98,9 @@ async function processGenerate(
     return { generations: [] };
   }
 
-  const credits = await checkGenerationCredits(project.user_id, 1);
+  // version > 1 means the concept already had an image: regeneration (½ credit).
+  const cost = generationCreditCost(Number(job.payload?.version ?? 1));
+  const credits = await checkGenerationCredits(project.user_id, cost);
   if (!credits.allowed) {
     // Out of credits is terminal — retrying won't help. Surface it on the job.
     await failJob(admin, job, credits.reason ?? "Insufficient credits");
@@ -139,7 +141,7 @@ async function processGenerate(
 
   // Deduct only after a successful render so failed generations never burn a
   // credit (mirrors /api/generate).
-  const deducted = await deductCredits(project.user_id, GENERATION_CREDIT_COST);
+  const deducted = await deductCredits(project.user_id, cost);
   if (!deducted.ok) {
     await failJob(admin, job, deducted.reason ?? "Insufficient credits");
     await admin.from("generations").update({ status: "failed" }).eq("id", job.generation_id);

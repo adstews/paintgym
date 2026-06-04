@@ -1,11 +1,10 @@
 "use client";
 
 import { SegmentedControl } from "./segmented-control";
-import { DEFAULT_STYLE_SETTINGS, PLATFORM_DIMENSIONS } from "@/lib/types";
+import { DEFAULT_STYLE_SETTINGS } from "@/lib/types";
 import type {
   Aggressiveness,
   ModelPreference,
-  Platform,
   StyleSettings,
   Tone,
   VisualStyle,
@@ -30,13 +29,18 @@ export function StyleControls({ value, onChange }: Props) {
         <div className="lab">Aggressiveness</div>
         <SegmentedControl<Aggressiveness>
           ariaLabel="Aggressiveness"
-          value={value.aggressiveness}
+          value={
+            (value.aggressiveness as string) === "more"
+              ? "maximum"
+              : value.aggressiveness
+          }
           onChange={(next) => onChange({ ...value, aggressiveness: next })}
+          columns={2}
           options={[
             { value: "less", label: "Less", hint: "Brand-building, aspirational" },
             { value: "average", label: "Average", hint: "Balanced, clear benefits" },
-            { value: "more", label: "More", hint: "Urgent, strong claims" },
             { value: "maximum", label: "Maximum", hint: "Full direct response" },
+            { value: "mix", label: "Mix it up", hint: "Random level per ad" },
           ]}
         />
       </div>
@@ -72,31 +76,8 @@ export function StyleControls({ value, onChange }: Props) {
             ]}
           />
         </div>
-
-        <div className="pg-control-block" style={{ marginTop: 0 }}>
-          <div className="lab">Platform</div>
-          <SegmentedControl<Platform>
-            ariaLabel="Platform"
-            value={value.platform}
-            onChange={(next) => onChange({ ...value, platform: next })}
-            size="sm"
-            options={(
-              [
-                { value: "meta", label: "Meta" },
-                { value: "tiktok", label: "TikTok" },
-                { value: "linkedin", label: "LinkedIn" },
-              ] as { value: Platform; label: string }[]
-            ).map((opt) => {
-              const d = PLATFORM_DIMENSIONS[opt.value];
-              return {
-                value: opt.value,
-                label: opt.label,
-                hint: `${d.width}x${d.height}`,
-              };
-            })}
-          />
-        </div>
       </div>
+      {/* Platform selector removed — every ad is Meta 4:5 (1080x1350) for now. */}
 
       <div
         className="pg-control-block"

@@ -3,7 +3,7 @@ import { getOpenAIClient, OPENAI_IMAGE_MODEL } from "./client";
 // The hard rules are model-agnostic — both generators append the exact same
 // rules so OpenAI and Gemini are held to the same fidelity bar.
 import { applyHardRules } from "../gemini/hard-rules";
-import { PLATFORM_DIMENSIONS } from "../types";
+import { platformDimensions } from "../types";
 import type { Platform } from "../types";
 // Mirror the Gemini generator's interface so the router can call either one
 // interchangeably.
@@ -30,7 +30,7 @@ const MAX_ATTEMPTS = 3;
 function openaiSize(
   platform: Platform,
 ): "1024x1024" | "1024x1536" | "1536x1024" {
-  const d = PLATFORM_DIMENSIONS[platform];
+  const d = platformDimensions(platform);
   if (d.width > d.height) return "1536x1024";
   if (d.height > d.width) return "1024x1536";
   return "1024x1024";
@@ -71,7 +71,7 @@ export async function generateImageOpenAI({
 }: GenerateImageOptions): Promise<GenerateImageResult> {
   const client = getOpenAIClient();
 
-  const dims = PLATFORM_DIMENSIONS[platform];
+  const dims = platformDimensions(platform);
   const finalPrompt = applyHardRules(prompt, {
     aspect: dims.aspect,
     width: dims.width,

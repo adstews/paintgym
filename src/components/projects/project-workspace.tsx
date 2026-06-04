@@ -19,16 +19,26 @@ import { BriefCard } from "./brief-card";
 import { RecreateTab } from "./recreate-tab";
 import { CompetitorSpyTab } from "./competitor-spy-tab";
 import { CreditsPanel } from "./credits-panel";
-import { CONCEPT_VARIANTS } from "@/lib/types";
+import {
+  CONCEPT_VARIANTS,
+  GENERATION_CREDIT_COST,
+  REGENERATION_CREDIT_COST,
+} from "@/lib/types";
 import { CATEGORY_ORDER, categoryForConcept } from "@/lib/concept-categories";
+import {
+  getMissingRequiredFields,
+  missingFieldsMessage,
+} from "@/lib/validators/required-fields";
 import type {
   Brief,
   Concept,
+  ConcreteAggressiveness,
   ConceptVariant,
   Generation,
   ImageModel,
   Project,
   Recreation,
+  Tone,
   UserProfile,
   VariantLabel,
 } from "@/lib/types";
@@ -162,6 +172,9 @@ export function ProjectWorkspace({
   userProfile: initialProfile,
 }: Props) {
   const [project, setProject] = useState(initialProject);
+  // Set true after a blocked generate so Product Details highlights what's
+  // missing (red borders + banner).
+  const [highlightMissing, setHighlightMissing] = useState(false);
   const [generations, setGenerations] = useState(initialGenerations);
   const [briefs, setBriefs] = useState(initialBriefs);
   const [recreations, setRecreations] = useState(initialRecreations);
@@ -233,10 +246,36 @@ export function ProjectWorkspace({
   );
 
   const briefsByKey = useMemo(() => {
+    // Only the Gemini briefs back the Briefs tab and the single /api/generate
+    // path; GPT briefs live in state but are selected server-side by enqueue.
     const m = new Map<string, Brief>();
-    for (const b of briefs) m.set(briefKey(b.concept_id, b.variant), b);
+    for (const b of briefs) {
+      if ((b.model_target ?? "gemini") !== "gemini") continue;
+      m.set(briefKey(b.concept_id, b.variant), b);
+    }
     return m;
   }, [briefs]);
+
+  // Required-field gate (incl. price) shared by every generate action.
+  const missingFields = getMissingRequiredFields(project);
+  function ensureRequiredFields(): boolean {
+    if (missingFields.length === 0) return true;
+    setHighlightMissing(true);
+    setActiveTab("product");
+    toast.error(missingFieldsMessage(missingFields));
+    return false;
+  }
+
+  // Project-level settings seed the per-card "regenerate with settings" picker.
+  // "mix"/legacy values resolve deterministically (no random) for the default.
+  const aggSetting = project.style_settings?.aggressiveness ?? "average";
+  const currentAggressiveness: ConcreteAggressiveness =
+    aggSetting === "less" || aggSetting === "average" || aggSetting === "maximum"
+      ? aggSetting
+      : (aggSetting as string) === "more"
+        ? "maximum"
+        : "average";
+  const currentTone: Tone = project.style_settings?.tone ?? "professional";
 
   const attemptsByKey = useMemo(() => {
     const map = new Map<string, Generation[]>();
@@ -400,6 +439,7 @@ export function ProjectWorkspace({
   }
 
   async function generateAllBriefs() {
+    if (!ensureRequiredFields()) return;
     setBatchBriefsLoading(true);
     try {
       await generateBriefs(enabledConcepts.map((c) => c.id));
@@ -412,6 +452,7 @@ export function ProjectWorkspace({
   }
 
   async function regenerateBriefsForConcept(conceptId: string) {
+    if (!ensureRequiredFields()) return;
     try {
       await generateBriefs([conceptId]);
     } catch (err) {
@@ -536,8 +577,40 @@ export function ProjectWorkspace({
     conceptId: string,
     variant: ConceptVariant,
   ) {
+    if (!ensureRequiredFields()) return;
     const { id } = await generateOneImage(conceptId, variant);
     if (id) await runReview(id);
+  }
+
+  // Regenerate an existing image with different settings (rewrites the brief,
+  // then renders). Costs 0.5 credits. Used by the per-card settings picker.
+  async function regenerateWithSettings(
+    generationId: string,
+    aggressiveness: ConcreteAggressiveness,
+    tone: Tone,
+  ) {
+    const { ok, status, json } = await postJson(
+      "/api/regenerate",
+      {
+        generation_id: generationId,
+        aggressiveness,
+        tone,
+      },
+      GENERATE_TIMEOUT_MS,
+    );
+    if (!ok) {
+      if (status === 402) {
+        toast.error((json.message as string) ?? "Out of credits");
+      } else {
+        toast.error((json.message as string) ?? "Regenerate failed");
+      }
+      throw new Error((json.message as string) ?? "Regenerate failed");
+    }
+    mergeGenerations([json.generation as Generation]);
+    if (typeof json.new_balance === "number") {
+      setProfile((p) => ({ ...p, credit_balance: json.new_balance as number }));
+    }
+    toast.success("New version ready");
   }
 
   async function regenerateVariantImage(
@@ -545,6 +618,7 @@ export function ProjectWorkspace({
     variantLabel: VariantLabel,
     promptText: string,
   ) {
+    if (!ensureRequiredFields()) return;
     const existing = generations.filter(
       (g) =>
         g.recreation_id === recreationId && g.variant_label === variantLabel,
@@ -769,6 +843,7 @@ export function ProjectWorkspace({
   }
 
   async function generateAllImages() {
+    if (!ensureRequiredFields()) return;
     const items: { concept_id: string; concept_variant: ConceptVariant }[] = [];
     for (const c of enabledConcepts) {
       for (const v of CONCEPT_VARIANTS) {
@@ -784,6 +859,41 @@ export function ProjectWorkspace({
     }
 
     setBatchImagesLoading(true);
+
+    // GPT gets its OWN brief set — a deliberately different take on each concept
+    // rather than reusing the Gemini brief. Write them before enqueuing so the
+    // enqueue route can pick the GPT-targeted briefs.
+    if (pendingImageModel === "openai") {
+      const conceptIds = Array.from(new Set(items.map((it) => it.concept_id)));
+      try {
+        toast("Writing unique GPT briefs...");
+        const briefRes = await fetch("/api/generate-briefs", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            project_id: project.id,
+            concept_ids: conceptIds,
+            model_target: "openai",
+          }),
+        });
+        const briefJson = await briefRes.json().catch(() => ({}));
+        if (!briefRes.ok) {
+          toast.error(
+            (briefJson.message as string) ??
+              (briefJson.error as string) ??
+              "Could not write GPT briefs",
+          );
+          setBatchImagesLoading(false);
+          return;
+        }
+        applyBriefs((briefJson.briefs as Brief[]) ?? []);
+      } catch {
+        toast.error("Could not write GPT briefs");
+        setBatchImagesLoading(false);
+        return;
+      }
+    }
+
     try {
       const res = await fetch("/api/queue/enqueue", {
         method: "POST",
@@ -796,7 +906,15 @@ export function ProjectWorkspace({
       });
       const json = await res.json().catch(() => ({}));
       if (!res.ok) {
-        toast.error((json.error as string) ?? "Could not queue images");
+        if (json.error === "missing_fields") {
+          setHighlightMissing(true);
+          setActiveTab("product");
+        }
+        toast.error(
+          (json.message as string) ??
+            (json.error as string) ??
+            "Could not queue images",
+        );
         setBatchImagesLoading(false);
         return;
       }
@@ -1165,6 +1283,7 @@ export function ProjectWorkspace({
             <ProductDetailsForm
               project={project}
               onProjectChange={setProject}
+              highlightMissing={highlightMissing}
             />
           </div>
         )}
@@ -1382,6 +1501,11 @@ export function ProjectWorkspace({
                       onRatingChange={applyRatingUpdate}
                       onRefined={applyRefinedGeneration}
                       onNeedImage={ensureImages}
+                      onRegenerateSettings={(aggressiveness, tone) =>
+                        regenerateWithSettings(latest.id, aggressiveness, tone)
+                      }
+                      currentAggressiveness={currentAggressiveness}
+                      currentTone={currentTone}
                     />
                   </div>,
                 ];
@@ -1484,9 +1608,30 @@ export function ProjectWorkspace({
         onOpenChange={setConfirmImages}
         title={`Generate with ${pendingImageModel === "openai" ? "GPT" : "Gemini"}`}
         body={(() => {
-          const n = briefsCount;
-          const via = pendingImageModel === "openai" ? "GPT" : "Gemini";
-          return `This will use ${n} credit${n === 1 ? "" : "s"} to generate ${n} image${n === 1 ? "" : "s"} with ${via}. Continue?`;
+          const model = pendingImageModel ?? "gemini";
+          const via = model === "openai" ? "GPT" : "Gemini";
+          // Concept/variants that already have a completed image in this model
+          // count as regenerations (½ credit).
+          const done = new Set<string>();
+          for (const g of generations) {
+            if (g.status !== "completed" || !g.concept_id) continue;
+            if ((g.model_used ?? "gemini") !== model) continue;
+            done.add(`${g.concept_id}:${g.concept_variant ?? "A"}`);
+          }
+          let firsts = 0;
+          let regens = 0;
+          for (const c of enabledConcepts) {
+            for (const v of CONCEPT_VARIANTS) {
+              if (!briefsByKey.has(briefKey(c.id, v))) continue;
+              if (done.has(`${c.id}:${v}`)) regens += 1;
+              else firsts += 1;
+            }
+          }
+          const total = firsts + regens;
+          const cost =
+            firsts * GENERATION_CREDIT_COST + regens * REGENERATION_CREDIT_COST;
+          const costStr = Number.isInteger(cost) ? `${cost}` : cost.toFixed(1);
+          return `This will generate ${total} image${total === 1 ? "" : "s"} with ${via} for ${costStr} credit${cost === 1 ? "" : "s"}${regens > 0 ? " (regenerations are 0.5 each)" : ""}. Continue?`;
         })()}
         confirmLabel="Generate"
         onConfirm={generateAllImages}

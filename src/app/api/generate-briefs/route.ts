@@ -1,11 +1,15 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { generateBriefsSchema } from "@/lib/validators/schemas";
+import {
+  getMissingRequiredFields,
+  missingFieldsMessage,
+} from "@/lib/validators/required-fields";
 import { generateBriefsForConcept } from "@/lib/anthropic/generate-brief";
 import { loadPrimaryProductImage } from "@/lib/gemini/reference-images";
 import { loadFewShotExamples } from "@/lib/anthropic/few-shot";
 import { DEFAULT_STYLE_SETTINGS } from "@/lib/types";
-import type { Concept, Project, StyleSettings } from "@/lib/types";
+import type { Brief, Concept, Project, StyleSettings } from "@/lib/types";
 
 export const runtime = "nodejs";
 export const maxDuration = 180;
@@ -15,6 +19,7 @@ interface BriefOut {
   project_id: string;
   concept_id: string;
   variant: "A" | "B" | "C";
+  model_target: "gemini" | "openai";
   brief_text: string;
   summary: string | null;
   key_points: string[];
@@ -41,7 +46,7 @@ export async function POST(request: Request) {
     );
   }
 
-  const { project_id, concept_ids } = parsed.data;
+  const { project_id, concept_ids, model_target } = parsed.data;
 
   const { data: projectRow, error: projErr } = await supabase
     .from("projects")
@@ -58,12 +63,44 @@ export async function POST(request: Request) {
       DEFAULT_STYLE_SETTINGS,
   };
 
+  // Hard requirement: core inputs (incl. price) must be set so Claude never has
+  // to invent them. Block, don't warn.
+  const missing = getMissingRequiredFields(fullProject);
+  if (missing.length > 0) {
+    return NextResponse.json(
+      {
+        error: "missing_fields",
+        message: missingFieldsMessage(missing),
+        missing_fields: missing.map((f) => f.key),
+      },
+      { status: 422 },
+    );
+  }
+
   const { data: concepts, error: cErr } = await supabase
     .from("concepts")
     .select("*")
     .in("id", concept_ids);
   if (cErr || !concepts || concepts.length === 0) {
     return NextResponse.json({ error: "concepts_not_found" }, { status: 404 });
+  }
+
+  // For the GPT set, load the existing Gemini briefs so Claude can deliberately
+  // write something different per concept instead of echoing them.
+  const contrastByConcept = new Map<string, string>();
+  if (model_target === "openai") {
+    const { data: existing } = await supabase
+      .from("briefs")
+      .select("concept_id, brief_text, model_target")
+      .eq("project_id", project_id)
+      .in("concept_id", concept_ids)
+      .eq("model_target", "gemini");
+    for (const b of (existing ?? []) as Pick<
+      Brief,
+      "concept_id" | "brief_text"
+    >[]) {
+      contrastByConcept.set(b.concept_id, b.brief_text);
+    }
   }
 
   // Load the primary product image once so Claude can SEE the real product
@@ -86,6 +123,7 @@ export async function POST(request: Request) {
         concept,
         fewShotExamples: examples,
         productImage,
+        contrastBrief: contrastByConcept.get(concept.id) ?? null,
       });
       return { concept, variants };
     }),
@@ -95,6 +133,7 @@ export async function POST(request: Request) {
     project_id: string;
     concept_id: string;
     variant: "A" | "B" | "C";
+    model_target: "gemini" | "openai";
     brief_text: string;
     summary: string;
     key_points: string[];
@@ -109,6 +148,7 @@ export async function POST(request: Request) {
           project_id,
           concept_id: item.value.concept.id,
           variant: v.variant,
+          model_target,
           brief_text: v.brief_text,
           summary: v.summary,
           key_points: v.key_points,
@@ -130,7 +170,7 @@ export async function POST(request: Request) {
   if (rows.length > 0) {
     const { data: upserted, error: upErr } = await supabase
       .from("briefs")
-      .upsert(rows, { onConflict: "project_id,concept_id,variant" })
+      .upsert(rows, { onConflict: "project_id,concept_id,variant,model_target" })
       .select("*");
     if (upErr) {
       return NextResponse.json(

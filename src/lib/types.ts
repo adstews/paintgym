@@ -32,10 +32,22 @@ export const JOB_MAX_ATTEMPTS: Record<JobType, number> = {
 
 export type ImageType = "product" | "logo" | "reference";
 
-export type Aggressiveness = "less" | "average" | "more" | "maximum";
+// Concrete aggressiveness levels plus "mix" — a meta-setting that randomly
+// assigns one of the concrete levels to each brief independently (~1/3 each).
+// "mix" never reaches the guidance map; it is resolved to a concrete level
+// per-concept at brief-writing time (see resolveAggressiveness).
+export type ConcreteAggressiveness = "less" | "average" | "maximum";
+export type Aggressiveness = ConcreteAggressiveness | "mix";
+export const CONCRETE_AGGRESSIVENESS: ConcreteAggressiveness[] = [
+  "less",
+  "average",
+  "maximum",
+];
 export type Tone = "professional" | "casual" | "edgy" | "playful";
 export type VisualStyle = "clean" | "bold" | "organic";
-export type Platform = "meta" | "tiktok" | "linkedin";
+// Only Meta (4:5) for now. TikTok/LinkedIn were removed; the type is a single
+// member so the platform selector collapses to a hardcoded default.
+export type Platform = "meta";
 
 // A concrete image generator. Stored on each generation row (model_used) so the
 // gallery can show which model produced an image.
@@ -58,7 +70,8 @@ export interface StyleSettings {
 }
 
 export const DEFAULT_STYLE_SETTINGS: StyleSettings = {
-  aggressiveness: "average",
+  // "Mix it up" is the default: each brief gets a random aggressiveness level.
+  aggressiveness: "mix",
   tone: "professional",
   visual_style: "clean",
   platform: "meta",
@@ -78,9 +91,14 @@ export const MODEL_LABEL: Record<ImageModel, string> = {
 
 export const PLATFORM_DIMENSIONS: Record<Platform, { width: number; height: number; aspect: string }> = {
   meta: { width: 1080, height: 1350, aspect: "4:5" },
-  tiktok: { width: 1080, height: 1920, aspect: "9:16" },
-  linkedin: { width: 1200, height: 627, aspect: "1.91:1" },
 };
+
+// Tolerant accessor: legacy projects may still carry "tiktok"/"linkedin" in
+// their stored style_settings, so anything unknown falls back to Meta rather
+// than crashing on an undefined dimension lookup.
+export function platformDimensions(platform: Platform | string | null | undefined) {
+  return PLATFORM_DIMENSIONS[(platform as Platform) ?? "meta"] ?? PLATFORM_DIMENSIONS.meta;
+}
 
 export interface ProductData {
   name?: string;
@@ -163,6 +181,10 @@ export interface Brief {
   project_id: string;
   concept_id: string;
   variant: ConceptVariant;
+  // Which image model this brief was written for. Gemini and GPT get separately
+  // authored briefs (different copy/visual direction) so their images diverge.
+  // Defaults to "gemini" for rows that predate model-targeted briefs.
+  model_target: ImageModel;
   brief_text: string;
   summary: string | null;
   key_points: string[];
@@ -250,9 +272,13 @@ export interface UserProfile {
   has_purchased: boolean;
 }
 
-// One credit per generation. New users start with five.
+// One credit for a concept's first image. New users start with five.
 export const INITIAL_FREE_CREDITS = 5;
 export const GENERATION_CREDIT_COST = 1;
+// Regenerations, refinements, and retries of an existing concept image cost
+// half a credit (still ~4.5x markup over our render cost). Requires the
+// numeric credit_balance column from migration 0015.
+export const REGENERATION_CREDIT_COST = 0.5;
 
 export type CreditPackId = "starter" | "full_project" | "pro" | "agency";
 

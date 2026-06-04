@@ -1,6 +1,6 @@
 import { getGeminiClient, IMAGE_MODEL } from "./client";
 import { applyHardRules } from "./hard-rules";
-import { PLATFORM_DIMENSIONS } from "../types";
+import { platformDimensions } from "../types";
 import type { Platform } from "../types";
 
 export interface GenerateImageOptions {
@@ -79,7 +79,7 @@ export async function generateImage({
 }: GenerateImageOptions): Promise<GenerateImageResult> {
   const ai = getGeminiClient();
 
-  const dims = PLATFORM_DIMENSIONS[platform];
+  const dims = platformDimensions(platform);
   const finalPrompt = applyHardRules(prompt, {
     aspect: dims.aspect,
     width: dims.width,

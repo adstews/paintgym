@@ -1,10 +1,18 @@
 import { z } from "zod";
 
 export const styleSettingsSchema = z.object({
-  aggressiveness: z.enum(["less", "average", "more", "maximum"]),
+  // Accept the legacy "more" level and normalize it to "maximum" so saving an
+  // older project never fails validation.
+  aggressiveness: z
+    .enum(["less", "average", "maximum", "mix", "more"])
+    .transform((v) => (v === "more" ? "maximum" : v)),
   tone: z.enum(["professional", "casual", "edgy", "playful"]),
   visual_style: z.enum(["clean", "bold", "organic"]),
-  platform: z.enum(["meta", "tiktok", "linkedin"]),
+  // Only Meta now; tolerate legacy values from older rows and coerce to meta.
+  platform: z
+    .enum(["meta", "tiktok", "linkedin"])
+    .optional()
+    .transform(() => "meta" as const),
   image_model: z
     .enum(["gemini", "openai", "alternating", "both"])
     .optional()
@@ -111,6 +119,9 @@ export const stripeCheckoutSchema = z.object({
 export const generateBriefsSchema = z.object({
   project_id: z.string().uuid(),
   concept_ids: z.array(z.string().uuid()).min(1).max(50),
+  // Which model these briefs are for. "openai" writes a fresh, deliberately
+  // different set (contrasted against the existing Gemini briefs).
+  model_target: z.enum(["gemini", "openai"]).optional().default("gemini"),
 });
 
 export const briefPatchSchema = z.object({
@@ -171,6 +182,14 @@ export const ratingPatchSchema = z
 export const refineRequestSchema = z.object({
   generation_id: z.string().uuid(),
   user_feedback: z.string().min(3).max(2000),
+});
+
+// Regenerate an existing image with different creative settings: rewrite the
+// brief with the new aggressiveness/tone, then render a fresh image.
+export const regenerateSettingsSchema = z.object({
+  generation_id: z.string().uuid(),
+  aggressiveness: z.enum(["less", "average", "maximum"]),
+  tone: z.enum(["professional", "casual", "edgy", "playful"]),
 });
 
 export const competitorSpySchema = z.object({

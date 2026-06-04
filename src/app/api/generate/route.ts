@@ -3,11 +3,12 @@ import { createClient } from "@/lib/supabase/server";
 import { generateRequestSchema } from "@/lib/validators/schemas";
 import { collectReferenceImages } from "@/lib/gemini/reference-images";
 import { generateWithModel, singleModel, modelPreference } from "@/lib/image-gen/router";
-import { checkGenerationCredits, deductCredits } from "@/lib/credits";
 import {
-  DEFAULT_STYLE_SETTINGS,
-  GENERATION_CREDIT_COST,
-} from "@/lib/types";
+  checkGenerationCredits,
+  deductCredits,
+  generationCreditCost,
+} from "@/lib/credits";
+import { DEFAULT_STYLE_SETTINGS } from "@/lib/types";
 import type { ProductData, StyleSettings } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -54,19 +55,6 @@ export async function POST(request: Request) {
   // batch path is where side-by-side comparison happens.
   const model = singleModel(modelPreference(style));
 
-  const tier = await checkGenerationCredits(user.id, 1);
-  if (!tier.allowed) {
-    return NextResponse.json(
-      {
-        error: "paywall",
-        message: tier.reason,
-        balance: tier.balance,
-        required: tier.required,
-      },
-      { status: 402 },
-    );
-  }
-
   // Version counter is scoped to (concept + variant) or (recreation + variant_label).
   let versionQuery = supabase
     .from("generations")
@@ -84,6 +72,21 @@ export async function POST(request: Request) {
   }
   const { count } = await versionQuery;
   const version = (count ?? 0) + 1;
+  // version > 1 means this concept already had an image, so it's a regeneration.
+  const cost = generationCreditCost(version);
+
+  const tier = await checkGenerationCredits(user.id, cost);
+  if (!tier.allowed) {
+    return NextResponse.json(
+      {
+        error: "paywall",
+        message: tier.reason,
+        balance: tier.balance,
+        required: tier.required,
+      },
+      { status: 402 },
+    );
+  }
 
   const { data: row, error: insErr } = await supabase
     .from("generations")
@@ -123,7 +126,7 @@ export async function POST(request: Request) {
 
     // Only deduct after a successful render so failed generations
     // don't burn a credit.
-    const deducted = await deductCredits(user.id, GENERATION_CREDIT_COST);
+    const deducted = await deductCredits(user.id, cost);
     if (!deducted.ok) {
       await supabase
         .from("generations")

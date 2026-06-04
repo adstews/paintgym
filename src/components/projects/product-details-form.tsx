@@ -1,19 +1,34 @@
 "use client";
 
 import { useState } from "react";
+import type { CSSProperties } from "react";
 import { Btn } from "@/components/tf/ui";
 import { toast } from "sonner";
 import { ImageUploadField } from "./image-upload-field";
 import { StyleControls } from "./style-controls";
 import { BrandKitSection } from "./brand-kit-section";
+import {
+  getMissingRequiredFields,
+  missingFieldsMessage,
+} from "@/lib/validators/required-fields";
 import type { Project, ProductData, StyleSettings } from "@/lib/types";
 
 interface Props {
   project: Project;
   onProjectChange: (next: Project) => void;
+  // When true (set after a blocked generate attempt), missing required fields
+  // get red borders and a banner explains what to fill in.
+  highlightMissing?: boolean;
 }
 
-export function ProductDetailsForm({ project, onProjectChange }: Props) {
+export function ProductDetailsForm({
+  project,
+  onProjectChange,
+  highlightMissing = false,
+}: Props) {
+  const missing = getMissingRequiredFields(project);
+  const missingKeys = new Set<string>(missing.map((f) => f.key));
+  const showError = (key: string) => highlightMissing && missingKeys.has(key);
   const [scrapeBusy, setScrapeBusy] = useState(false);
   const [savedAt, setSavedAt] = useState<number | null>(null);
 
@@ -139,6 +154,24 @@ export function ProductDetailsForm({ project, onProjectChange }: Props) {
           </div>
         </div>
 
+        {highlightMissing && missing.length > 0 && (
+          <div
+            role="alert"
+            style={{
+              marginTop: 12,
+              padding: "10px 12px",
+              border: "1.5px solid var(--red)",
+              borderRadius: 4,
+              background: "#fdecec",
+              color: "var(--red)",
+              fontSize: 12.5,
+              fontWeight: 600,
+            }}
+          >
+            {missingFieldsMessage(missing)}
+          </div>
+        )}
+
         <div className="pg-form-card">
           <div className="pg-grid2">
             <Field
@@ -147,6 +180,8 @@ export function ProductDetailsForm({ project, onProjectChange }: Props) {
               value={project.brand_name ?? project.client_name ?? ""}
               placeholder="Acme Co."
               onChange={(v) => patchLocal({ brand_name: v })}
+              required
+              error={showError("brand_name")}
             />
             <Field
               id="prod-name"
@@ -154,6 +189,8 @@ export function ProductDetailsForm({ project, onProjectChange }: Props) {
               value={project.product_name ?? ""}
               placeholder="The thing you are selling"
               onChange={(v) => patchLocal({ product_name: v })}
+              required
+              error={showError("product_name")}
             />
           </div>
 
@@ -163,6 +200,8 @@ export function ProductDetailsForm({ project, onProjectChange }: Props) {
             value={project.product_description ?? ""}
             placeholder="A short description: what it is, who it is for, what it solves."
             onChange={(v) => patchLocal({ product_description: v })}
+            required
+            error={showError("product_description")}
           />
 
           <FieldArea
@@ -188,6 +227,8 @@ export function ProductDetailsForm({ project, onProjectChange }: Props) {
               value={project.price_point ?? ""}
               placeholder="$49, free trial, $9.99 / month..."
               onChange={(v) => patchLocal({ price_point: v })}
+              required
+              error={showError("price_point")}
             />
           </div>
 
@@ -294,17 +335,40 @@ interface FieldProps {
   value: string;
   placeholder?: string;
   onChange: (next: string) => void;
+  required?: boolean;
+  error?: boolean;
 }
 
-function Field({ id, label, value, placeholder, onChange }: FieldProps) {
+const ERROR_BORDER: CSSProperties = {
+  borderColor: "var(--red)",
+  boxShadow: "0 0 0 1px var(--red)",
+};
+
+function FieldLabel({
+  htmlFor,
+  label,
+  required,
+}: {
+  htmlFor: string;
+  label: string;
+  required?: boolean;
+}) {
+  return (
+    <label htmlFor={htmlFor} className="pg-field-label">
+      {label}
+      {required && <span style={{ color: "var(--red)", marginLeft: 3 }}>*</span>}
+    </label>
+  );
+}
+
+function Field({ id, label, value, placeholder, onChange, required, error }: FieldProps) {
   return (
     <div className="pg-form-row">
-      <label htmlFor={id} className="pg-field-label">
-        {label}
-      </label>
+      <FieldLabel htmlFor={id} label={label} required={required} />
       <input
         id={id}
         className="pg-input"
+        style={error ? ERROR_BORDER : undefined}
         value={value}
         placeholder={placeholder}
         onChange={(e) => onChange(e.target.value)}
@@ -318,15 +382,14 @@ interface AreaProps extends FieldProps {
   last?: boolean;
 }
 
-function FieldArea({ id, label, value, placeholder, onChange, rows = 3, last }: AreaProps) {
+function FieldArea({ id, label, value, placeholder, onChange, rows = 3, last, required, error }: AreaProps) {
   return (
     <div className="pg-form-row" style={last ? { marginBottom: 0 } : undefined}>
-      <label htmlFor={id} className="pg-field-label">
-        {label}
-      </label>
+      <FieldLabel htmlFor={id} label={label} required={required} />
       <textarea
         id={id}
         className="pg-input pg-textarea"
+        style={error ? ERROR_BORDER : undefined}
         rows={rows}
         value={value}
         placeholder={placeholder}

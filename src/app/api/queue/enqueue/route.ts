@@ -2,9 +2,13 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { enqueueImagesSchema } from "@/lib/validators/schemas";
+import {
+  getMissingRequiredFields,
+  missingFieldsMessage,
+} from "@/lib/validators/required-fields";
 import { modelPreference, modelsForConcept } from "@/lib/image-gen/router";
 import { JOB_MAX_ATTEMPTS } from "@/lib/types";
-import type { Brief, Generation, StyleSettings } from "@/lib/types";
+import type { Brief, Generation, ImageModel, Project, StyleSettings } from "@/lib/types";
 
 export const runtime = "nodejs";
 
@@ -29,13 +33,29 @@ export async function POST(request: Request) {
 
   const { data: project } = await supabase
     .from("projects")
-    .select("id, user_id, style_settings")
+    .select("*")
     .eq("id", project_id)
     .single();
   if (!project || project.user_id !== user.id) {
     return NextResponse.json({ error: "not_found" }, { status: 404 });
   }
-  const pref = modelPreference(project.style_settings as StyleSettings | null);
+
+  // Hard requirement: core inputs (incl. price) must be set before any image.
+  const missing = getMissingRequiredFields(project as Project);
+  if (missing.length > 0) {
+    return NextResponse.json(
+      {
+        error: "missing_fields",
+        message: missingFieldsMessage(missing),
+        missing_fields: missing.map((f) => f.key),
+      },
+      { status: 422 },
+    );
+  }
+
+  const pref = modelPreference(
+    (project as Project).style_settings as StyleSettings | null,
+  );
 
   const admin = createAdminClient();
 
@@ -44,8 +64,23 @@ export async function POST(request: Request) {
     .select("*")
     .eq("project_id", project_id);
   const briefs = (briefRows ?? []) as Brief[];
-  const briefByKey = new Map<string, Brief>();
-  for (const b of briefs) briefByKey.set(`${b.concept_id}:${b.variant}`, b);
+  // Keyed by model_target so the Gemini and GPT sets stay separate. Each image
+  // job picks the brief written for its own model, falling back to the Gemini
+  // brief if a GPT-specific one hasn't been written yet.
+  const briefByModelKey = new Map<string, Brief>();
+  for (const b of briefs) {
+    briefByModelKey.set(
+      `${b.concept_id}:${b.variant}:${b.model_target ?? "gemini"}`,
+      b,
+    );
+  }
+  const briefFor = (
+    conceptId: string,
+    variant: string,
+    model: ImageModel,
+  ): Brief | undefined =>
+    briefByModelKey.get(`${conceptId}:${variant}:${model}`) ??
+    briefByModelKey.get(`${conceptId}:${variant}:gemini`);
 
   // (concept, variant, model) tuples with an already-active generate job — never
   // enqueue the same one twice. Keyed by model too so "both" mode can run a
@@ -79,18 +114,16 @@ export async function POST(request: Request) {
   // Index over items drives "alternating" mode (1st concept Gemini, 2nd OpenAI…).
   let index = 0;
   for (const item of items) {
-    const brief = briefByKey.get(`${item.concept_id}:${item.concept_variant}`);
-    if (!brief) {
-      skipped += 1;
-      index += 1;
-      continue;
-    }
-
     // One render per resolved model — "both" yields two rows + two jobs.
     // A forced model (the GPT button) overrides the project preference and
     // renders every concept with that single model.
     const models = forcedModel ? [forcedModel] : modelsForConcept(pref, index);
     for (const model of models) {
+      const brief = briefFor(item.concept_id, item.concept_variant, model);
+      if (!brief) {
+        skipped += 1;
+        continue;
+      }
       if (activeKeys.has(activeKey(item.concept_id, item.concept_variant, model))) {
         skipped += 1;
         continue;
@@ -133,7 +166,8 @@ export async function POST(request: Request) {
         type: "generate",
         status: "pending",
         max_attempts: JOB_MAX_ATTEMPTS.generate,
-        payload: { prompt_text: brief.brief_text, model },
+        // version drives the credit cost in the worker (>1 = regeneration).
+        payload: { prompt_text: brief.brief_text, model, version },
       });
       if (jobErr) {
         // Roll the placeholder back so we don't leave an orphan stuck on

@@ -8,6 +8,7 @@ import {
   OctagonXIcon,
   Loader2Icon,
   SparklesIcon,
+  SlidersHorizontalIcon,
 } from "lucide-react";
 import {
   Dialog,
@@ -20,7 +21,12 @@ import { cn } from "@/lib/utils";
 import { RatingControls } from "./rating-controls";
 import { RefineDialog } from "./refine-dialog";
 import type { CSSProperties } from "react";
-import type { Generation, QaStatus } from "@/lib/types";
+import type {
+  ConcreteAggressiveness,
+  Generation,
+  QaStatus,
+  Tone,
+} from "@/lib/types";
 import { MODEL_BADGE, MODEL_LABEL } from "@/lib/types";
 
 interface Props {
@@ -38,6 +44,14 @@ interface Props {
   // visible attempt, plus any attempts it expands) so the workspace can fetch
   // just those images on demand.
   onNeedImage?: (ids: string[]) => void;
+  // Regenerate with different creative settings (rewrites the brief, then
+  // renders). The current project-level settings seed the picker.
+  onRegenerateSettings?: (
+    aggressiveness: ConcreteAggressiveness,
+    tone: Tone,
+  ) => Promise<void>;
+  currentAggressiveness?: ConcreteAggressiveness;
+  currentTone?: Tone;
 }
 
 interface QaPresentation {
@@ -85,8 +99,15 @@ export function GenerationCard({
   onRatingChange,
   onRefined,
   onNeedImage,
+  onRegenerateSettings,
+  currentAggressiveness = "average",
+  currentTone = "professional",
 }: Props) {
   const [regenLoading, setRegenLoading] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [settingsLoading, setSettingsLoading] = useState(false);
+  const [pickAgg, setPickAgg] = useState<ConcreteAggressiveness>(currentAggressiveness);
+  const [pickTone, setPickTone] = useState<Tone>(currentTone);
   const [reviewLoading, setReviewLoading] = useState(false);
   const [overrideLoading, setOverrideLoading] = useState(false);
   const [unlockLoading, setUnlockLoading] = useState(false);
@@ -154,6 +175,19 @@ export function GenerationCard({
       toast.error(err instanceof Error ? err.message : "Regenerate failed");
     } finally {
       setRegenLoading(false);
+    }
+  }
+
+  async function handleRegenerateSettings() {
+    if (!onRegenerateSettings) return;
+    setSettingsLoading(true);
+    try {
+      await onRegenerateSettings(pickAgg, pickTone);
+      setSettingsOpen(false);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Regenerate failed");
+    } finally {
+      setSettingsLoading(false);
     }
   }
 
@@ -359,8 +393,20 @@ export function GenerationCard({
               Download
             </button>
             <button className="pg-btn pg-btn--outline pg-btn--sm" onClick={handleRegenerate} disabled={regenLoading || isInFlight}>
-              {regenLoading ? "…" : "Regenerate"}
+              {regenLoading ? "…" : "Regenerate · 0.5cr"}
             </button>
+            {onRegenerateSettings && !isInFlight && (
+              <button
+                className="pg-btn pg-btn--outline pg-btn--sm"
+                onClick={() => setSettingsOpen((v) => !v)}
+                aria-expanded={settingsOpen}
+                title="Regenerate with different settings"
+                style={{ gap: 5 }}
+              >
+                <SlidersHorizontalIcon className="size-3.5" aria-hidden />
+                Settings
+              </button>
+            )}
             {selected.image_url && !isInFlight && (
               <button className="pg-btn pg-btn--outline pg-btn--sm" onClick={() => setRefineOpen(true)} style={{ gap: 5 }}>
                 <SparklesIcon className="size-3.5" aria-hidden />
@@ -378,6 +424,60 @@ export function GenerationCard({
               </>
             )}
           </div>
+
+          {settingsOpen && onRegenerateSettings && (
+            <div
+              style={{
+                marginTop: 8,
+                padding: 10,
+                border: "1.5px solid var(--ink)",
+                borderRadius: 4,
+                background: "#fff",
+                display: "flex",
+                flexDirection: "column",
+                gap: 8,
+              }}
+            >
+              <div className="pg-mono pg-muted" style={{ fontSize: 9.5, letterSpacing: ".06em", textTransform: "uppercase" }}>
+                Regenerate with new settings
+              </div>
+              <label className="pg-field-label" style={{ marginBottom: 0 }}>
+                Aggressiveness
+              </label>
+              <select
+                className="pg-input"
+                value={pickAgg}
+                onChange={(e) => setPickAgg(e.target.value as ConcreteAggressiveness)}
+                disabled={settingsLoading}
+              >
+                <option value="less">Less</option>
+                <option value="average">Average</option>
+                <option value="maximum">Maximum</option>
+              </select>
+              <label className="pg-field-label" style={{ marginBottom: 0 }}>
+                Tone
+              </label>
+              <select
+                className="pg-input"
+                value={pickTone}
+                onChange={(e) => setPickTone(e.target.value as Tone)}
+                disabled={settingsLoading}
+              >
+                <option value="professional">Professional</option>
+                <option value="casual">Casual</option>
+                <option value="edgy">Edgy</option>
+                <option value="playful">Playful</option>
+              </select>
+              <button
+                className="pg-btn pg-btn--pop pg-btn--sm"
+                onClick={handleRegenerateSettings}
+                disabled={settingsLoading}
+                style={{ justifyContent: "center", marginTop: 2 }}
+              >
+                {settingsLoading ? "Regenerating…" : "Regenerate with new settings · 0.5cr"}
+              </button>
+            </div>
+          )}
 
           {selected.refined_from && (
             <div className="pg-mono" style={{ marginTop: 6, fontSize: 9, color: "var(--muted)" }}>
@@ -473,7 +573,7 @@ export function GenerationCard({
                   onClick={handleRegenerate}
                   disabled={regenLoading || isInFlight}
                 >
-                  {regenLoading ? "…" : "Regenerate"}
+                  {regenLoading ? "…" : "Regenerate · 0.5cr"}
                 </button>
                 {selected.image_url && !isInFlight && (
                   <button

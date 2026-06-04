@@ -31,6 +31,7 @@ Make the brief concrete and renderable:
 
 Rules:
 - Use the exact product, brand, price, and proof details provided. Do not invent product names, prices, features, claims, or testimonials.
+- NEVER invent, guess, or hallucinate a price. Use only the exact price given in the product context. If no price is provided, do not mention price, cost, "$", discounts, or any number that implies a price anywhere in the brief.
 - Match the supplied aggressiveness, tone, visual style, and platform.
 - Never use em dashes. Never use exclamation marks. No AI cliches (unleash, elevate, revolutionize, game-changer, journey).
 - Do not address the reader or explain your choices in the brief.
@@ -43,11 +44,21 @@ Output format:
 - "key_points" is exactly three short phrases (~3 to 6 words each) naming the most important creative decisions: the hook or headline, the core visual, and the format or angle.`;
 }
 
+function buildContrastSection(contrastBrief: string | null | undefined): string {
+  if (!contrastBrief || !contrastBrief.trim()) return "";
+  return `\n## Brief already written for this concept (DO NOT REPEAT IT)
+You already wrote the brief below for the SAME product and concept. Now write a COMPLETELY DIFFERENT version. Use a different copy angle, a different headline, a different visual approach, a different emotional hook, a different composition. Do not reuse any of its ideas, phrasing, layout, or imagery. The two ads should feel like they came from two different creative teams.
+"""
+${contrastBrief.trim()}
+"""\n`;
+}
+
 function buildUserPrompt(
   project: Project,
   concept: Concept,
   examples: FewShotExample[],
   hasImage: boolean,
+  contrastBrief: string | null | undefined,
 ): string {
   const fewShot = buildFewShotSection(examples);
   return `## Product context
@@ -58,7 +69,7 @@ ${buildConceptSection(concept)}
 
 ## Style direction
 ${buildStyleSection(project.style_settings)}
-${fewShot ? `\n${fewShot}\n` : ""}
+${buildContrastSection(contrastBrief)}${fewShot ? `\n${fewShot}\n` : ""}
 ## Your task
 Write one image generation brief for this concept. Return only the JSON object.`;
 }
@@ -98,6 +109,9 @@ export interface GenerateBriefOptions {
   concept: Concept;
   fewShotExamples?: FewShotExample[];
   productImage?: InlineImage | null;
+  // The existing brief for this concept to deliberately diverge from (used when
+  // writing the GPT set so it doesn't echo the Gemini set).
+  contrastBrief?: string | null;
 }
 
 export async function generateBriefsForConcept({
@@ -105,11 +119,18 @@ export async function generateBriefsForConcept({
   concept,
   fewShotExamples = [],
   productImage = null,
+  contrastBrief = null,
 }: GenerateBriefOptions): Promise<VariantBrief[]> {
   const client = getAnthropicClient();
 
   const useImage = !!productImage && SUPPORTED_MIME.has(productImage.mimeType);
-  const userText = buildUserPrompt(project, concept, fewShotExamples, useImage);
+  const userText = buildUserPrompt(
+    project,
+    concept,
+    fewShotExamples,
+    useImage,
+    contrastBrief,
+  );
   const content: Anthropic.MessageParam["content"] = useImage
     ? [
         {

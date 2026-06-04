@@ -1,6 +1,7 @@
-import { PLATFORM_DIMENSIONS } from "../types";
+import { CONCRETE_AGGRESSIVENESS, platformDimensions } from "../types";
 import type {
   Aggressiveness,
+  ConcreteAggressiveness,
   Concept,
   Platform,
   Project,
@@ -9,14 +10,31 @@ import type {
   VisualStyle,
 } from "../types";
 
-export const AGGRESSIVENESS_GUIDANCE: Record<Aggressiveness, string> = {
+export const AGGRESSIVENESS_GUIDANCE: Record<ConcreteAggressiveness, string> = {
   less: "Soft, brand-building, aspirational. Lean on mood, lifestyle and meaning. Avoid pressure tactics, urgency, or hard sells. The ad should feel like a beautifully art-directed piece of editorial content first, a product ad second. Copy is short, evocative, and confident without shouting.",
   average:
     "Balanced direct response. Lead with the clearest, most concrete benefit. Use plain, confident product language. Include a single calm call to action. No urgency tactics, no scarcity hints. Feels premium, thoughtful, and credible.",
-  more: "Hard-hitting direct response. Lead with a sharp hook the target audience will recognize as their own problem. Use strong, specific value props, light urgency cues such as time bound deals or limited availability, and a confident call to action. Still tasteful; no fake countdowns, no fake reviews.",
   maximum:
     "Full direct response, performance-first. Aggressive hooks, bold claims grounded in real product truth, scarcity and urgency where honest, and a hard call to action. Copy is short, punchy, and benefit forward. The visual still has to be on brand and credible; the energy is aggressive, not tacky.",
 };
+
+// Resolve a stored aggressiveness setting to a concrete level. "mix" picks a
+// random level (so a 35-brief batch lands ~1/3 in each); the retired "more"
+// level maps to "maximum".
+export function resolveAggressiveness(
+  level: Aggressiveness | string,
+): ConcreteAggressiveness {
+  if (level === "mix") {
+    return CONCRETE_AGGRESSIVENESS[
+      Math.floor(Math.random() * CONCRETE_AGGRESSIVENESS.length)
+    ];
+  }
+  if (level === "more") return "maximum";
+  if (level === "less" || level === "average" || level === "maximum") {
+    return level;
+  }
+  return "average";
+}
 
 export const TONE_GUIDANCE: Record<Tone, string> = {
   professional:
@@ -38,11 +56,11 @@ export const VISUAL_GUIDANCE: Record<VisualStyle, string> = {
 
 export const PLATFORM_GUIDANCE: Record<Platform, string> = {
   meta: "Designed for the Meta feed (Facebook and Instagram). Composition reads at thumbnail scale. Hero element occupies the center 60% of the canvas.",
-  tiktok:
-    "Designed for TikTok and Instagram Reels. Vertical composition with the focal point in the upper two-thirds so it stays visible above any UI overlay. Optimized for muted-by-default phone viewing.",
-  linkedin:
-    "Designed for the LinkedIn feed. Horizontal composition. Reads as credible and business-appropriate without losing visual interest. Avoid party or hangover-style imagery.",
 };
+
+function platformGuidance(platform: Platform | string): string {
+  return PLATFORM_GUIDANCE[platform as Platform] ?? PLATFORM_GUIDANCE.meta;
+}
 
 function lineIfPresent(label: string, value: string | null | undefined): string | null {
   if (!value) return null;
@@ -117,11 +135,14 @@ export function buildProductContext(project: Project): string {
 }
 
 export function buildStyleSection(settings: StyleSettings): string {
-  const dims = PLATFORM_DIMENSIONS[settings.platform];
-  return `Aggressiveness (${settings.aggressiveness}): ${AGGRESSIVENESS_GUIDANCE[settings.aggressiveness]}
+  const dims = platformDimensions(settings.platform);
+  // Resolve "mix"/legacy levels to a concrete one (random per call for "mix",
+  // which gives a batch its ~1/3 spread across concepts).
+  const agg = resolveAggressiveness(settings.aggressiveness);
+  return `Aggressiveness (${agg}): ${AGGRESSIVENESS_GUIDANCE[agg]}
 Tone (${settings.tone}): ${TONE_GUIDANCE[settings.tone]}
 Visual style (${settings.visual_style}): ${VISUAL_GUIDANCE[settings.visual_style]}
-Platform (${settings.platform}): ${PLATFORM_GUIDANCE[settings.platform]} Output dimensions ${dims.width} by ${dims.height} pixels, aspect ratio ${dims.aspect}.`;
+Platform (meta): ${platformGuidance(settings.platform)} Output dimensions ${dims.width} by ${dims.height} pixels, aspect ratio ${dims.aspect}.`;
 }
 
 export function buildConceptSection(concept: Concept): string {
