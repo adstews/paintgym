@@ -138,7 +138,7 @@ export function BriefCard({
   );
 
   return (
-    <div className="pg-form-card" style={{ marginTop: 0, padding: expanded ? 16 : 12 }}>
+    <div className="pg-form-card" style={{ marginTop: 0, padding: expanded ? 20 : 16 }}>
       {/* Collapsed header — tap to expand (item 16) */}
       <button
         type="button"
