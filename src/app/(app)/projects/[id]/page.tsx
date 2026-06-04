@@ -16,6 +16,18 @@ interface PageProps {
   params: Promise<{ id: string }>;
 }
 
+// Every generation column EXCEPT the two heavy base64 data URLs (image_url,
+// watermarked_url). Those run 5-10MB each as data URLs, so selecting them for
+// every row made the initial page payload hundreds of MB and the page take
+// 5-10s to load. We ship metadata only; the client lazy-loads each image via
+// /api/generations/by-ids when its card scrolls into view.
+const GENERATION_METADATA_COLUMNS =
+  "id, project_id, concept_id, concept_variant, recreation_id, variant_label, " +
+  "prompt_text, is_unlocked, status, version, model_used, created_at, qa_status, " +
+  "qa_issues, qa_severity, auto_rewrite_count, is_auto_rewrite, rating, " +
+  "is_favorited, used_in_ad, refined_from, refinement_feedback, is_competitive, " +
+  "competitor_name";
+
 export default async function ProjectPage({ params }: PageProps) {
   const { id } = await params;
   const supabase = await createClient();
@@ -46,7 +58,7 @@ export default async function ProjectPage({ params }: PageProps) {
       .order("sort_order", { ascending: true }),
     supabase
       .from("generations")
-      .select("*")
+      .select(GENERATION_METADATA_COLUMNS)
       .eq("project_id", id)
       .order("created_at", { ascending: false }),
     supabase
@@ -87,7 +99,13 @@ export default async function ProjectPage({ params }: PageProps) {
     <ProjectWorkspace
       project={projectHydrated}
       concepts={allConcepts}
-      initialGenerations={(gens ?? []) as Generation[]}
+      initialGenerations={
+        (gens ?? []).map((g) => ({
+          ...(g as object),
+          image_url: null,
+          watermarked_url: null,
+        })) as Generation[]
+      }
       initialBriefs={(briefs ?? []) as Brief[]}
       initialRecreations={(recreations ?? []) as Recreation[]}
       enabledConceptIds={enabledSet}

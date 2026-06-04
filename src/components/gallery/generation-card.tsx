@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import {
   CircleCheckIcon,
@@ -33,6 +33,11 @@ interface Props {
   onUnlock?: () => Promise<void>;
   onRatingChange: (next: Generation) => void;
   onRefined: (next: Generation, newBalance?: number) => void;
+  // Lazy image loading: the initial page load ships generation metadata WITHOUT
+  // the heavy base64 image_url. The card calls this with the ids it needs (the
+  // visible attempt, plus any attempts it expands) so the workspace can fetch
+  // just those images on demand.
+  onNeedImage?: (ids: string[]) => void;
 }
 
 interface QaPresentation {
@@ -79,6 +84,7 @@ export function GenerationCard({
   onUnlock,
   onRatingChange,
   onRefined,
+  onNeedImage,
 }: Props) {
   const [regenLoading, setRegenLoading] = useState(false);
   const [reviewLoading, setReviewLoading] = useState(false);
@@ -104,6 +110,41 @@ export function GenerationCard({
   const hasIssues = selected.qa_issues && selected.qa_issues.length > 0;
   const isFlagged =
     selected.qa_status === "minor" || selected.qa_status === "major";
+
+  // A completed generation always has a rendered image, but the page ships
+  // metadata without the heavy base64 bytes — so a completed card with no
+  // image_url just hasn't been lazy-loaded yet (vs. genuinely having no image).
+  const needsImage = selected.status === "completed" && !selected.image_url;
+
+  // Lazy-load the visible attempt's image once the card scrolls near the
+  // viewport. rootMargin preloads a little ahead so images are usually ready by
+  // the time the card is fully on screen.
+  const cardRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!onNeedImage || !needsImage) return;
+    const el = cardRef.current;
+    if (!el) return;
+    const obs = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((e) => e.isIntersecting)) {
+          onNeedImage([selected.id]);
+          obs.disconnect();
+        }
+      },
+      { rootMargin: "300px" },
+    );
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, [onNeedImage, needsImage, selected.id]);
+
+  // When the attempts strip is expanded, pull in every older version's image.
+  useEffect(() => {
+    if (!onNeedImage || !showAttempts) return;
+    const missing = attempts
+      .filter((a) => a.status === "completed" && !a.image_url)
+      .map((a) => a.id);
+    if (missing.length > 0) onNeedImage(missing);
+  }, [onNeedImage, showAttempts, attempts]);
 
   async function handleRegenerate() {
     setRegenLoading(true);
@@ -164,7 +205,7 @@ export function GenerationCard({
 
   return (
     <>
-      <div className="pg-adcard pg-card-in">
+      <div className="pg-adcard pg-card-in" ref={cardRef}>
         <div className="pg-adcard-frame">
           <div style={{ position: "relative" }}>
             <button
@@ -197,9 +238,14 @@ export function GenerationCard({
                     alt={conceptName}
                     fill
                     sizes="(min-width:1024px) 320px, (min-width:640px) 50vw, 100vw"
-                    className="object-cover"
+                    className="object-contain"
                     unoptimized
                   />
+                ) : needsImage ? (
+                  <div className="pg-ad-load">
+                    <div className="ring" />
+                    <div className="lbl">loading…</div>
+                  </div>
                 ) : selected.status === "failed" ? (
                   <div className="pg-ad-err">
                     <TriangleAlertIcon className="size-5" aria-hidden />
@@ -529,7 +575,7 @@ function AttemptThumb({ attempt, isSelected, onClick }: ThumbProps) {
     >
       <div className="pg-ad" style={{ background: "var(--paper)" }}>
         {attempt.image_url && (
-          <Image src={attempt.image_url} alt={`v${attempt.version}`} fill sizes="46px" className="object-cover" unoptimized />
+          <Image src={attempt.image_url} alt={`v${attempt.version}`} fill sizes="46px" className="object-contain" unoptimized />
         )}
       </div>
       <div className="vlab">v{attempt.version}</div>

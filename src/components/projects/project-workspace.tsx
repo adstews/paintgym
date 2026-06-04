@@ -293,6 +293,70 @@ export function ProjectWorkspace({
     });
   }
 
+  // Lazy image loading. The page ships generation metadata without the heavy
+  // base64 image_url, so cards request the images they actually need (when they
+  // scroll into view) via /api/generations/by-ids. We dedupe already-requested
+  // ids and batch requests fired within the same tick into one round trip.
+  const requestedImageIds = useRef<Set<string>>(new Set());
+  const pendingImageIds = useRef<Set<string>>(new Set());
+  const imageFlushTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const ensureImages = useCallback((ids: string[]) => {
+    for (const id of ids) {
+      if (!id || requestedImageIds.current.has(id)) continue;
+      requestedImageIds.current.add(id);
+      pendingImageIds.current.add(id);
+    }
+    if (pendingImageIds.current.size === 0 || imageFlushTimer.current) return;
+    imageFlushTimer.current = setTimeout(async () => {
+      imageFlushTimer.current = null;
+      const batch = Array.from(pendingImageIds.current);
+      pendingImageIds.current.clear();
+      if (batch.length === 0) return;
+      try {
+        const res = await fetch("/api/generations/by-ids", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ ids: batch }),
+        });
+        if (!res.ok) {
+          // Let a later scroll retry these ids rather than getting stuck blank.
+          for (const id of batch) requestedImageIds.current.delete(id);
+          return;
+        }
+        const json = (await res.json()) as { generations: Generation[] };
+        const incoming = json.generations ?? [];
+        if (incoming.length > 0) {
+          setGenerations((arr) => {
+            const byId = new Map(arr.map((g) => [g.id, g]));
+            for (const g of incoming) byId.set(g.id, g);
+            return Array.from(byId.values());
+          });
+        }
+      } catch {
+        for (const id of batch) requestedImageIds.current.delete(id);
+      }
+    }, 50);
+  }, []);
+
+  // The gallery cards lazy-load their own images on scroll, but the Recreate and
+  // Competitor tabs render images directly without that wiring. When the user
+  // opens one of those tabs, eagerly pull in the images it will show (a
+  // deliberate tab switch, like opening Review mode). ensureImages dedupes, so
+  // this fires one batch the first time and no-ops afterward.
+  useEffect(() => {
+    const needed =
+      activeTab === "recreate"
+        ? generations.filter((g) => g.recreation_id)
+        : activeTab === "competitor"
+          ? generations.filter((g) => g.is_competitive)
+          : [];
+    const ids = needed
+      .filter((g) => g.status === "completed" && !g.image_url)
+      .map((g) => g.id);
+    if (ids.length > 0) ensureImages(ids);
+  }, [activeTab, generations, ensureImages]);
+
   function updateGeneration(
     matchId: string,
     patch: Partial<Generation> & { id?: string },
@@ -856,9 +920,10 @@ export function ProjectWorkspace({
   }
 
   async function downloadAll(model?: ImageModel) {
+    // Gate on status (image_url is lazy-loaded), not on the bytes being present.
     const items = generations.filter(
       (g) =>
-        g.image_url &&
+        g.status === "completed" &&
         g.is_unlocked &&
         g.qa_status !== "rewriting" &&
         g.concept_id &&
@@ -872,11 +937,33 @@ export function ProjectWorkspace({
       toast.error("Unlock images first");
       return;
     }
+    // Pull in the bytes for any items not yet lazy-loaded before downloading.
+    const urlById = new Map<string, string>();
+    for (const g of items) if (g.image_url) urlById.set(g.id, g.image_url);
+    const missing = items.filter((g) => !g.image_url).map((g) => g.id);
+    if (missing.length > 0) {
+      try {
+        const res = await fetch("/api/generations/by-ids", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ ids: missing }),
+        });
+        if (res.ok) {
+          const json = (await res.json()) as { generations: Generation[] };
+          const rows = json.generations ?? [];
+          mergeGenerations(rows);
+          for (const g of rows) if (g.image_url) urlById.set(g.id, g.image_url);
+        }
+      } catch {
+        // Fall through — we download whatever bytes we already have.
+      }
+    }
     for (const g of items) {
+      const url = urlById.get(g.id);
       const concept = g.concept_id ? conceptsById.get(g.concept_id) : null;
-      if (!concept || !g.image_url) continue;
+      if (!concept || !url) continue;
       const a = document.createElement("a");
-      a.href = g.image_url;
+      a.href = url;
       a.download = `${concept.name.toLowerCase().replace(/\s+/g, "-")}-${g.concept_variant ?? ""}-v${g.version}.png`;
       document.body.appendChild(a);
       a.click();
@@ -897,7 +984,7 @@ export function ProjectWorkspace({
   const lockedCount = useMemo(
     () =>
       generations.filter(
-        (g) => g.image_url && !g.is_unlocked && g.status === "completed",
+        (g) => !g.is_unlocked && g.status === "completed",
       ).length,
     [generations],
   );
@@ -912,7 +999,9 @@ export function ProjectWorkspace({
       for (const v of CONCEPT_VARIANTS) {
         const attempts = attemptsByKey.get(variantKey(c.id, v)) ?? [];
         const latest = attempts[0];
-        if (latest && latest.image_url) {
+        // image_url is lazy-loaded, so gate on status (a completed generation
+        // always has a rendered image) rather than on the bytes being present.
+        if (latest && latest.status === "completed") {
           out.push({
             generation: latest,
             conceptName: c.name,
@@ -1014,13 +1103,16 @@ export function ProjectWorkspace({
   const hasGalleryImages = generations.some(
     (g) =>
       g.concept_id &&
-      g.image_url &&
       g.status === "completed" &&
       enabled.has(g.concept_id) &&
       inActiveModel(g),
   );
   const galleryDownloadCount = generations.filter(
-    (g) => g.image_url && g.is_unlocked && g.concept_id && inActiveModel(g),
+    (g) =>
+      g.status === "completed" &&
+      g.is_unlocked &&
+      g.concept_id &&
+      inActiveModel(g),
   ).length;
   const galleryModelName = galleryModel === "openai" ? "GPT" : "Gemini";
   const startGalleryGeneration = () => {
@@ -1225,7 +1317,12 @@ export function ProjectWorkspace({
                 <button
                   type="button"
                   className="pg-btn pg-btn--outline pg-btn--sm"
-                  onClick={() => setReviewOpen(true)}
+                  onClick={() => {
+                    // Review mode renders the full image, so make sure the
+                    // lazy-loaded bytes are fetched for the items we'll swipe.
+                    ensureImages(galleryReviewItems.map((it) => it.generation.id));
+                    setReviewOpen(true);
+                  }}
                 >
                   Review ({galleryReviewItems.length})
                 </button>
@@ -1284,6 +1381,7 @@ export function ProjectWorkspace({
                       onUnlock={() => unlockGeneration(latest.id)}
                       onRatingChange={applyRatingUpdate}
                       onRefined={applyRefinedGeneration}
+                      onNeedImage={ensureImages}
                     />
                   </div>,
                 ];
