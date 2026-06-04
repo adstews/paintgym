@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import type {
   Brief,
@@ -35,6 +35,13 @@ export function BriefCard({
   const [showFull, setShowFull] = useState(false);
   // item 16: collapsed by default — tap the header to expand.
   const [expanded, setExpanded] = useState(false);
+
+  // Sync the editor when the brief prop changes (e.g. a regenerate finished, or
+  // an empty concept got its first brief) so it appears without a page refresh.
+  useEffect(() => {
+    setDraft(brief?.brief_text ?? "");
+    setDirty(false);
+  }, [brief?.id, brief?.brief_text]);
 
   function handleEdit(next: string) {
     setDraft(next);

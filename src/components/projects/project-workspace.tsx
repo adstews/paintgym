@@ -175,6 +175,11 @@ export function ProjectWorkspace({
   // Set true after a blocked generate so Product Details highlights what's
   // missing (red borders + banner).
   const [highlightMissing, setHighlightMissing] = useState(false);
+  // Live brief-generation progress ("Writing brief X of N…"). Null when idle.
+  const [briefProgress, setBriefProgress] = useState<{
+    done: number;
+    total: number;
+  } | null>(null);
   const [generations, setGenerations] = useState(initialGenerations);
   const [briefs, setBriefs] = useState(initialBriefs);
   const [recreations, setRecreations] = useState(initialRecreations);
@@ -308,9 +313,13 @@ export function ProjectWorkspace({
 
   function applyBriefs(newBriefs: Brief[]) {
     if (newBriefs.length === 0) return;
-    const m = new Map(briefs.map((b) => [b.id, b]));
-    for (const b of newBriefs) m.set(b.id, b);
-    setBriefs(Array.from(m.values()));
+    // Functional updater so concurrent incremental merges (the X-of-N batch)
+    // don't clobber each other with a stale snapshot.
+    setBriefs((prev) => {
+      const m = new Map(prev.map((b) => [b.id, b]));
+      for (const b of newBriefs) m.set(b.id, b);
+      return Array.from(m.values());
+    });
   }
 
   function replaceBrief(updated: Brief) {
@@ -405,56 +414,112 @@ export function ProjectWorkspace({
     );
   }
 
-  async function generateBriefs(conceptIds: string[]) {
-    if (conceptIds.length === 0) return;
+  // Fetch + merge the (Gemini) briefs for the given concept ids in ONE request.
+  // Returns the concept ids that actually got a brief, so the caller can track
+  // progress and detect misses. Throws only on a hard request failure (e.g.
+  // missing required fields) — per-concept failures come back in the payload.
+  async function fetchBriefs(conceptIds: string[]): Promise<{
+    succeeded: string[];
+  }> {
+    if (conceptIds.length === 0) return { succeeded: [] };
     const res = await fetch("/api/generate-briefs", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        project_id: project.id,
-        concept_ids: conceptIds,
-      }),
+      body: JSON.stringify({ project_id: project.id, concept_ids: conceptIds }),
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
+      if (err.error === "missing_fields") {
+        setHighlightMissing(true);
+        setActiveTab("product");
+      }
       throw new Error(err.message ?? err.error ?? "Brief generation failed");
     }
     const json = await res.json();
-    applyBriefs(json.briefs as Brief[]);
+    const briefsOut = (json.briefs as Brief[]) ?? [];
+    applyBriefs(briefsOut);
     if (json.informed_by && typeof json.informed_by === "object") {
       setInformedBy((prev) => ({
         ...prev,
         ...(json.informed_by as Record<string, number>),
       }));
     }
-    const failures = (json.failures ?? []) as {
-      concept_id: string;
-      message: string;
-    }[];
-    if (failures.length > 0) {
-      toast.error(
-        `${failures.length} concept${failures.length === 1 ? "" : "s"} failed`,
-      );
-    }
+    return { succeeded: briefsOut.map((b) => b.concept_id) };
   }
 
   async function generateAllBriefs() {
     if (!ensureRequiredFields()) return;
+    const ids = enabledConcepts.map((c) => c.id);
+    if (ids.length === 0) return;
+
     setBatchBriefsLoading(true);
+    setBriefProgress({ done: 0, total: ids.length });
+    const succeeded = new Set<string>();
+    let done = 0;
+
+    // Bounded-concurrency worker pool: each concept is its own request so cards
+    // fill in as they finish and the counter ticks up. ~4 in flight keeps us
+    // well under Anthropic rate limits.
+    const queue = [...ids];
+    const runOne = async (id: string) => {
+      try {
+        const { succeeded: ok } = await fetchBriefs([id]);
+        ok.forEach((c) => succeeded.add(c));
+      } catch {
+        // hard failure for this one — counts as a miss, self-heal will retry
+      } finally {
+        done += 1;
+        setBriefProgress({ done, total: ids.length });
+      }
+    };
+    const worker = async () => {
+      for (let id = queue.shift(); id; id = queue.shift()) await runOne(id);
+    };
     try {
-      await generateBriefs(enabledConcepts.map((c) => c.id));
-      toast.success("Briefs ready");
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Brief generation failed");
+      await Promise.all(
+        Array.from({ length: Math.min(4, ids.length) }, worker),
+      );
+
+      // Self-heal: any enabled concept the batch missed gets one retry pass.
+      const missing = ids.filter((id) => !succeeded.has(id));
+      if (missing.length > 0) {
+        const retryQueue = [...missing];
+        const retryWorker = async () => {
+          for (let id = retryQueue.shift(); id; id = retryQueue.shift()) {
+            try {
+              const { succeeded: ok } = await fetchBriefs([id]);
+              ok.forEach((c) => succeeded.add(c));
+            } catch {
+              /* still failed; reported below */
+            }
+          }
+        };
+        await Promise.all(
+          Array.from({ length: Math.min(3, missing.length) }, retryWorker),
+        );
+      }
+
+      const stillMissing = ids.filter((id) => !succeeded.has(id));
+      if (stillMissing.length === 0) {
+        toast.success("Briefs ready");
+      } else {
+        toast.error(
+          `${stillMissing.length} brief${stillMissing.length === 1 ? "" : "s"} failed — retry them individually`,
+        );
+      }
     } finally {
       setBatchBriefsLoading(false);
+      setBriefProgress(null);
     }
   }
 
   async function regenerateBriefsForConcept(conceptId: string) {
     if (!ensureRequiredFields()) return;
     try {
-      await generateBriefs([conceptId]);
+      const { succeeded } = await fetchBriefs([conceptId]);
+      if (succeeded.length === 0) {
+        toast.error("Couldn't write that brief — try again");
+      }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Regenerate failed");
     }
@@ -1364,6 +1429,47 @@ export function ProjectWorkspace({
                       ? "Writing briefs..."
                       : `Generate briefs (${enabledConcepts.length})`}
                   </button>
+                </div>
+              )}
+              {briefProgress && (
+                <div
+                  aria-live="polite"
+                  style={{
+                    border: "1.5px solid var(--ink)",
+                    borderRadius: 4,
+                    background: "#fff",
+                    padding: "10px 12px",
+                    boxShadow: "var(--shadow-sm)",
+                  }}
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="pg-mono" style={{ fontSize: 12, fontWeight: 700 }}>
+                      Writing brief{" "}
+                      {Math.min(briefProgress.done + 1, briefProgress.total)} of{" "}
+                      {briefProgress.total}...
+                    </span>
+                    <span className="pg-mono pg-muted" style={{ fontSize: 11 }}>
+                      {briefProgress.done}/{briefProgress.total}
+                    </span>
+                  </div>
+                  <div
+                    style={{
+                      marginTop: 8,
+                      height: 6,
+                      borderRadius: 999,
+                      background: "var(--line)",
+                      overflow: "hidden",
+                    }}
+                  >
+                    <div
+                      style={{
+                        width: `${briefProgress.total === 0 ? 0 : Math.round((briefProgress.done / briefProgress.total) * 100)}%`,
+                        height: "100%",
+                        background: "var(--pop)",
+                        transition: "width .3s ease",
+                      }}
+                    />
+                  </div>
                 </div>
               )}
               {enabledConcepts.flatMap((c) =>
