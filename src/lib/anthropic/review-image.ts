@@ -1,3 +1,4 @@
+import sharp from "sharp";
 import { z } from "zod";
 import { BRIEF_MODEL, getAnthropicClient } from "./client";
 
@@ -121,10 +122,40 @@ type ImageSource =
   | { type: "base64"; media_type: AnthropicImageMediaType; data: string }
   | { type: "url"; url: string };
 
-function buildImageSource(input: string): ImageSource {
+// Anthropic's vision API rejects images whose decoded size is over ~5MB. The QA
+// pipeline is model-agnostic, but the two generators are not equally sized:
+// gpt-image-1 emits high-res PNGs that routinely run several MB, while Gemini's
+// output tends to be smaller. So an oversized OpenAI image makes the review call
+// throw where the comparable Gemini image sails through — which surfaces as QA
+// "failing" only on GPT images. Re-encode anything near the limit down to a
+// review-friendly JPEG (1568px is Anthropic's own internal resize target, so we
+// lose no review fidelity) so QA works the same for every model. Best-effort: if
+// the re-encode fails for any reason we fall back to the original bytes.
+const MAX_REVIEW_IMAGE_BYTES = 4_500_000;
+
+async function compressIfOversized(
+  media_type: AnthropicImageMediaType,
+  data: string,
+): Promise<{ media_type: AnthropicImageMediaType; data: string }> {
+  const buf = Buffer.from(data, "base64");
+  if (buf.length <= MAX_REVIEW_IMAGE_BYTES) return { media_type, data };
+  try {
+    const out = await sharp(buf)
+      .rotate()
+      .resize({ width: 1568, height: 1568, fit: "inside", withoutEnlargement: true })
+      .jpeg({ quality: 80 })
+      .toBuffer();
+    return { media_type: "image/jpeg", data: out.toString("base64") };
+  } catch {
+    return { media_type, data };
+  }
+}
+
+async function buildImageSource(input: string): Promise<ImageSource> {
   if (input.startsWith("data:")) {
     const { mediaType, data } = parseDataUrl(input);
-    return { type: "base64", media_type: mediaType, data };
+    const safe = await compressIfOversized(mediaType, data);
+    return { type: "base64", media_type: safe.media_type, data: safe.data };
   }
   return { type: "url", url: input };
 }
@@ -140,7 +171,7 @@ export async function reviewImage({
   briefText,
   logoReferenceUrl,
 }: ReviewImageOptions): Promise<ReviewResult> {
-  const generatedSource = buildImageSource(imageDataUrl);
+  const generatedSource = await buildImageSource(imageDataUrl);
   const client = getAnthropicClient();
 
   const content: Array<
@@ -151,7 +182,7 @@ export async function reviewImage({
   let hasLogoReference = false;
   if (logoReferenceUrl) {
     try {
-      const logoSource = buildImageSource(logoReferenceUrl);
+      const logoSource = await buildImageSource(logoReferenceUrl);
       content.push({ type: "image", source: logoSource });
       hasLogoReference = true;
     } catch {

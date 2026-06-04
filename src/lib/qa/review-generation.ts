@@ -207,6 +207,10 @@ export async function reviewGeneration(
   for (let step = 0; step < MAX_AUTO_REWRITES + 1; step++) {
     const currentImage = generation.image_url;
     if (!currentImage) {
+      console.error(
+        `[qa] generation ${generation.id} has no image_url to review ` +
+          `(model=${generation.model_used ?? "gemini"})`,
+      );
       return { generations: touched, missing_image: true };
     }
     await markReviewing(supabase, generation.id);
@@ -219,6 +223,14 @@ export async function reviewGeneration(
         logoReferenceUrl: project.logo_url,
       });
     } catch (err) {
+      // Previously this swallowed the error into a "minor" fallback with no log,
+      // so a model-specific review failure (e.g. an oversized OpenAI image) was
+      // invisible. Log with model context so the next one is diagnosable.
+      console.error(
+        `[qa] review call failed for generation ${generation.id} ` +
+          `(model=${generation.model_used ?? "gemini"}):`,
+        err instanceof Error ? err.message : err,
+      );
       const fallback = await saveReviewFailed(
         supabase,
         generation.id,
