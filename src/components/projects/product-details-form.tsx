@@ -58,6 +58,7 @@ export function ProductDetailsForm({
       target_audience: project.target_audience,
       price_point: project.price_point,
       proof_points: project.proof_points,
+      compliance_rules: project.compliance_rules,
       style_settings: project.style_settings,
       product_data: project.product_data,
       brand_colors: project.brand_colors,
@@ -238,6 +239,15 @@ export function ProductDetailsForm({
             value={project.proof_points ?? ""}
             placeholder="Awards, press mentions, customer counts, testimonials, stats."
             onChange={(v) => patchLocal({ proof_points: v })}
+            rows={4}
+          />
+
+          <FieldArea
+            id="prod-compliance"
+            label="Compliance / hard rules"
+            value={project.compliance_rules ?? ""}
+            placeholder={"Hard rules Claude must never break — banned claims, required disclaimers, words or imagery to avoid.\ne.g. never say 'cure', always include '18+', no before/after weight-loss imagery."}
+            onChange={(v) => patchLocal({ compliance_rules: v })}
             rows={4}
             last
           />

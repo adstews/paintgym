@@ -32,6 +32,7 @@ Make the brief concrete and renderable:
 Rules:
 - Use the exact product, brand, price, and proof details provided. Do not invent product names, prices, features, claims, or testimonials.
 - NEVER invent, guess, or hallucinate a price. Use only the exact price given in the product context. If no price is provided, do not mention price, cost, "$", discounts, or any number that implies a price anywhere in the brief.
+- OBEY the compliance / hard rules in the product context without exception. Never write copy, claims, disclaimers, or visuals that violate them. If a compliance rule conflicts with the concept, the compliance rule wins.
 - Match the supplied aggressiveness, tone, visual style, and platform.
 - Never use em dashes. Never use exclamation marks. No AI cliches (unleash, elevate, revolutionize, game-changer, journey).
 - Do not address the reader or explain your choices in the brief.

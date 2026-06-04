@@ -42,6 +42,7 @@ export const SAMPLE_PROJECT: Project = {
   price_point: "$12.99",
   proof_points:
     "Featured in Bon Appetit best new hot sauces 2025. 4.8 stars across 1,200 reviews.",
+  compliance_rules: null,
   style_settings: DEFAULT_STYLE_SETTINGS,
   brand_colors: [
     { label: "primary", hex: "#C0322B" },
