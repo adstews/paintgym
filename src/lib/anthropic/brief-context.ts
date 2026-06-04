@@ -127,6 +127,12 @@ export function buildProductContext(project: Project): string {
     if (voice) lines.push(`Brand voice: ${voice}. Any on-image copy you write must sound like this.`);
   }
 
+  if (project.compliance_rules && project.compliance_rules.trim()) {
+    lines.push(
+      `COMPLIANCE / HARD RULES (NON-NEGOTIABLE — the brief and any on-image copy or visual MUST obey these; if a rule conflicts with the concept, the rule wins): ${project.compliance_rules.trim()}`,
+    );
+  }
+
   if (lines.length === 0) {
     lines.push(`Brand or product name: ${project.name}`);
   }

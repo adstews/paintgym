@@ -49,6 +49,7 @@ export const projectPatchSchema = z.object({
   target_audience: z.string().max(1000).optional().nullable(),
   price_point: z.string().max(200).optional().nullable(),
   proof_points: z.string().max(4000).optional().nullable(),
+  compliance_rules: z.string().max(4000).optional().nullable(),
   style_settings: styleSettingsSchema.optional(),
   product_data: z
     .object({

@@ -140,6 +140,8 @@ export interface Project {
   target_audience: string | null;
   price_point: string | null;
   proof_points: string | null;
+  // Hard rules / compliance constraints the briefs must never violate.
+  compliance_rules: string | null;
   style_settings: StyleSettings;
   brand_colors: BrandColor[];
   brand_fonts: BrandFont[];
