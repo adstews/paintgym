@@ -628,7 +628,7 @@ html,body{max-width:100%;overflow-x:hidden;}
 
 
 /* ============================================================
-   VIDEO STUDIO  (/video) — self-contained section styles
+   VIDEO STUDIO  (/video) · self-contained section styles
    Reuses the Training Floor tokens: chalk paper, jersey ink,
    electric lime pop, hard offset shadows, mono micro-labels.
    ============================================================ */
@@ -737,6 +737,7 @@ html,body{max-width:100%;overflow-x:hidden;}
 
 /* ---- integrations ---- */
 .vid-int{display:flex;flex-direction:column;gap:16px;}
+.vid-int-intro{display:flex;flex-direction:column;gap:6px;}
 .vid-int-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;}
 .vid-int-card{background:#fff;border:1.5px solid var(--ink);border-radius:5px;box-shadow:var(--shadow-sm);padding:16px;display:flex;flex-direction:column;gap:9px;}
 .vid-int-top{display:flex;align-items:center;justify-content:space-between;gap:8px;}

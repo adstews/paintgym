@@ -87,7 +87,7 @@ export const FORMATS: FormatSpec[] = [
     cost: "Free to 20 dollars per clip",
     bestFor: ["Home goods", "Tech", "Beauty tools", "Fitness equipment"],
     icon: "image",
-    workflowIds: ["cinematic", "claymation", "cartoon"],
+    workflowIds: ["cinematic"],
   },
 ];
 

@@ -222,6 +222,42 @@ export const WORKFLOWS: WorkflowSpec[] = [
       },
     ],
   },
+  {
+    id: "cinematic",
+    name: "Cinematic Product Demo Ad",
+    method: "Veo 3 / Kling Method",
+    summary:
+      "B-roll style product film: plan the beats, render each shot in Veo 3 or Kling, then grade and cut in CapCut for a premium look.",
+    steps: [
+      {
+        title: "Plan the shot list",
+        body:
+          "Claude breaks the product story into cinematic beats: an establishing shot, a hero close-up, the product in use, and a payoff. Use the Script Studio below with the Cinematic format to draft the beats and scene descriptions.",
+      },
+      {
+        title: "Generate B-roll clips",
+        body:
+          "Render one clip per beat in Veo 3 or Kling through the Higgsfield MCP. Use the Scene Prompt Generator to turn each beat into a rich, camera-aware prompt. Generate a couple of takes per beat so you have options in the edit.",
+        tool: "Veo 3 / Kling",
+      },
+      {
+        title: "Capture the hero product shot",
+        body:
+          "Get one clean hero close-up with shallow depth of field and soft, directional light. This is the shot that sells the build quality, so give it extra takes.",
+      },
+      {
+        title: "Add lifestyle scenes",
+        body:
+          "Render the product in its real setting with a person interacting naturally. Lifestyle context makes the demo feel aspirational rather than clinical.",
+      },
+      {
+        title: "Assemble in CapCut",
+        body:
+          "Sequence the clips on a 9:16 timeline, apply a consistent color grade, lay in a cinematic music bed, add restrained captions, and close on a clean CTA. Export at 1080p.",
+        tool: "CapCut",
+      },
+    ],
+  },
 ];
 
 export function getWorkflow(id: string): WorkflowSpec | undefined {
