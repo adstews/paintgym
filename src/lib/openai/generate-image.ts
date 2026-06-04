@@ -15,10 +15,13 @@ import type {
 export type { GenerateImageOptions, GenerateImageResult };
 
 const REFERENCE_ANCHOR =
-  "The attached image(s) are the EXACT product and brand assets for this ad. " +
-  "Reproduce the product faithfully — the same item, packaging, label, shape, " +
-  "proportions, colors, and any on-product text or logo. Do not invent, swap, " +
-  "or substitute a different product.\n\n";
+  "The attached image is the EXACT product for this ad. Treat it as the real " +
+  "product photo to place into the scene — do NOT redesign, restyle, recolor, " +
+  "or reinterpret it. Reproduce it identically: same container shape, same cap " +
+  "or lid, same label layout, the same text printed on the product spelled " +
+  "exactly, same colors, same proportions. The product in the final ad must be " +
+  "indistinguishable from this reference. Do not invent, swap, or substitute a " +
+  "different product, and do not invent a new label or packaging.\n\n";
 
 // Per-call deadline so a stalled request fails fast instead of hanging the route.
 const CALL_TIMEOUT_MS = 120_000;

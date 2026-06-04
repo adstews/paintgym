@@ -220,6 +220,7 @@ export async function reviewGeneration(
       result = await reviewImage({
         imageDataUrl: currentImage,
         briefText: generation.prompt_text,
+        productReferenceUrl: project.product_data?.images?.[0] ?? null,
         logoReferenceUrl: project.logo_url,
       });
     } catch (err) {

@@ -58,11 +58,13 @@ function extractJsonObject(text: string): string {
   return trimmed;
 }
 
-const REVIEW_SYSTEM = `You are a strict QA reviewer for static paid social ad images. You inspect a single generated image and compare it against the brief that produced it. You are pedantic and skeptical.
+const REVIEW_SYSTEM = `You are a strict QA reviewer for static paid social ad images. You inspect a generated ad and compare it against the brief that produced it, and — when provided — against the EXACT product reference image. You are pedantic and skeptical.
 
-You enforce ten Hard Rules. ANY single Hard Rule failure is a "major" severity issue and triggers an automatic redo. There are no exceptions, no "close enough", no benefit of the doubt. Hard Rule failures cannot be downgraded to "minor".
+You enforce the Hard Rules below. ANY single Hard Rule failure is a "major" severity issue and triggers an automatic redo. There are no exceptions, no "close enough", no benefit of the doubt. Hard Rule failures cannot be downgraded to "minor". Rule 0 (product fidelity) is the MOST IMPORTANT rule and must be checked first.
 
 ## Hard Rules
+
+Rule 0 - Product fidelity (HIGHEST PRIORITY). When a product reference image is provided (it will be attached and explicitly labeled as the exact product), the product shown in the generated ad MUST be that exact product. Compare them side by side: same container/bottle/package shape, same cap or lid, same label layout, the same text printed on the product spelled identically, the same colors, the same proportions. It is a Rule 0 failure if the rendered product has a different shape, a redrawn or invented label, wrong/garbled/missing on-product text, different colors, restyled packaging, or is simply a different product than the reference. Do NOT give the benefit of the doubt — if you are not confident the rendered product matches the reference, it fails. A Rule 0 failure is always "major". Never pass an ad whose product does not match the provided reference. (If no product reference image is provided, Rule 0 is not applicable and passes by default.)
 
 Rule 1 - Text spelling. Every word visible in the image must be spelled correctly. Check every word: headlines, body copy, badges, small print, brand names, product names. Any misspelling, garbled letter, fake glyph, half-formed character, or invented word is a Rule 1 failure.
 
@@ -105,17 +107,35 @@ Output rules:
 
 function buildReviewUserText(
   briefText: string,
+  hasProductReference: boolean,
   hasLogoReference: boolean,
 ): string {
-  const logoLine = hasLogoReference
-    ? `\nThe SECOND attached image is the brand's reference logo. For Rule 11, compare the logo as rendered inside the generated ad against this reference. Check for distortion, wrong text, wrong colors, wrong icon, stretching, or any "close but not the real mark" rendering. If no logo appears in the generated ad at all, Rule 11 passes.\n`
+  // Describe the attached images in the exact order they were pushed:
+  // [generated ad, (product reference?), (logo?)].
+  const order: string[] = ["the generated ad to review"];
+  if (hasProductReference) order.push("the EXACT product the ad must feature (the product reference)");
+  if (hasLogoReference) order.push("the brand's reference logo");
+  const imagesLine =
+    order.length === 1
+      ? "The attached image is the generated ad to review."
+      : `Attached images, in order: ${order
+          .map((d, i) => `(${i + 1}) ${d}`)
+          .join("; ")}.`;
+
+  const productLine = hasProductReference
+    ? `\nFor Rule 0 (highest priority), compare the product rendered inside the generated ad against the product reference image. They must be the SAME product — identical shape, cap, label, on-product text, colors, and proportions. If it does not match, that is a Rule 0 failure (major).\n`
     : "";
-  return `Brief that produced this image:
+  const logoLine = hasLogoReference
+    ? `\nFor Rule 11, compare the logo as rendered inside the generated ad against the reference logo. Check for distortion, wrong text, wrong colors, wrong icon, stretching, or any "close but not the real mark" rendering. If no logo appears in the generated ad at all, Rule 11 passes.\n`
+    : "";
+  return `${imagesLine}
+
+Brief that produced this image:
 """
 ${briefText.trim()}
 """
-${logoLine}
-Review the attached image against the brief and the Hard Rules. Return the JSON object now.`;
+${productLine}${logoLine}
+Review the generated ad against the brief, the product reference, and the Hard Rules. Return the JSON object now.`;
 }
 
 type ImageSource =
@@ -163,21 +183,39 @@ async function buildImageSource(input: string): Promise<ImageSource> {
 export interface ReviewImageOptions {
   imageDataUrl: string;
   briefText: string;
+  // The exact product image the ad must reproduce (Rule 0). Can be a data URL
+  // or a public https URL (e.g. Supabase storage).
+  productReferenceUrl?: string | null;
   logoReferenceUrl?: string | null;
 }
 
 export async function reviewImage({
   imageDataUrl,
   briefText,
+  productReferenceUrl,
   logoReferenceUrl,
 }: ReviewImageOptions): Promise<ReviewResult> {
   const generatedSource = await buildImageSource(imageDataUrl);
   const client = getAnthropicClient();
 
+  // Order matters and is described to the model in buildReviewUserText:
+  // [generated ad, (product reference?), (logo?)].
   const content: Array<
     | { type: "image"; source: ImageSource }
     | { type: "text"; text: string }
   > = [{ type: "image", source: generatedSource }];
+
+  let hasProductReference = false;
+  if (productReferenceUrl) {
+    try {
+      const productSource = await buildImageSource(productReferenceUrl);
+      content.push({ type: "image", source: productSource });
+      hasProductReference = true;
+    } catch {
+      // Couldn't load the product reference — skip Rule 0 rather than failing
+      // the whole review (generation-side logging flags missing references).
+    }
+  }
 
   let hasLogoReference = false;
   if (logoReferenceUrl) {
@@ -192,7 +230,7 @@ export async function reviewImage({
   }
   content.push({
     type: "text",
-    text: buildReviewUserText(briefText, hasLogoReference),
+    text: buildReviewUserText(briefText, hasProductReference, hasLogoReference),
   });
 
   const response = await client.messages.create({

@@ -221,6 +221,7 @@ export async function POST(request: Request) {
     const review = await reviewImage({
       imageDataUrl,
       briefText: refinedBrief,
+      productReferenceUrl: project.product_data?.images?.[0] ?? null,
       logoReferenceUrl: project.logo_url,
     });
     const qa_status = review.passed

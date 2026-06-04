@@ -44,5 +44,17 @@ export async function collectReferenceImages(
   productImageUrls: string[] | null | undefined,
 ): Promise<InlineImage[]> {
   const primary = await loadPrimaryProductImage(productImageUrls);
+  // Fail loud: if a product image IS configured but we couldn't load it, the
+  // model would otherwise silently invent the product. Surface it in logs so a
+  // broken/inaccessible reference URL is diagnosable instead of hallucinating.
+  const configured = (productImageUrls ?? []).some(
+    (u) => typeof u === "string" && u.length > 0,
+  );
+  if (configured && !primary) {
+    console.error(
+      "[reference-images] product image configured but could not be loaded; " +
+        `generating WITHOUT a product reference. urls=${JSON.stringify(productImageUrls)}`,
+    );
+  }
   return primary ? [primary] : [];
 }
