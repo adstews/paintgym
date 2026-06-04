@@ -68,7 +68,7 @@ export function NewProjectDialog({
             <span className="pg-h2">New project</span>
           </DialogTitle>
         </DialogHeader>
-        <form onSubmit={handleCreate} className="space-y-4">
+        <form onSubmit={handleCreate}>
           <div className="pg-form-row">
             <label className="pg-field-label" htmlFor="np-name">
               Project name
