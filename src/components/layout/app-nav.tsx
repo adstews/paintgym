@@ -47,6 +47,13 @@ export function AppNav({ email }: { email: string }) {
           Concepts
         </Link>
         <Link
+          href="/video"
+          className="pg-btn pg-btn--ghost pg-btn--sm"
+          style={{ textDecoration: "none" }}
+        >
+          Video
+        </Link>
+        <Link
           href="/pricing"
           className="pg-btn pg-btn--ghost pg-btn--sm"
           style={{ textDecoration: "none" }}
@@ -86,6 +93,10 @@ export function AppNav({ email }: { email: string }) {
             <Link href="/concepts" className="pg-nav-drawer-link" role="menuitem">
               <Icon name="grid" size={18} />
               Concepts
+            </Link>
+            <Link href="/video" className="pg-nav-drawer-link" role="menuitem">
+              <Icon name="image" size={18} />
+              Video
             </Link>
             <Link href="/pricing" className="pg-nav-drawer-link" role="menuitem">
               <Icon name="bolt" size={18} />
