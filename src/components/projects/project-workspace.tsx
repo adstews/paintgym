@@ -26,6 +26,7 @@ import type {
   Concept,
   ConceptVariant,
   Generation,
+  ImageModel,
   Project,
   Recreation,
   UserProfile,
@@ -185,7 +186,7 @@ export function ProjectWorkspace({
   const [confirmImages, setConfirmImages] = useState(false);
   // When set, the pending batch forces this model (the "Generate via GPT"
   // button sets "openai"); null falls back to the project's model preference.
-  const [pendingImageModel, setPendingImageModel] = useState<"openai" | null>(
+  const [pendingImageModel, setPendingImageModel] = useState<ImageModel | null>(
     null,
   );
   // Tinder-style review overlay (item 13).
@@ -261,9 +262,6 @@ export function ProjectWorkspace({
       ),
     [concepts, attemptsByKey],
   );
-
-  // Drives whether the gallery shows paired (Gemini + OpenAI) cards per concept.
-  const galleryModelPref = project.style_settings.image_model ?? "gemini";
 
   // The two gallery tabs each pin to a single model; the active tab decides it.
   const galleryModel: "gemini" | "openai" =
@@ -857,13 +855,18 @@ export function ProjectWorkspace({
     });
   }
 
-  async function downloadAll() {
+  async function downloadAll(model?: ImageModel) {
     const items = generations.filter(
       (g) =>
         g.image_url &&
         g.is_unlocked &&
         g.qa_status !== "rewriting" &&
-        g.concept_id,
+        g.concept_id &&
+        (model
+          ? model === "gemini"
+            ? (g.model_used ?? "gemini") === "gemini"
+            : g.model_used === "openai"
+          : true),
     );
     if (items.length === 0) {
       toast.error("Unlock images first");
@@ -899,23 +902,6 @@ export function ProjectWorkspace({
     [generations],
   );
 
-  // "both" mode renders two images per brief; every other mode renders one.
-  const imagesToGenerate =
-    briefsCount * (galleryModelPref === "both" ? 2 : 1);
-
-  // item 10: once images exist for the enabled concepts, the batch button is
-  // disabled (use per-image Regenerate instead). Briefs likewise.
-  const hasAnyImages = useMemo(
-    () =>
-      generations.some(
-        (g) =>
-          g.concept_id &&
-          g.image_url &&
-          g.status === "completed" &&
-          enabled.has(g.concept_id),
-      ),
-    [generations, enabled],
-  );
   const hasAnyBriefs = briefsCount > 0;
 
   // Flat list of the latest image per concept/variant, for the swipe review
@@ -971,6 +957,77 @@ export function ProjectWorkspace({
     queueView.imagesTotal > 0 &&
     (batchImagesLoading || (progress?.active ?? 0) > 0);
 
+  // Shared generation progress bar. Both gallery tabs feed the same queue, so a
+  // single bar reflects whichever batch is currently running.
+  const queueBar =
+    showQueueBar && queueView ? (
+      <div
+        aria-live="polite"
+        style={{
+          border: "1.5px solid var(--ink)",
+          borderRadius: 4,
+          background: "#fff",
+          padding: "10px 12px",
+          boxShadow: "var(--shadow-sm)",
+        }}
+      >
+        <div className="flex items-center justify-between gap-3">
+          <span className="pg-mono" style={{ fontSize: 12, fontWeight: 700 }}>
+            {queueView.label}
+          </span>
+          <span className="pg-mono pg-muted" style={{ fontSize: 11 }}>
+            {queueView.imagesDone}/{queueView.imagesTotal}
+            {queueView.imagesFailed > 0
+              ? ` · ${queueView.imagesFailed} failed`
+              : ""}
+          </span>
+        </div>
+        <div
+          style={{
+            marginTop: 8,
+            height: 6,
+            borderRadius: 999,
+            background: "var(--line)",
+            overflow: "hidden",
+          }}
+        >
+          <div
+            style={{
+              width: `${queueView.pct}%`,
+              height: "100%",
+              background: "var(--pop)",
+              transition: "width .3s ease",
+            }}
+          />
+        </div>
+      </div>
+    ) : null;
+
+  // Review/download/regenerate counts scoped to the active gallery's model.
+  const inActiveModel = (g: Generation): boolean =>
+    galleryModel === "gemini"
+      ? (g.model_used ?? "gemini") === "gemini"
+      : g.model_used === "openai";
+  const galleryReviewItems = reviewableItems.filter((it) =>
+    inActiveModel(it.generation),
+  );
+  const hasGalleryImages = generations.some(
+    (g) =>
+      g.concept_id &&
+      g.image_url &&
+      g.status === "completed" &&
+      enabled.has(g.concept_id) &&
+      inActiveModel(g),
+  );
+  const galleryDownloadCount = generations.filter(
+    (g) => g.image_url && g.is_unlocked && g.concept_id && inActiveModel(g),
+  ).length;
+  const galleryModelName = galleryModel === "openai" ? "GPT" : "Gemini";
+  const startGalleryGeneration = () => {
+    setPendingImageModel(galleryModel);
+    setConfirmImages(true);
+  };
+
   return (
     <div className="space-y-6">
       <div className="pg-ws-head" style={{ border: 0, padding: 0, background: "transparent" }}>
@@ -984,124 +1041,7 @@ export function ProjectWorkspace({
             </span>
           </div>
         )}
-        <div className="pg-ws-stats" style={{ gap: 8 }}>
-          <button
-            className="pg-btn pg-btn--outline pg-btn--sm"
-            onClick={() => setConfirmBriefs(true)}
-            disabled={batchBriefsLoading || enabledConcepts.length === 0 || hasAnyBriefs}
-            title={
-              hasAnyBriefs
-                ? "Briefs already generated. Use Regenerate on individual briefs."
-                : undefined
-            }
-          >
-            {batchBriefsLoading
-              ? "Writing briefs..."
-              : `Generate briefs (${enabledConcepts.length})`}
-          </button>
-          <button
-            className="pg-btn pg-btn--pop pg-btn--sm"
-            onClick={() => {
-              setPendingImageModel(null);
-              setConfirmImages(true);
-            }}
-            disabled={batchImagesLoading || briefsCount === 0 || hasAnyImages}
-            title={
-              hasAnyImages
-                ? "Images already generated. Use Regenerate on individual images."
-                : undefined
-            }
-          >
-            {batchImagesLoading
-              ? "Generating..."
-              : `Generate images (${imagesToGenerate})`}
-          </button>
-          <button
-            className="pg-btn pg-btn--outline pg-btn--sm"
-            onClick={() => {
-              setPendingImageModel("openai");
-              setConfirmImages(true);
-            }}
-            disabled={batchImagesLoading || briefsCount === 0 || hasAnyImages}
-            title={
-              hasAnyImages
-                ? "Images already generated. Use Regenerate on individual images."
-                : "Generate every image with OpenAI/GPT instead of the project model"
-            }
-            style={{ borderColor: "var(--green)", color: "var(--green)" }}
-          >
-            {batchImagesLoading
-              ? "Generating..."
-              : `Generate via GPT (${briefsCount})`}
-          </button>
-          {batchImagesLoading && (
-            <button
-              className="pg-btn pg-btn--outline pg-btn--sm"
-              onClick={stopGeneration}
-              style={{ color: "var(--red)", borderColor: "var(--red)" }}
-            >
-              Stop
-            </button>
-          )}
-          <button
-            className="pg-btn pg-btn--outline pg-btn--sm"
-            onClick={downloadAll}
-            disabled={
-              generations.filter(
-                (g) => g.image_url && g.is_unlocked && g.concept_id,
-              ).length === 0
-            }
-          >
-            Download all
-          </button>
-        </div>
       </div>
-
-      {showQueueBar && queueView && (
-        <div
-          aria-live="polite"
-          style={{
-            border: "1.5px solid var(--ink)",
-            borderRadius: 4,
-            background: "#fff",
-            padding: "10px 12px",
-            boxShadow: "var(--shadow-sm)",
-          }}
-        >
-          <div className="flex items-center justify-between gap-3">
-            <span
-              className="pg-mono"
-              style={{ fontSize: 12, fontWeight: 700 }}
-            >
-              {queueView.label}
-            </span>
-            <span className="pg-mono pg-muted" style={{ fontSize: 11 }}>
-              {queueView.imagesDone}/{queueView.imagesTotal}
-              {queueView.imagesFailed > 0
-                ? ` · ${queueView.imagesFailed} failed`
-                : ""}
-            </span>
-          </div>
-          <div
-            style={{
-              marginTop: 8,
-              height: 6,
-              borderRadius: 999,
-              background: "var(--line)",
-              overflow: "hidden",
-            }}
-          >
-            <div
-              style={{
-                width: `${queueView.pct}%`,
-                height: "100%",
-                background: "var(--pop)",
-                transition: "width .3s ease",
-              }}
-            />
-          </div>
-        </div>
-      )}
 
       <CreditsPanel
         profile={profile}
@@ -1201,6 +1141,20 @@ export function ProjectWorkspace({
             </div>
           ) : (
             <div className="grid gap-2">
+              {!hasAnyBriefs && (
+                <div className="flex items-center justify-end">
+                  <button
+                    type="button"
+                    className="pg-btn pg-btn--pop pg-btn--sm"
+                    onClick={() => setConfirmBriefs(true)}
+                    disabled={batchBriefsLoading}
+                  >
+                    {batchBriefsLoading
+                      ? "Writing briefs..."
+                      : `Generate briefs (${enabledConcepts.length})`}
+                  </button>
+                </div>
+              )}
               {enabledConcepts.flatMap((c) =>
                 CONCEPT_VARIANTS.map((v) => {
                   const brief = briefsByKey.get(briefKey(c.id, v)) ?? null;
@@ -1241,16 +1195,49 @@ export function ProjectWorkspace({
               few-shot examples the next time Claude writes briefs for
               the same concept.
             </div>
-            <div className="flex items-center gap-2">
-              {reviewableItems.length > 0 && (
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                className="pg-btn pg-btn--pop pg-btn--sm"
+                onClick={startGalleryGeneration}
+                disabled={batchImagesLoading || briefsCount === 0}
+                title={
+                  briefsCount === 0 ? "Write briefs first" : undefined
+                }
+              >
+                {batchImagesLoading
+                  ? "Generating..."
+                  : hasGalleryImages
+                    ? `Regenerate all with ${galleryModelName}`
+                    : `Generate all with ${galleryModelName} (${briefsCount})`}
+              </button>
+              {batchImagesLoading && (
                 <button
                   type="button"
-                  className="pg-btn pg-btn--pop pg-btn--sm"
-                  onClick={() => setReviewOpen(true)}
+                  className="pg-btn pg-btn--outline pg-btn--sm"
+                  onClick={stopGeneration}
+                  style={{ color: "var(--red)", borderColor: "var(--red)" }}
                 >
-                  Review ({reviewableItems.length})
+                  Stop
                 </button>
               )}
+              {galleryReviewItems.length > 0 && (
+                <button
+                  type="button"
+                  className="pg-btn pg-btn--outline pg-btn--sm"
+                  onClick={() => setReviewOpen(true)}
+                >
+                  Review ({galleryReviewItems.length})
+                </button>
+              )}
+              <button
+                type="button"
+                className="pg-btn pg-btn--outline pg-btn--sm"
+                onClick={() => downloadAll(galleryModel)}
+                disabled={galleryDownloadCount === 0}
+              >
+                Download all
+              </button>
               <button
                 type="button"
                 className={`pg-chip ${topPerformersOnly ? "is-on" : ""}`}
@@ -1260,6 +1247,7 @@ export function ProjectWorkspace({
               </button>
             </div>
           </div>
+          {queueBar}
           {(() => {
             // Each gallery tab shows only its own model's images.
             const matchesModel = (g: Generation): boolean =>
@@ -1316,16 +1304,23 @@ export function ProjectWorkspace({
                   <div className="ix">
                     <Icon name="grid" size={26} />
                   </div>
-                  <h3>
-                    {galleryModel === "openai"
-                      ? "No GPT images yet"
-                      : "No Gemini images yet"}
-                  </h3>
+                  <h3>No {galleryModelName} images yet</h3>
                   <p>
-                    {galleryModel === "openai"
-                      ? "No GPT images yet. Generate some using the Generate via GPT button."
-                      : "No Gemini images yet. Generate some using the Generate images button."}
+                    {briefsCount === 0
+                      ? "Write briefs first, then generate images here."
+                      : `Render every brief with ${galleryModelName}.`}
                   </p>
+                  <button
+                    type="button"
+                    className="pg-btn pg-btn--pop pg-btn--sm"
+                    onClick={startGalleryGeneration}
+                    disabled={batchImagesLoading || briefsCount === 0}
+                    style={{ marginTop: 12 }}
+                  >
+                    {batchImagesLoading
+                      ? "Generating..."
+                      : `Generate with ${galleryModelName}`}
+                  </button>
                 </div>
               );
             }
@@ -1389,11 +1384,11 @@ export function ProjectWorkspace({
       <ConfirmDialog
         open={confirmImages}
         onOpenChange={setConfirmImages}
-        title={pendingImageModel === "openai" ? "Generate via GPT" : "Generate images"}
+        title={`Generate with ${pendingImageModel === "openai" ? "GPT" : "Gemini"}`}
         body={(() => {
-          const n = pendingImageModel === "openai" ? briefsCount : imagesToGenerate;
-          const via = pendingImageModel === "openai" ? " with GPT" : "";
-          return `This will use ${n} credit${n === 1 ? "" : "s"} to generate ${n} image${n === 1 ? "" : "s"}${via}. Continue?`;
+          const n = briefsCount;
+          const via = pendingImageModel === "openai" ? "GPT" : "Gemini";
+          return `This will use ${n} credit${n === 1 ? "" : "s"} to generate ${n} image${n === 1 ? "" : "s"} with ${via}. Continue?`;
         })()}
         confirmLabel="Generate"
         onConfirm={generateAllImages}
@@ -1401,7 +1396,7 @@ export function ProjectWorkspace({
 
       {reviewOpen && (
         <ReviewMode
-          items={reviewableItems}
+          items={galleryReviewItems}
           onClose={() => setReviewOpen(false)}
           onRatingChange={applyRatingUpdate}
           onRefined={applyRefinedGeneration}
