@@ -3,6 +3,7 @@ import {
   CREDIT_PACKS,
   GENERATION_CREDIT_COST,
   INITIAL_FREE_CREDITS,
+  REGEN_FREE_BUDGET,
   REGENERATION_CREDIT_COST,
   UNLOCK_ALL_DISCOUNT,
 } from "@/lib/types";
@@ -168,6 +169,53 @@ export async function addCredits(
       { onConflict: "user_id" },
     );
   return next;
+}
+
+// A free regeneration: atomically spend one unit of a project's regen_budget.
+// Returns whether a free regen was applied and the budget left afterward. The
+// decrement happens in a single SQL UPDATE (consume_regen_budget RPC) so a
+// double-click cannot spend the same unit twice.
+export interface RegenBudgetResult {
+  used: boolean;
+  remaining: number;
+}
+
+export async function consumeRegenBudget(
+  projectId: string,
+): Promise<RegenBudgetResult> {
+  const admin = createAdminClient();
+  const { data, error } = await admin.rpc("consume_regen_budget", {
+    p_project_id: projectId,
+  });
+  // RPC returns the new budget when a unit was spent, or null when it was 0.
+  if (!error && typeof data === "number") {
+    return { used: true, remaining: data };
+  }
+  // Nothing consumed (budget was 0, or the RPC errored): report the current
+  // value so callers can still surface "0 free regenerations remaining".
+  const { data: row } = await admin
+    .from("projects")
+    .select("regen_budget")
+    .eq("id", projectId)
+    .single();
+  return { used: false, remaining: (row?.regen_budget as number | undefined) ?? 0 };
+}
+
+// Reset a project's free-regeneration budget. Called when a full batch finishes
+// so each completed batch ships with a fresh allotment of free regens.
+export async function grantRegenBudget(
+  projectId: string,
+  amount: number = REGEN_FREE_BUDGET,
+): Promise<number> {
+  const admin = createAdminClient();
+  const { error } = await admin
+    .from("projects")
+    .update({ regen_budget: amount })
+    .eq("id", projectId);
+  // If the update failed (e.g. the regen_budget column does not exist yet on a
+  // deploy that predates the migration), report 0 so the UI never advertises
+  // free regenerations that were not actually persisted.
+  return error ? 0 : amount;
 }
 
 export function findPack(id: string): CreditPack | undefined {

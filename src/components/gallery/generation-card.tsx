@@ -52,6 +52,9 @@ interface Props {
   ) => Promise<void>;
   currentAggressiveness?: ConcreteAggressiveness;
   currentTone?: Tone;
+  // True when the project has free regenerations left, so the button advertises
+  // "free" instead of the credit cost.
+  freeRegen?: boolean;
 }
 
 interface QaPresentation {
@@ -102,6 +105,7 @@ export function GenerationCard({
   onRegenerateSettings,
   currentAggressiveness = "average",
   currentTone = "professional",
+  freeRegen = false,
 }: Props) {
   const [regenLoading, setRegenLoading] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -392,7 +396,13 @@ export function GenerationCard({
               Download
             </button>
             <button className="pg-btn pg-btn--outline pg-btn--sm" onClick={handleRegenerate} disabled={regenLoading || isInFlight}>
-              {regenLoading ? "…" : "Regenerate · 0.5cr"}
+              {regenLoading
+                ? "…"
+                : selected.status === "failed"
+                  ? "Retry"
+                  : freeRegen
+                    ? "Regenerate · free"
+                    : "Regenerate · 0.5cr"}
             </button>
             {onRegenerateSettings && !isInFlight && (
               <button
@@ -473,7 +483,11 @@ export function GenerationCard({
                 disabled={settingsLoading}
                 style={{ justifyContent: "center", marginTop: 2 }}
               >
-                {settingsLoading ? "Regenerating…" : "Regenerate with new settings · 0.5cr"}
+                {settingsLoading
+                  ? "Regenerating…"
+                  : freeRegen
+                    ? "Regenerate with new settings · free"
+                    : "Regenerate with new settings · 0.5cr"}
               </button>
             </div>
           )}

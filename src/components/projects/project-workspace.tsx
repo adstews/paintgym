@@ -614,6 +614,7 @@ export function ProjectWorkspace({
       qa_severity: null,
       auto_rewrite_count: 0,
       is_auto_rewrite: false,
+      recovery_attempted: false,
       rating: null,
       is_favorited: false,
       used_in_ad: false,
@@ -662,6 +663,9 @@ export function ProjectWorkspace({
     });
     if (typeof json.new_balance === "number") {
       setProfile((p) => ({ ...p, credit_balance: json.new_balance as number }));
+    }
+    if (typeof json.regen_budget === "number") {
+      setProject((p) => ({ ...p, regen_budget: json.regen_budget as number }));
     }
     return { id: realId, status: "ok" };
   }
@@ -714,6 +718,9 @@ export function ProjectWorkspace({
     if (typeof json.new_balance === "number") {
       setProfile((p) => ({ ...p, credit_balance: json.new_balance as number }));
     }
+    if (typeof json.regen_budget === "number") {
+      setProject((p) => ({ ...p, regen_budget: json.regen_budget as number }));
+    }
     toast.success("New version ready");
   }
 
@@ -750,6 +757,7 @@ export function ProjectWorkspace({
       qa_severity: null,
       auto_rewrite_count: 0,
       is_auto_rewrite: false,
+      recovery_attempted: false,
       rating: null,
       is_favorited: false,
       used_in_ad: false,
@@ -914,6 +922,52 @@ export function ProjectWorkspace({
     }
   }, [project.id]);
 
+  // Post-batch finalize: auto-recover any image that failed or never rendered
+  // (one retry each), then reset the project's free regeneration budget once the
+  // batch is fully settled. Bounded loop — the server only recovers a row once
+  // (recovery_attempted), so a recovery pass always converges to requeued=0.
+  const finalizeBatch = useCallback(async () => {
+    // The user pressed Stop: respect that, don't auto-retry cancelled work.
+    if (stopRef.current) return;
+    for (let pass = 0; pass < 3; pass++) {
+      let json: {
+        requeued?: number;
+        batch_complete?: boolean;
+        regen_budget?: number;
+      };
+      try {
+        const res = await fetch("/api/queue/finalize", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ project_id: project.id }),
+        });
+        if (!res.ok) return;
+        json = await res.json();
+      } catch {
+        // Best-effort: recovery and the budget grant are non-blocking niceties.
+        return;
+      }
+      const requeued = json.requeued ?? 0;
+      if (requeued > 0) {
+        toast(
+          `Recovering ${requeued} image${requeued === 1 ? "" : "s"} that didn't render`,
+        );
+        await startDrain();
+        continue;
+      }
+      if (json.batch_complete && typeof json.regen_budget === "number") {
+        const budget = json.regen_budget;
+        setProject((p) => ({ ...p, regen_budget: budget }));
+        if (budget > 0) {
+          toast.success(
+            `Batch complete. ${budget} free regeneration${budget === 1 ? "" : "s"} included.`,
+          );
+        }
+      }
+      return;
+    }
+  }, [project.id, startDrain]);
+
   // Stop button (item 12): cancel pending jobs server-side, flip their
   // placeholders to failed locally, and signal the drain loop to wind down.
   async function stopGeneration() {
@@ -1042,6 +1096,7 @@ export function ProjectWorkspace({
       return;
     }
     await startDrain();
+    await finalizeBatch();
   }
 
   // Resume on mount: if the project has in-flight jobs (a batch that was running
@@ -1055,7 +1110,7 @@ export function ProjectWorkspace({
         const json = (await res.json()) as ProgressState;
         if (cancelled) return;
         setProgress(json);
-        if (json.active > 0) void startDrain();
+        if (json.active > 0) void startDrain().then(() => finalizeBatch());
       } catch {
         // Best-effort resume; the button is always available as a fallback.
       }
@@ -1063,7 +1118,7 @@ export function ProjectWorkspace({
     return () => {
       cancelled = true;
     };
-  }, [project.id, startDrain]);
+  }, [project.id, startDrain, finalizeBatch]);
 
   async function overrideGeneration(generationId: string) {
     try {
@@ -1568,6 +1623,26 @@ export function ProjectWorkspace({
               the same concept.
             </div>
             <div className="flex flex-wrap items-center gap-2">
+              {project.regen_budget > 0 && (
+                <span
+                  className="pg-mono"
+                  title="Regenerations spend these free reps before they cost credits. Resets each batch."
+                  style={{
+                    fontSize: 10,
+                    letterSpacing: ".04em",
+                    textTransform: "uppercase",
+                    padding: "4px 8px",
+                    border: "1.5px solid var(--ink)",
+                    borderRadius: 999,
+                    background: "var(--pop)",
+                    color: "var(--ink)",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  {project.regen_budget} free regen
+                  {project.regen_budget === 1 ? "" : "s"} left
+                </span>
+              )}
               <button
                 type="button"
                 className="pg-btn pg-btn--pop pg-btn--sm"
@@ -1667,6 +1742,7 @@ export function ProjectWorkspace({
                       }
                       currentAggressiveness={currentAggressiveness}
                       currentTone={currentTone}
+                      freeRegen={project.regen_budget > 0}
                     />
                   </div>,
                 ];

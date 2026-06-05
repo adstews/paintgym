@@ -147,6 +147,9 @@ export interface Project {
   brand_fonts: BrandFont[];
   brand_voice: string | null;
   competitor_data: CompetitorData | null;
+  // Free regenerations remaining for this project. Reset to REGEN_FREE_BUDGET
+  // each time a full batch completes; a regeneration spends this before credits.
+  regen_budget: number;
   created_at: string;
 }
 
@@ -262,6 +265,10 @@ export interface Generation {
   qa_severity: QaSeverity | null;
   auto_rewrite_count: number;
   is_auto_rewrite: boolean;
+  // The post-batch sweep auto-retries each failed/stuck generation exactly once;
+  // this flag marks a row that has already been swept so it is never retried in
+  // a loop. A row that fails again after recovery stays failed (manual Retry).
+  recovery_attempted: boolean;
   rating: number | null;
   is_favorited: boolean;
   used_in_ad: boolean;
@@ -287,6 +294,11 @@ export const GENERATION_CREDIT_COST = 1;
 // half a credit (still ~4.5x markup over our render cost). Requires the
 // numeric credit_balance column from migration 0015.
 export const REGENERATION_CREDIT_COST = 0.5;
+
+// Free regenerations included with a completed batch. A regeneration spends this
+// budget before it spends paid credits; the budget resets to this value each
+// time a full batch finishes generating (see /api/queue/finalize).
+export const REGEN_FREE_BUDGET = 4;
 
 export type CreditPackId = "starter" | "full_project" | "pro" | "agency";
 
