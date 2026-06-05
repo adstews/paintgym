@@ -7,6 +7,7 @@ import {
   buildStyleSection,
 } from "./brief-context";
 import { buildFewShotSection, type FewShotExample } from "./few-shot";
+import { hookInstruction } from "../hooks";
 import type { Concept, ConceptVariant, Project } from "../types";
 import type { InlineImage } from "../gemini/reference-images";
 
@@ -60,6 +61,7 @@ function buildUserPrompt(
   examples: FewShotExample[],
   hasImage: boolean,
   contrastBrief: string | null | undefined,
+  hook: string | null | undefined,
 ): string {
   const fewShot = buildFewShotSection(examples);
   return `## Product context
@@ -70,7 +72,7 @@ ${buildConceptSection(concept)}
 
 ## Style direction
 ${buildStyleSection(project.style_settings)}
-${buildContrastSection(contrastBrief)}${fewShot ? `\n${fewShot}\n` : ""}
+${buildContrastSection(contrastBrief)}${hookInstruction(hook, "brief")}${fewShot ? `\n${fewShot}\n` : ""}
 ## Your task
 Write one image generation brief for this concept. Return only the JSON object.`;
 }
@@ -113,6 +115,8 @@ export interface GenerateBriefOptions {
   // The existing brief for this concept to deliberately diverge from (used when
   // writing the GPT set so it doesn't echo the Gemini set).
   contrastBrief?: string | null;
+  // A proven hook template the user picked; the brief opens with it.
+  hook?: string | null;
 }
 
 export async function generateBriefsForConcept({
@@ -121,6 +125,7 @@ export async function generateBriefsForConcept({
   fewShotExamples = [],
   productImage = null,
   contrastBrief = null,
+  hook = null,
 }: GenerateBriefOptions): Promise<VariantBrief[]> {
   const client = getAnthropicClient();
 
@@ -131,6 +136,7 @@ export async function generateBriefsForConcept({
     fewShotExamples,
     useImage,
     contrastBrief,
+    hook,
   );
   const content: Anthropic.MessageParam["content"] = useImage
     ? [

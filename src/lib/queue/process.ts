@@ -1,6 +1,8 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { collectReferenceImages } from "@/lib/gemini/reference-images";
 import { generateWithModel, singleModel, modelPreference } from "@/lib/image-gen/router";
+import { renderConceptToDataUrl } from "@/lib/html-render/render";
+import type { HtmlRenderType } from "@/lib/html-render/types";
 import { reviewGeneration } from "@/lib/qa/review-generation";
 import {
   checkGenerationCredits,
@@ -91,6 +93,41 @@ async function processGenerate(
     await failJob(admin, job, "generate job missing generation_id");
     return { generations: [] };
   }
+
+  // HTML-rendered concept: screenshot the React component server-side instead of
+  // calling an image model. Free (no credit check / deduction) and no QA review
+  // since the on-screen text was authored by Claude under the compliance rules.
+  const renderType = job.payload?.render_type as HtmlRenderType | undefined;
+  if (renderType) {
+    let imageDataUrl: string;
+    try {
+      imageDataUrl = await renderConceptToDataUrl(
+        renderType,
+        job.payload?.render_content,
+      );
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "render_failed";
+      if (job.attempts < job.max_attempts) {
+        await requeue(admin, job, message);
+      } else {
+        await failJob(admin, job, message);
+        await admin
+          .from("generations")
+          .update({ status: "failed" })
+          .eq("id", job.generation_id);
+      }
+      return { generations: [] };
+    }
+    const { data: updated } = await admin
+      .from("generations")
+      .update({ status: "completed", image_url: imageDataUrl, qa_status: "passed" })
+      .eq("id", job.generation_id)
+      .select("*")
+      .single();
+    await completeJob(admin, job);
+    return { generations: updated ? [updated as Generation] : [] };
+  }
+
   const prompt = String(job.payload?.prompt_text ?? "");
   if (!prompt) {
     await failJob(admin, job, "generate job missing prompt_text");

@@ -190,6 +190,10 @@ export interface Brief {
   brief_text: string;
   summary: string | null;
   key_points: string[];
+  // Structured on-screen content for the eight HTML-rendered concepts (iMessage,
+  // Notes, Reddit, Tweet, TikTok, Instagram Story, Claude, ChatGPT). Null for
+  // ordinary image-model briefs. Drives the server-side screenshot renderer.
+  render_content: Record<string, unknown> | null;
   created_at: string;
   updated_at: string;
 }
@@ -274,8 +278,10 @@ export interface UserProfile {
   has_purchased: boolean;
 }
 
-// One credit for a concept's first image. New users start with five.
-export const INITIAL_FREE_CREDITS = 5;
+// New users start with zero credits: briefs are free, image generation is paid.
+// Buying a credit pack is what unlocks rendering. (HTML-rendered concepts still
+// cost nothing, since their server-side screenshot has no image-model cost.)
+export const INITIAL_FREE_CREDITS = 0;
 export const GENERATION_CREDIT_COST = 1;
 // Regenerations, refinements, and retries of an existing concept image cost
 // half a credit (still ~4.5x markup over our render cost). Requires the

@@ -13,6 +13,8 @@ interface Props {
   concept: Concept;
   variant: ConceptVariant;
   brief: Brief | null;
+  // A screenshot (HTML-rendered) concept: generating its image is free.
+  free?: boolean;
   latestGeneration: Generation | null;
   onBriefChange: (next: Brief) => void;
   onRegenerateConcept: () => Promise<void>;
@@ -22,6 +24,7 @@ interface Props {
 export function BriefCard({
   concept,
   brief,
+  free = false,
   latestGeneration,
   onBriefChange,
   onRegenerateConcept,
@@ -317,7 +320,9 @@ export function BriefCard({
               ? "Generating..."
               : isReviewing
                 ? "Reviewing..."
-                : "Generate image"}
+                : free
+                  ? "Generate image (free)"
+                  : "Generate image"}
           </button>
         </div>
       </div>

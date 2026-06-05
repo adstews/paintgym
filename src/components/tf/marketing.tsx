@@ -53,7 +53,7 @@ export function Pricing({
           <div className="pg-hero" style={{ padding: "10px 0 0" }}>
             <div className="kick">credit packs · no subscription</div>
             <h1 style={{ fontSize: "clamp(38px,11vw,50px)" }}>TRAIN MORE.<br /><span className="lime">PAY LESS.</span></h1>
-            <p className="sub" style={{ marginTop: 14 }}>1 credit = 1 generated ad. Buy a pack, train at volume, top up whenever. Credits never expire.</p>
+            <p className="sub" style={{ marginTop: 14 }}>Free to write briefs. Credits are required for image generation. 1 credit = 1 generated ad, screenshot concepts render free. Buy a pack, top up whenever, credits never expire.</p>
           </div>
         </div>
 

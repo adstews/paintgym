@@ -3,6 +3,8 @@ import { createClient } from "@/lib/supabase/server";
 import { generateRequestSchema } from "@/lib/validators/schemas";
 import { collectReferenceImages } from "@/lib/gemini/reference-images";
 import { generateWithModel, singleModel, modelPreference } from "@/lib/image-gen/router";
+import { renderConceptToDataUrl } from "@/lib/html-render/render";
+import { htmlRenderTypeForConcept } from "@/lib/html-render/types";
 import {
   checkGenerationCredits,
   deductCredits,
@@ -72,6 +74,92 @@ export async function POST(request: Request) {
   }
   const { count } = await versionQuery;
   const version = (count ?? 0) + 1;
+
+  // HTML-rendered concept: screenshot it server-side, free, no credit check.
+  if (concept_id) {
+    const { data: conceptRow } = await supabase
+      .from("concepts")
+      .select("name")
+      .eq("id", concept_id)
+      .single();
+    const htmlType = htmlRenderTypeForConcept(
+      conceptRow?.name as string | undefined,
+    );
+    if (htmlType) {
+      const { data: brief } = await supabase
+        .from("briefs")
+        .select("render_content")
+        .eq("project_id", project_id)
+        .eq("concept_id", concept_id)
+        .eq("variant", concept_variant ?? "A")
+        .eq("model_target", "gemini")
+        .maybeSingle();
+      const renderContent = brief?.render_content as
+        | Record<string, unknown>
+        | null
+        | undefined;
+      if (!renderContent) {
+        return NextResponse.json(
+          { error: "no_render_content", message: "Generate the brief first." },
+          { status: 422 },
+        );
+      }
+      const { data: row, error: insErr } = await supabase
+        .from("generations")
+        .insert({
+          project_id,
+          concept_id,
+          concept_variant: concept_variant ?? null,
+          prompt_text,
+          status: "generating",
+          version,
+          model_used: model,
+          qa_status: "pending",
+          qa_issues: [],
+          is_unlocked: true,
+        })
+        .select("*")
+        .single();
+      if (insErr || !row) {
+        return NextResponse.json(
+          { error: "create_failed", message: insErr?.message },
+          { status: 500 },
+        );
+      }
+      try {
+        const imageDataUrl = await renderConceptToDataUrl(htmlType, renderContent);
+        const { data: updated, error: updErr } = await supabase
+          .from("generations")
+          .update({ status: "completed", image_url: imageDataUrl, qa_status: "passed" })
+          .eq("id", row.id)
+          .select("*")
+          .single();
+        if (updErr || !updated) throw updErr ?? new Error("update_failed");
+        return NextResponse.json({
+          id: updated.id,
+          image_url: updated.image_url,
+          watermarked_url: updated.watermarked_url,
+          is_unlocked: updated.is_unlocked,
+          status: "completed",
+          version,
+          generation: updated,
+        });
+      } catch (err) {
+        await supabase
+          .from("generations")
+          .update({ status: "failed" })
+          .eq("id", row.id);
+        return NextResponse.json(
+          {
+            error: "generation_failed",
+            message: err instanceof Error ? err.message : "render failed",
+            id: row.id,
+          },
+          { status: 502 },
+        );
+      }
+    }
+  }
   // version > 1 means this concept already had an image, so it's a regeneration.
   const cost = generationCreditCost(version);
 

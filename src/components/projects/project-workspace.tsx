@@ -19,12 +19,15 @@ import { BriefCard } from "./brief-card";
 import { RecreateTab } from "./recreate-tab";
 import { CompetitorSpyTab } from "./competitor-spy-tab";
 import { CreditsPanel } from "./credits-panel";
+import { HookPicker } from "./hook-picker";
+import { BuyCreditsDialog } from "./buy-credits-dialog";
 import {
   CONCEPT_VARIANTS,
   GENERATION_CREDIT_COST,
   REGENERATION_CREDIT_COST,
 } from "@/lib/types";
 import { CATEGORY_ORDER, categoryForConcept } from "@/lib/concept-categories";
+import { htmlRenderTypeForConcept } from "@/lib/html-render/types";
 import {
   getMissingRequiredFields,
   missingFieldsMessage,
@@ -209,6 +212,11 @@ export function ProjectWorkspace({
   );
   // Tinder-style review overlay (item 13).
   const [reviewOpen, setReviewOpen] = useState(false);
+  // Hook bank: the proven opening the user picked before writing briefs (null =
+  // let Claude choose).
+  const [selectedHookId, setSelectedHookId] = useState<string | null>(null);
+  // Paywall: opened when a user with no credits tries to generate a paid image.
+  const [paywallOpen, setPaywallOpen] = useState(false);
 
   // Restore the tab from the hash on mount, and keep it in sync with the hash.
   useEffect(() => {
@@ -248,6 +256,18 @@ export function ProjectWorkspace({
   const enabledConcepts = useMemo(
     () => concepts.filter((c) => enabled.has(c.id)),
     [concepts, enabled],
+  );
+
+  // The eight HTML-rendered concepts (iMessage, Reddit, Tweet, etc.) are
+  // screenshotted server-side for free, so they bypass the credit paywall.
+  const freeConceptIds = useMemo(
+    () =>
+      new Set(
+        concepts
+          .filter((c) => htmlRenderTypeForConcept(c.name))
+          .map((c) => c.id),
+      ),
+    [concepts],
   );
 
   const briefsByKey = useMemo(() => {
@@ -418,14 +438,21 @@ export function ProjectWorkspace({
   // Returns the concept ids that actually got a brief, so the caller can track
   // progress and detect misses. Throws only on a hard request failure (e.g.
   // missing required fields) — per-concept failures come back in the payload.
-  async function fetchBriefs(conceptIds: string[]): Promise<{
+  async function fetchBriefs(
+    conceptIds: string[],
+    hookId: string | null = selectedHookId,
+  ): Promise<{
     succeeded: string[];
   }> {
     if (conceptIds.length === 0) return { succeeded: [] };
     const res = await fetch("/api/generate-briefs", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ project_id: project.id, concept_ids: conceptIds }),
+      body: JSON.stringify({
+        project_id: project.id,
+        concept_ids: conceptIds,
+        ...(hookId ? { hook_id: hookId } : {}),
+      }),
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
@@ -630,7 +657,8 @@ export function ProjectWorkspace({
       watermarked_url: updatedRow?.watermarked_url ?? null,
       is_unlocked: updatedRow?.is_unlocked ?? false,
       status: "completed",
-      qa_status: "reviewing",
+      // HTML-rendered concepts come back already passed (no model QA needed).
+      qa_status: updatedRow?.qa_status ?? "reviewing",
     });
     if (typeof json.new_balance === "number") {
       setProfile((p) => ({ ...p, credit_balance: json.new_balance as number }));
@@ -643,8 +671,19 @@ export function ProjectWorkspace({
     variant: ConceptVariant,
   ) {
     if (!ensureRequiredFields()) return;
-    const { id } = await generateOneImage(conceptId, variant);
-    if (id) await runReview(id);
+    // Screenshot concepts are free; everything else needs at least some credit.
+    const isFree = freeConceptIds.has(conceptId);
+    if (!isFree && profile.credit_balance <= 0) {
+      setPaywallOpen(true);
+      return;
+    }
+    const { id, status } = await generateOneImage(conceptId, variant);
+    if (status === "paywall") {
+      setPaywallOpen(true);
+      return;
+    }
+    // HTML renders are already QA-passed server-side; skip the model QA walk.
+    if (id && !isFree) await runReview(id);
   }
 
   // Regenerate an existing image with different settings (rewrites the brief,
@@ -1299,6 +1338,17 @@ export function ProjectWorkspace({
   ).length;
   const galleryModelName = galleryModel === "openai" ? "GPT" : "Gemini";
   const startGalleryGeneration = () => {
+    // If the user has no credits and the batch includes any paid (non-screenshot)
+    // concept, send them to the paywall. An all-screenshot batch stays free.
+    const hasPaid = enabledConcepts.some(
+      (c) =>
+        !freeConceptIds.has(c.id) &&
+        CONCEPT_VARIANTS.some((v) => briefsByKey.has(briefKey(c.id, v))),
+    );
+    if (profile.credit_balance <= 0 && hasPaid) {
+      setPaywallOpen(true);
+      return;
+    }
     setPendingImageModel(galleryModel);
     setConfirmImages(true);
   };
@@ -1417,6 +1467,10 @@ export function ProjectWorkspace({
             </div>
           ) : (
             <div className="grid gap-2">
+              <HookPicker
+                selectedHookId={selectedHookId}
+                onChange={setSelectedHookId}
+              />
               {!hasAnyBriefs && (
                 <div className="flex items-center justify-end">
                   <button
@@ -1483,6 +1537,7 @@ export function ProjectWorkspace({
                       concept={c}
                       variant={v}
                       brief={brief}
+                      free={freeConceptIds.has(c.id)}
                       latestGeneration={latest}
                       onBriefChange={replaceBrief}
                       onRegenerateConcept={() => regenerateBriefsForConcept(c.id)}
@@ -1726,18 +1781,21 @@ export function ProjectWorkspace({
           }
           let firsts = 0;
           let regens = 0;
+          let free = 0;
           for (const c of enabledConcepts) {
             for (const v of CONCEPT_VARIANTS) {
               if (!briefsByKey.has(briefKey(c.id, v))) continue;
-              if (done.has(`${c.id}:${v}`)) regens += 1;
+              if (freeConceptIds.has(c.id)) free += 1;
+              else if (done.has(`${c.id}:${v}`)) regens += 1;
               else firsts += 1;
             }
           }
-          const total = firsts + regens;
+          const total = firsts + regens + free;
           const cost =
             firsts * GENERATION_CREDIT_COST + regens * REGENERATION_CREDIT_COST;
           const costStr = Number.isInteger(cost) ? `${cost}` : cost.toFixed(1);
-          return `This will generate ${total} image${total === 1 ? "" : "s"} with ${via} for ${costStr} credit${cost === 1 ? "" : "s"}${regens > 0 ? " (regenerations are 0.5 each)" : ""}. Continue?`;
+          const freeNote = free > 0 ? ` ${free} screenshot concept${free === 1 ? "" : "s"} render free.` : "";
+          return `This will generate ${total} image${total === 1 ? "" : "s"} with ${via} for ${costStr} credit${cost === 1 ? "" : "s"}${regens > 0 ? " (regenerations are 0.5 each)" : ""}.${freeNote} Continue?`;
         })()}
         confirmLabel="Generate"
         onConfirm={generateAllImages}
@@ -1752,6 +1810,13 @@ export function ProjectWorkspace({
           onRegenerate={generateImageForVariant}
         />
       )}
+
+      <BuyCreditsDialog
+        open={paywallOpen}
+        onOpenChange={setPaywallOpen}
+        title="Your briefs are ready"
+        intro="Purchase credits to generate images. Each generated image costs one credit. Screenshot concepts render for free."
+      />
     </div>
   );
 }
