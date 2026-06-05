@@ -98,7 +98,7 @@ export function TfAuthForm({ mode }: { mode: Mode }) {
                   }}
                 >
                   <span style={{ width: 22, height: 1.5, background: "var(--ink)" }} />
-                  {signup ? "5 free reps · no card" : "welcome back"}
+                  {signup ? "free briefs · no card" : "welcome back"}
                 </div>
                 <div className="pg-h2" style={{ fontSize: 34 }}>
                   {signup ? (

@@ -123,6 +123,8 @@ export const generateBriefsSchema = z.object({
   // Which model these briefs are for. "openai" writes a fresh, deliberately
   // different set (contrasted against the existing Gemini briefs).
   model_target: z.enum(["gemini", "openai"]).optional().default("gemini"),
+  // Optional proven hook the user picked; the brief opens with it.
+  hook_id: z.string().uuid().optional().nullable(),
 });
 
 export const briefPatchSchema = z.object({

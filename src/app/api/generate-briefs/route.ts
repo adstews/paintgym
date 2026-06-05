@@ -6,6 +6,8 @@ import {
   missingFieldsMessage,
 } from "@/lib/validators/required-fields";
 import { generateBriefsForConcept } from "@/lib/anthropic/generate-brief";
+import { generateHtmlConceptContent } from "@/lib/anthropic/html-concept-content";
+import { htmlRenderTypeForConcept } from "@/lib/html-render/types";
 import { loadPrimaryProductImage } from "@/lib/gemini/reference-images";
 import { loadFewShotExamples } from "@/lib/anthropic/few-shot";
 import { DEFAULT_STYLE_SETTINGS } from "@/lib/types";
@@ -23,6 +25,7 @@ interface BriefOut {
   brief_text: string;
   summary: string | null;
   key_points: string[];
+  render_content: Record<string, unknown> | null;
   created_at: string;
   updated_at: string;
 }
@@ -46,7 +49,7 @@ export async function POST(request: Request) {
     );
   }
 
-  const { project_id, concept_ids, model_target } = parsed.data;
+  const { project_id, concept_ids, model_target, hook_id } = parsed.data;
 
   const { data: projectRow, error: projErr } = await supabase
     .from("projects")
@@ -85,6 +88,17 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "concepts_not_found" }, { status: 404 });
   }
 
+  // Optional hook the user picked to open the creative with.
+  let hookTemplate: string | null = null;
+  if (hook_id) {
+    const { data: hookRow } = await supabase
+      .from("hooks")
+      .select("hook_template")
+      .eq("id", hook_id)
+      .single();
+    hookTemplate = (hookRow?.hook_template as string | undefined) ?? null;
+  }
+
   // For the GPT set, load the existing Gemini briefs so Claude can deliberately
   // write something different per concept instead of echoing them.
   const contrastByConcept = new Map<string, string>();
@@ -110,9 +124,49 @@ export async function POST(request: Request) {
     fullProject.product_data?.images ?? null,
   );
 
+  interface BriefRow {
+    project_id: string;
+    concept_id: string;
+    variant: "A" | "B" | "C";
+    model_target: "gemini" | "openai";
+    brief_text: string;
+    summary: string;
+    key_points: string[];
+    render_content: Record<string, unknown> | null;
+    updated_at: string;
+  }
+
   const fewShotByConcept = new Map<string, number>();
   const settled = await Promise.allSettled(
-    (concepts as Concept[]).map(async (concept) => {
+    (concepts as Concept[]).map(async (concept): Promise<BriefRow[]> => {
+      const now = new Date().toISOString();
+      const htmlType = htmlRenderTypeForConcept(concept.name);
+      // The eight HTML-rendered concepts skip the image model entirely: Claude
+      // writes the structured on-screen text, which we store as render_content
+      // and screenshot later. They're model-agnostic, so they live under the
+      // canonical "gemini" key regardless of which set was requested.
+      if (htmlType) {
+        const out = await generateHtmlConceptContent({
+          project: fullProject,
+          type: htmlType,
+          productImage,
+          hook: hookTemplate,
+        });
+        return [
+          {
+            project_id,
+            concept_id: concept.id,
+            variant: "A",
+            model_target: "gemini",
+            brief_text: out.brief_text,
+            summary: out.summary,
+            key_points: out.key_points,
+            render_content: out.render_content as Record<string, unknown>,
+            updated_at: now,
+          },
+        ];
+      }
+
       const examples = await loadFewShotExamples({
         userId: user.id,
         conceptId: concept.id,
@@ -124,37 +178,28 @@ export async function POST(request: Request) {
         fewShotExamples: examples,
         productImage,
         contrastBrief: contrastByConcept.get(concept.id) ?? null,
+        hook: hookTemplate,
       });
-      return { concept, variants };
+      return variants.map((v) => ({
+        project_id,
+        concept_id: concept.id,
+        variant: v.variant,
+        model_target,
+        brief_text: v.brief_text,
+        summary: v.summary,
+        key_points: v.key_points,
+        render_content: null,
+        updated_at: now,
+      }));
     }),
   );
 
-  const rows: {
-    project_id: string;
-    concept_id: string;
-    variant: "A" | "B" | "C";
-    model_target: "gemini" | "openai";
-    brief_text: string;
-    summary: string;
-    key_points: string[];
-    updated_at: string;
-  }[] = [];
+  const rows: BriefRow[] = [];
   const failures: { concept_id: string; message: string }[] = [];
   for (let i = 0; i < settled.length; i++) {
     const item = settled[i];
     if (item.status === "fulfilled") {
-      for (const v of item.value.variants) {
-        rows.push({
-          project_id,
-          concept_id: item.value.concept.id,
-          variant: v.variant,
-          model_target,
-          brief_text: v.brief_text,
-          summary: v.summary,
-          key_points: v.key_points,
-          updated_at: new Date().toISOString(),
-        });
-      }
+      rows.push(...item.value);
     } else {
       failures.push({
         concept_id: (concepts as Concept[])[i].id,

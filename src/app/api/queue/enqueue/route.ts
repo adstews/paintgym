@@ -7,6 +7,7 @@ import {
   missingFieldsMessage,
 } from "@/lib/validators/required-fields";
 import { modelPreference, modelsForConcept } from "@/lib/image-gen/router";
+import { htmlRenderTypeForConcept } from "@/lib/html-render/types";
 import { JOB_MAX_ATTEMPTS } from "@/lib/types";
 import type { Brief, Generation, ImageModel, Project, StyleSettings } from "@/lib/types";
 
@@ -58,6 +59,17 @@ export async function POST(request: Request) {
   );
 
   const admin = createAdminClient();
+
+  // Concept names, so we can detect the eight HTML-rendered concepts (matched by
+  // name) and route them to the free screenshot renderer instead of a model.
+  const conceptIds = [...new Set(items.map((it) => it.concept_id))];
+  const { data: conceptRows } = await admin
+    .from("concepts")
+    .select("id, name")
+    .in("id", conceptIds);
+  const conceptName = new Map<string, string>(
+    (conceptRows ?? []).map((c) => [c.id as string, c.name as string]),
+  );
 
   const { data: briefRows } = await admin
     .from("briefs")
@@ -114,6 +126,72 @@ export async function POST(request: Request) {
   // Index over items drives "alternating" mode (1st concept Gemini, 2nd OpenAI…).
   let index = 0;
   for (const item of items) {
+    const htmlType = htmlRenderTypeForConcept(conceptName.get(item.concept_id));
+    if (htmlType) {
+      // HTML-rendered concept: one free screenshot job, model-agnostic. We pin
+      // the active gallery's model on the row so the card shows up where the
+      // user clicked, but no image model actually runs and no credit is charged.
+      index += 1;
+      const brief = briefFor(item.concept_id, item.concept_variant, "gemini");
+      const renderContent = (brief as Brief | undefined)?.render_content;
+      if (!brief || !renderContent) {
+        skipped += 1;
+        continue;
+      }
+      const model: ImageModel =
+        forcedModel ?? modelsForConcept(pref, index - 1)[0];
+      if (activeKeys.has(activeKey(item.concept_id, item.concept_variant, "html"))) {
+        skipped += 1;
+        continue;
+      }
+      const { count } = await admin
+        .from("generations")
+        .select("id", { count: "exact", head: true })
+        .eq("project_id", project_id)
+        .eq("concept_id", item.concept_id)
+        .eq("concept_variant", item.concept_variant);
+      const version = (count ?? 0) + 1;
+
+      const { data: gen } = await admin
+        .from("generations")
+        .insert({
+          project_id,
+          concept_id: item.concept_id,
+          concept_variant: item.concept_variant,
+          prompt_text: (brief as Brief).brief_text,
+          status: "generating",
+          version,
+          model_used: model,
+          qa_status: "pending",
+          qa_issues: [],
+          is_unlocked: true,
+        })
+        .select("*")
+        .single();
+      if (!gen) {
+        skipped += 1;
+        continue;
+      }
+      const { error: jobErr } = await admin.from("jobs").insert({
+        project_id,
+        generation_id: (gen as Generation).id,
+        concept_id: item.concept_id,
+        concept_variant: item.concept_variant,
+        type: "generate",
+        status: "pending",
+        max_attempts: JOB_MAX_ATTEMPTS.generate,
+        payload: { render_type: htmlType, render_content: renderContent, model, version },
+      });
+      if (jobErr) {
+        await admin.from("generations").delete().eq("id", (gen as Generation).id);
+        skipped += 1;
+        continue;
+      }
+      activeKeys.add(activeKey(item.concept_id, item.concept_variant, "html"));
+      created.push(gen as Generation);
+      continue;
+    }
+
     // One render per resolved model — "both" yields two rows + two jobs.
     // A forced model (the GPT button) overrides the project preference and
     // renders every concept with that single model.

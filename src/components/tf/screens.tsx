@@ -59,7 +59,7 @@ export function Landing({ onStart, onSkip }: { onStart: (u: string) => void; onS
               Train
             </Btn>
           </div>
-          <div className="hint">{"// no card required · 5 free reps to start"}</div>
+          <div className="hint">{"// no card required · briefs are free to write"}</div>
         </div>
 
         <div className="pg-proof">
