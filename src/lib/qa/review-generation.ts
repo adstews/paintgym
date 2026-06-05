@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { reviewImage } from "@/lib/anthropic/review-image";
 import { rewriteBriefAfterFailure } from "@/lib/anthropic/rewrite-brief";
+import { collectReferenceImages } from "@/lib/gemini/reference-images";
 import { generateWithModel } from "@/lib/image-gen/router";
 import { DEFAULT_STYLE_SETTINGS } from "@/lib/types";
 import type {
@@ -199,6 +200,13 @@ export async function reviewGeneration(
   const { project, concept } = ctx;
   let { generation } = ctx;
 
+  // The exact product photo, attached to every rewrite render so a QA-driven
+  // redo never silently invents or swaps the product (the wrong-product bug
+  // Rule 0 guards against). Loaded once and reused across the rewrite walk.
+  const referenceImages = await collectReferenceImages(
+    project.product_data?.images ?? null,
+  );
+
   const touched: Generation[] = [];
 
   // Walk: review -> if major + concept + budget, rewrite + regen -> review again.
@@ -280,6 +288,7 @@ export async function reviewGeneration(
       newImage = await generateWithModel(model, {
         prompt: newBrief,
         platform: project.style_settings.platform,
+        referenceImages,
       });
     } catch (err) {
       return {

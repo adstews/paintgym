@@ -7,6 +7,7 @@ import { loadPrimaryProductImage, collectReferenceImages } from "@/lib/gemini/re
 import { generateWithModel, modelPreference, singleModel } from "@/lib/image-gen/router";
 import {
   checkGenerationCredits,
+  consumeRegenBudget,
   deductCredits,
   generationCreditCost,
 } from "@/lib/credits";
@@ -102,14 +103,19 @@ export async function POST(request: Request) {
     .eq("concept_id", source.concept_id)
     .eq("concept_variant", source.concept_variant ?? "A");
   const version = (count ?? 0) + 1;
-  const cost = generationCreditCost(version);
+  // Settings regeneration is always a regen, so it spends the project's free
+  // regen budget before paid credits. Budget is spent post-render below.
+  const willUseBudget = ((projectRow as Project).regen_budget ?? 0) > 0;
+  const cost = willUseBudget ? 0 : generationCreditCost(version);
 
-  const tier = await checkGenerationCredits(user.id, cost);
-  if (!tier.allowed) {
-    return NextResponse.json(
-      { error: "paywall", message: tier.reason, balance: tier.balance, required: tier.required },
-      { status: 402 },
-    );
+  if (!willUseBudget) {
+    const tier = await checkGenerationCredits(user.id, cost);
+    if (!tier.allowed) {
+      return NextResponse.json(
+        { error: "paywall", message: tier.reason, balance: tier.balance, required: tier.required },
+        { status: 402 },
+      );
+    }
   }
 
   // Rewrite the brief with the new settings (Claude sees the real product).
@@ -185,13 +191,22 @@ export async function POST(request: Request) {
     );
   }
 
-  const deducted = await deductCredits(user.id, cost);
-  if (!deducted.ok) {
-    await supabase.from("generations").update({ status: "failed" }).eq("id", row.id);
-    return NextResponse.json(
-      { error: "paywall", message: deducted.reason ?? "Insufficient credits" },
-      { status: 402 },
-    );
+  // Fund only after a successful render: spend a free regen, else deduct credits.
+  let newBalance: number | undefined;
+  let regenRemaining: number | undefined;
+  if (willUseBudget) {
+    const spent = await consumeRegenBudget(source.project_id);
+    regenRemaining = spent.remaining;
+  } else {
+    const deducted = await deductCredits(user.id, cost);
+    if (!deducted.ok) {
+      await supabase.from("generations").update({ status: "failed" }).eq("id", row.id);
+      return NextResponse.json(
+        { error: "paywall", message: deducted.reason ?? "Insufficient credits" },
+        { status: 402 },
+      );
+    }
+    newBalance = deducted.new_balance;
   }
 
   const { data: updated } = await supabase
@@ -236,5 +251,9 @@ export async function POST(request: Request) {
     if (qaUpdated) current = qaUpdated as Generation;
   }
 
-  return NextResponse.json({ generation: current, new_balance: deducted.new_balance });
+  return NextResponse.json({
+    generation: current,
+    ...(typeof newBalance === "number" ? { new_balance: newBalance } : {}),
+    ...(typeof regenRemaining === "number" ? { regen_budget: regenRemaining } : {}),
+  });
 }

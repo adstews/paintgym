@@ -7,6 +7,7 @@ import { renderConceptToDataUrl } from "@/lib/html-render/render";
 import { htmlRenderTypeForConcept } from "@/lib/html-render/types";
 import {
   checkGenerationCredits,
+  consumeRegenBudget,
   deductCredits,
   generationCreditCost,
 } from "@/lib/credits";
@@ -161,19 +162,37 @@ export async function POST(request: Request) {
     }
   }
   // version > 1 means this concept already had an image, so it's a regeneration.
-  const cost = generationCreditCost(version);
+  // Regenerations spend the project's free regen budget before paid credits, so a
+  // regen with budget left is free. The budget is actually spent post-render
+  // (mirrors how credits deduct only on success).
+  const isRegen = version > 1;
+  let willUseBudget = false;
+  if (isRegen) {
+    // Tolerant read of the free-regen budget. Selected separately (not in the
+    // main project select) so a deploy that predates the regen_budget migration
+    // resolves to 0 here instead of erroring the whole generate path.
+    const { data: pb } = await supabase
+      .from("projects")
+      .select("regen_budget")
+      .eq("id", project_id)
+      .maybeSingle();
+    willUseBudget = ((pb?.regen_budget as number | undefined) ?? 0) > 0;
+  }
+  const cost = willUseBudget ? 0 : generationCreditCost(version);
 
-  const tier = await checkGenerationCredits(user.id, cost);
-  if (!tier.allowed) {
-    return NextResponse.json(
-      {
-        error: "paywall",
-        message: tier.reason,
-        balance: tier.balance,
-        required: tier.required,
-      },
-      { status: 402 },
-    );
+  if (!willUseBudget) {
+    const tier = await checkGenerationCredits(user.id, cost);
+    if (!tier.allowed) {
+      return NextResponse.json(
+        {
+          error: "paywall",
+          message: tier.reason,
+          balance: tier.balance,
+          required: tier.required,
+        },
+        { status: 402 },
+      );
+    }
   }
 
   const { data: row, error: insErr } = await supabase
@@ -212,21 +231,30 @@ export async function POST(request: Request) {
       referenceImages,
     });
 
-    // Only deduct after a successful render so failed generations
-    // don't burn a credit.
-    const deducted = await deductCredits(user.id, cost);
-    if (!deducted.ok) {
-      await supabase
-        .from("generations")
-        .update({ status: "failed" })
-        .eq("id", row.id);
-      return NextResponse.json(
-        {
-          error: "paywall",
-          message: deducted.reason ?? "Insufficient credits",
-        },
-        { status: 402 },
-      );
+    // Fund the render only after it succeeds so a failed generation never spends
+    // a free regen or a credit. A budget-funded regen spends one unit of the
+    // project's regen_budget; everything else deducts credits.
+    let newBalance: number | undefined;
+    let regenRemaining: number | undefined;
+    if (willUseBudget) {
+      const spent = await consumeRegenBudget(project_id);
+      regenRemaining = spent.remaining;
+    } else {
+      const deducted = await deductCredits(user.id, cost);
+      if (!deducted.ok) {
+        await supabase
+          .from("generations")
+          .update({ status: "failed" })
+          .eq("id", row.id);
+        return NextResponse.json(
+          {
+            error: "paywall",
+            message: deducted.reason ?? "Insufficient credits",
+          },
+          { status: 402 },
+        );
+      }
+      newBalance = deducted.new_balance;
     }
 
     const { data: updated, error: updErr } = await supabase
@@ -247,7 +275,8 @@ export async function POST(request: Request) {
       status: "completed",
       version,
       generation: updated,
-      new_balance: deducted.new_balance,
+      ...(typeof newBalance === "number" ? { new_balance: newBalance } : {}),
+      ...(typeof regenRemaining === "number" ? { regen_budget: regenRemaining } : {}),
     });
   } catch (err) {
     await supabase
