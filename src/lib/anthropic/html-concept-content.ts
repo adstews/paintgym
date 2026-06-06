@@ -24,7 +24,7 @@ const SUPPORTED_MIME = new Set(["image/jpeg", "image/png", "image/gif", "image/w
 const TYPE_GUIDANCE: Record<HtmlRenderType, string> = {
   imessage: `Write a believable two-person text thread where one friend recommends the product to another who has the matching problem. 4 to 6 messages, alternating naturally, "them" sends first. The recommendation should name the product and one concrete reason it works. contact_name is the friend's first name.`,
   notes: `Write an Apple Notes note as if a real customer jotted down why the product is worth it. A short title, a believable date, and 4 to 7 short lines (most as bullets) that read like honest personal notes, not ad copy.`,
-  reddit: `Write a Reddit thread where the product surfaces as the genuine answer. A realistic subreddit, an upvoted question-style post from someone with the problem, and 2 to 3 top comments that recommend the product with specifics. Usernames and vote counts must look real ("1.2k", "847", "u/quietgains").`,
+  reddit: `Write a single first-person Reddit post (no comments) where the product surfaces as the genuine answer. Give a realistic subreddit and username, a compelling question-style title that hints at a relatable problem, and a post_body of 3 to 5 short paragraphs (separate paragraphs with a blank line). The body should tell a believable personal story that arrives at the product as the answer, and end with a short lowercase "EDIT:" paragraph that nudges the reader to act. Make upvotes and comments_count look real ("892", "1.2k", "247").`,
   tweet: `Write one tweet from a believable account praising the product in a specific, non-corporate way. Realistic display name, handle, and engagement counts (replies/retweets/likes, optional views like "84.2K").`,
   tiktok: `Write a TikTok comment section over a video about the product. A short caption, and 3 to 4 comments that hype the product the way real commenters do (specific, casual). Realistic usernames and like counts.`,
   instagram_story: `Write an Instagram Story reacting to the product: 1 to 3 short overlay text lines and one interactive sticker (a poll, a question box, or a rating) that fits the product. Casual, first-person, like a creator sharing a find.`,
@@ -67,7 +67,7 @@ function shapeHint(type: HtmlRenderType): string {
     case "notes":
       return `{"title": string, "date": string, "lines": [{"text": string, "bullet": boolean}]}`;
     case "reddit":
-      return `{"subreddit": string, "post_title": string, "post_author": string, "posted": string, "upvotes": string, "post_body": string (optional), "comments": [{"author": string, "posted": string, "upvotes": string, "text": string}]}`;
+      return `{"subreddit": string, "post_title": string, "post_author": string, "posted": string (e.g. "21d"), "upvotes": string, "comments_count": string, "post_body": string (3-5 paragraphs separated by blank lines, ending with a short "EDIT:" line)}`;
     case "tweet":
       return `{"name": string, "handle": string, "verified": boolean, "time": string, "text": string, "replies": string, "retweets": string, "likes": string, "views": string (optional)}`;
     case "tiktok":
@@ -117,11 +117,7 @@ export function serializeRenderContent(
     }
     case "reddit": {
       const c = content as RedditContent;
-      return `r/${c.subreddit} — ${c.post_title} (${c.upvotes} upvotes)\n${
-        c.post_body ?? ""
-      }\n\n${c.comments
-        .map((cm) => `u/${cm.author} (${cm.upvotes}): ${cm.text}`)
-        .join("\n\n")}`;
+      return `r/${c.subreddit} · u/${c.post_author} · ${c.posted}\n${c.post_title}\n(${c.upvotes} upvotes · ${c.comments_count} comments)\n\n${c.post_body}`;
     }
     case "tweet": {
       const c = content as TweetContent;
