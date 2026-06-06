@@ -1,0 +1,40 @@
+# Paintgym robots.txt
+
+User-agent: *
+Allow: /
+Disallow: /dashboard
+Disallow: /projects
+Disallow: /admin
+Disallow: /api
+Disallow: /video
+Disallow: /auth
+
+# AI crawlers are welcome on public marketing and content pages
+User-agent: GPTBot
+Allow: /
+Disallow: /dashboard
+Disallow: /projects
+Disallow: /admin
+Disallow: /api
+Disallow: /video
+Disallow: /auth
+
+User-agent: ClaudeBot
+Allow: /
+Disallow: /dashboard
+Disallow: /projects
+Disallow: /admin
+Disallow: /api
+Disallow: /video
+Disallow: /auth
+
+User-agent: PerplexityBot
+Allow: /
+Disallow: /dashboard
+Disallow: /projects
+Disallow: /admin
+Disallow: /api
+Disallow: /video
+Disallow: /auth
+
+Sitemap: https://www.paintgym.com/sitemap.xml

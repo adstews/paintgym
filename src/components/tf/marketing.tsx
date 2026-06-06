@@ -4,22 +4,7 @@
 // was removed with the /tf preview; the real app uses tf-auth-form.tsx with
 // real Supabase auth.)
 import { Btn, IconBtn, Badge, Icon } from "@/components/tf/ui";
-
-type Pack = {
-  n: string;
-  c: number;
-  p: number;
-  pop?: boolean;
-  blurb: string;
-  feats: string[];
-};
-
-export const CREDIT_PACKS: Pack[] = [
-  { n: "Starter", c: 50, p: 39, blurb: "Test the waters", feats: ["50 ad credits", "All 35 frameworks", "4:5 high-res export"] },
-  { n: "Plus", c: 110, p: 69, blurb: "For steady testing", feats: ["110 ad credits", "Competitor Spy", "Recreate-from-example"] },
-  { n: "Pro", c: 300, p: 149, pop: true, blurb: "Most popular", feats: ["300 ad credits", "Brand kits", "Priority generation", "Version history"] },
-  { n: "Agency", c: 750, p: 299, blurb: "Volume for clients", feats: ["750 ad credits", "Multiple brands", "Team seats", "White-label export"] },
-];
+import { CREDIT_PACKS, type Pack } from "@/content/credit-packs";
 
 export function Pricing({
   onBuy,
