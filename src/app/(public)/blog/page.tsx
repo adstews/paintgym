@@ -7,6 +7,10 @@ import { pageMetadata } from "@/lib/seo/site";
 import { getAllPosts } from "@/lib/blog";
 import { readingTimeMinutes } from "@/lib/markdown";
 
+// Re-query the blog_posts table hourly so DB edits and new posts appear
+// without a redeploy.
+export const revalidate = 3600;
+
 export const metadata: Metadata = pageMetadata({
   title: "Blog",
   description:

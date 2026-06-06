@@ -13,6 +13,9 @@ import {
   readingTimeMinutes,
 } from "@/lib/markdown";
 
+// Re-query the blog_posts table hourly so DB edits appear without a redeploy.
+export const revalidate = 3600;
+
 type Params = { params: Promise<{ slug: string }> };
 
 export async function generateStaticParams() {
