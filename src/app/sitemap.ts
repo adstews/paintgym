@@ -2,6 +2,9 @@ import type { MetadataRoute } from "next";
 import { SITE_URL } from "@/lib/seo/site";
 import { getAllPosts } from "@/lib/blog";
 
+// Refresh hourly so newly published posts enter the sitemap without a redeploy.
+export const revalidate = 3600;
+
 type Freq = MetadataRoute.Sitemap[number]["changeFrequency"];
 
 const STATIC_ROUTES: { path: string; changeFrequency: Freq; priority: number }[] =
