@@ -8,6 +8,13 @@ import {
 } from "next/font/google";
 import Script from "next/script";
 import "./globals.css";
+import {
+  SITE_URL,
+  SITE_NAME,
+  DEFAULT_DESCRIPTION,
+  DEFAULT_OG_IMAGE,
+  TWITTER_HANDLE,
+} from "@/lib/seo/site";
 
 const META_PIXEL_ID = "1256753106289269";
 const GTM_ID = "GTM-5KDK42WX";
@@ -41,9 +48,41 @@ const fontVars = [
 ].join(" ");
 
 export const metadata: Metadata = {
-  title: "paintgym — build ad volume",
-  description:
-    "A gym for your ad creative. Paste a product URL and train a whole wall of ad concepts across 35 proven frameworks.",
+  metadataBase: new URL(SITE_URL),
+  title: {
+    default: "Paintgym — AI Ad Creatives in Minutes",
+    template: "%s | Paintgym",
+  },
+  description: DEFAULT_DESCRIPTION,
+  applicationName: SITE_NAME,
+  keywords: [
+    "AI ad creative",
+    "AI ad generator",
+    "static ad concepts",
+    "Meta ad creative",
+    "Facebook ad maker",
+    "ad creative tool",
+    "AI UGC ads",
+  ],
+  alternates: { canonical: "/" },
+  openGraph: {
+    type: "website",
+    siteName: SITE_NAME,
+    title: "Paintgym — AI Ad Creatives in Minutes",
+    description: DEFAULT_DESCRIPTION,
+    url: SITE_URL,
+    images: [
+      { url: DEFAULT_OG_IMAGE, width: 1200, height: 630, alt: SITE_NAME },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Paintgym — AI Ad Creatives in Minutes",
+    description: DEFAULT_DESCRIPTION,
+    site: TWITTER_HANDLE,
+    creator: TWITTER_HANDLE,
+    images: [DEFAULT_OG_IMAGE],
+  },
 };
 
 export default function RootLayout({
