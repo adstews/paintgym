@@ -416,152 +416,245 @@ export function Notes({ c }: { c: NotesContent }) {
 }
 
 // ===========================================================================
-// 3. Reddit thread
+// 3. Reddit post (mobile post-detail screen — fixed "best performing" layout)
 // ===========================================================================
-function VoteArrow({ dir }: { dir: "up" | "down" }) {
+const REDDIT_BLUE = "#1e6fd6";
+
+function RedditVote({ dir }: { dir: "up" | "down" }) {
+  // Outlined arrow matching the Reddit app vote control.
   return (
-    <svg width={32} height={32} viewBox="0 0 24 24" fill="none">
-      <path
-        d={dir === "up" ? "M12 4l8 9h-5v7H9v-7H4z" : "M12 20l-8-9h5V4h6v7h5z"}
-        fill="#878a8c"
-      />
+    <svg width={34} height={34} viewBox="0 0 24 24" fill="none" stroke="#878a8c" strokeWidth={2.2}>
+      {dir === "up" ? (
+        <path d="M12 19V5M5 12l7-7 7 7" strokeLinecap="round" strokeLinejoin="round" />
+      ) : (
+        <path d="M12 5v14M5 12l7 7 7-7" strokeLinecap="round" strokeLinejoin="round" />
+      )}
     </svg>
   );
 }
 
 export function Reddit({ c }: { c: RedditContent }) {
+  const paragraphs = c.post_body
+    .split(/\n+/)
+    .map((p) => p.trim())
+    .filter(Boolean);
   return (
-    <Frame background="#dae0e6">
-      <div style={{ padding: 40, display: "flex", flexDirection: "column", gap: 26 }}>
-        {/* post card */}
-        <div
-          style={{
-            background: "#fff",
-            borderRadius: 18,
-            padding: "34px 38px",
-            boxShadow: "0 1px 3px rgba(0,0,0,0.08)",
-          }}
-        >
-          <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 22 }}>
+    <Frame background="#ffffff">
+      {/* blue app header */}
+      <div
+        style={{
+          background: REDDIT_BLUE,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          padding: "30px 34px",
+          flex: "0 0 auto",
+        }}
+      >
+        {/* close */}
+        <svg width={40} height={40} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth={2.4}>
+          <path d="M6 6l12 12M18 6L6 18" strokeLinecap="round" />
+        </svg>
+        <div style={{ display: "flex", alignItems: "center", gap: 38 }}>
+          {/* search */}
+          <svg width={40} height={40} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth={2.2}>
+            <circle cx="11" cy="11" r="7" />
+            <path d="M21 21l-4.3-4.3" strokeLinecap="round" />
+          </svg>
+          {/* sort / sliders */}
+          <svg width={40} height={40} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth={2.2}>
+            <path d="M4 7h11M19 7h1M4 17h1M9 17h11" strokeLinecap="round" />
+            <circle cx="17" cy="7" r="2.4" fill="#fff" stroke="none" />
+            <circle cx="7" cy="17" r="2.4" fill="#fff" stroke="none" />
+          </svg>
+          {/* more */}
+          <svg width={40} height={40} viewBox="0 0 24 24" fill="#fff">
+            <circle cx="5" cy="12" r="2" />
+            <circle cx="12" cy="12" r="2" />
+            <circle cx="19" cy="12" r="2" />
+          </svg>
+          {/* account avatar with online dot */}
+          <div style={{ position: "relative", width: 46, height: 46 }}>
             <div
               style={{
-                width: 52,
-                height: 52,
-                borderRadius: 52,
-                background: "#ff4500",
+                width: 46,
+                height: 46,
+                borderRadius: 46,
+                background: "#bcc6cf",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
               }}
             >
-              <svg width={34} height={34} viewBox="0 0 24 24" fill="#fff">
-                <circle cx="12" cy="13" r="7" />
-                <circle cx="18.5" cy="6.5" r="2.2" />
+              <svg width={34} height={34} viewBox="0 0 24 24" fill="#7a8894">
+                <circle cx="12" cy="13" r="6.5" />
+                <circle cx="18" cy="6.5" r="2" />
               </svg>
             </div>
-            <div style={{ display: "flex", flexDirection: "column" }}>
-              <span style={{ fontSize: 25, fontWeight: 700, color: "#1a1a1b" }}>
-                r/{c.subreddit}
-              </span>
-              <span style={{ fontSize: 20, color: "#787c7e" }}>
-                Posted by u/{c.post_author} · {c.posted}
-              </span>
-            </div>
+            <div
+              style={{
+                position: "absolute",
+                right: -1,
+                bottom: -1,
+                width: 16,
+                height: 16,
+                borderRadius: 16,
+                background: "#46d160",
+                border: "3px solid " + REDDIT_BLUE,
+              }}
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* post body */}
+      <div style={{ flex: 1, padding: "34px 40px 0", display: "flex", flexDirection: "column" }}>
+        {/* subreddit row */}
+        <div style={{ display: "flex", alignItems: "center", gap: 18, marginBottom: 26 }}>
+          <div
+            style={{
+              width: 66,
+              height: 66,
+              borderRadius: 66,
+              background: "#1a1a2e",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              flex: "0 0 auto",
+            }}
+          >
+            <span style={{ color: "#fff", fontSize: 28, fontWeight: 800 }}>r/</span>
+          </div>
+          <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 4 }}>
+            <span style={{ fontSize: 27, fontWeight: 700, color: "#1a1a1b" }}>
+              r/{c.subreddit}
+            </span>
+            <span style={{ fontSize: 22, color: "#787c7e" }}>
+              u/{c.post_author} · {c.posted}
+            </span>
           </div>
           <div
             style={{
-              fontSize: 40,
-              fontWeight: 600,
-              color: "#1a1a1b",
-              lineHeight: 1.25,
-              marginBottom: c.post_body ? 18 : 24,
+              background: REDDIT_BLUE,
+              color: "#fff",
+              fontSize: 24,
+              fontWeight: 700,
+              padding: "14px 34px",
+              borderRadius: 999,
+              flex: "0 0 auto",
             }}
           >
-            {c.post_title}
-          </div>
-          {c.post_body && (
-            <div style={{ fontSize: 28, color: "#1c1c1c", lineHeight: 1.45, marginBottom: 24 }}>
-              {c.post_body}
-            </div>
-          )}
-          <div style={{ display: "flex", alignItems: "center", gap: 30, color: "#878a8c" }}>
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 12,
-                background: "#f6f7f8",
-                borderRadius: 999,
-                padding: "10px 18px",
-              }}
-            >
-              <VoteArrow dir="up" />
-              <span style={{ fontSize: 26, fontWeight: 700, color: "#1a1a1b" }}>
-                {c.upvotes}
-              </span>
-              <VoteArrow dir="down" />
-            </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <svg width={30} height={30} viewBox="0 0 24 24" fill="none" stroke="#878a8c" strokeWidth={2}>
-                <path d="M21 11.5a8.38 8.38 0 01-9 8.5 8.5 8.5 0 01-4-1L3 20l1.5-4.5A8.38 8.38 0 0112 3a8.5 8.5 0 019 8.5z" />
-              </svg>
-              <span style={{ fontSize: 24, fontWeight: 600 }}>
-                {c.comments.length} comments
-              </span>
-            </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <svg width={30} height={30} viewBox="0 0 24 24" fill="none" stroke="#878a8c" strokeWidth={2}>
-                <path d="M4 12v7a2 2 0 002 2h12a2 2 0 002-2v-7M16 6l-4-4-4 4M12 2v14" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-              <span style={{ fontSize: 24, fontWeight: 600 }}>Share</span>
-            </div>
+            Join
           </div>
         </div>
 
-        {/* comments */}
+        {/* serif title */}
         <div
           style={{
-            background: "#fff",
-            borderRadius: 18,
-            padding: "20px 38px 34px",
-            boxShadow: "0 1px 3px rgba(0,0,0,0.08)",
-            display: "flex",
-            flexDirection: "column",
+            fontFamily: "'Noto Serif', Georgia, 'Times New Roman', serif",
+            fontSize: 50,
+            fontWeight: 700,
+            color: "#0b0b0b",
+            lineHeight: 1.16,
+            letterSpacing: "-0.005em",
+            marginBottom: 30,
           }}
         >
-          {c.comments.map((cm, i) => (
+          {c.post_title}
+        </div>
+
+        {/* body paragraphs */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 26 }}>
+          {paragraphs.map((p, i) => (
             <div
               key={i}
-              style={{
-                display: "flex",
-                gap: 18,
-                paddingTop: i === 0 ? 18 : 26,
-                paddingBottom: 26,
-                borderTop: i === 0 ? "none" : "1px solid #edeff1",
-              }}
+              style={{ fontSize: 31, color: "#1a1a1b", lineHeight: 1.45 }}
             >
-              <Avatar seed={cm.author} size={52} />
-              <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 10 }}>
-                <div style={{ fontSize: 21, color: "#787c7e" }}>
-                  <span style={{ fontWeight: 700, color: "#1a1a1b" }}>
-                    u/{cm.author}
-                  </span>{" "}
-                  · {cm.posted}
-                </div>
-                <div style={{ fontSize: 29, color: "#1a1a1b", lineHeight: 1.4 }}>
-                  {cm.text}
-                </div>
-                <div style={{ display: "flex", alignItems: "center", gap: 14, color: "#878a8c", marginTop: 4 }}>
-                  <VoteArrow dir="up" />
-                  <span style={{ fontSize: 23, fontWeight: 700, color: "#1a1a1b" }}>
-                    {cm.upvotes}
-                  </span>
-                  <VoteArrow dir="down" />
-                  <span style={{ fontSize: 23, fontWeight: 600, marginLeft: 10 }}>Reply</span>
-                </div>
-              </div>
+              {boldSpans(p, `rb-${i}`)}
             </div>
           ))}
+        </div>
+
+        <div style={{ flex: 1 }} />
+
+        {/* action bar */}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 20,
+            padding: "30px 0 40px",
+          }}
+        >
+          {/* vote pill */}
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 16,
+              border: "1.5px solid #d6d8da",
+              borderRadius: 999,
+              padding: "14px 22px",
+            }}
+          >
+            <RedditVote dir="up" />
+            <span style={{ fontSize: 28, fontWeight: 700, color: "#1a1a1b" }}>
+              {c.upvotes}
+            </span>
+            <RedditVote dir="down" />
+          </div>
+          {/* comment pill */}
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 14,
+              border: "1.5px solid #d6d8da",
+              borderRadius: 999,
+              padding: "14px 24px",
+            }}
+          >
+            <svg width={32} height={32} viewBox="0 0 24 24" fill="none" stroke="#878a8c" strokeWidth={2}>
+              <path d="M21 11.5a8.38 8.38 0 01-9 8.5 8.5 8.5 0 01-4-1L3 20l1.5-4.5A8.38 8.38 0 0112 3a8.5 8.5 0 019 8.5z" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            <span style={{ fontSize: 28, fontWeight: 700, color: "#1a1a1b" }}>
+              {c.comments_count}
+            </span>
+          </div>
+          <div style={{ flex: 1 }} />
+          {/* award */}
+          <div
+            style={{
+              width: 70,
+              height: 70,
+              borderRadius: 70,
+              border: "1.5px solid #d6d8da",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <svg width={34} height={34} viewBox="0 0 24 24" fill="none" stroke="#878a8c" strokeWidth={2}>
+              <circle cx="12" cy="9" r="6" />
+              <path d="M9 14.5L7.5 22l4.5-2.6L16.5 22 15 14.5" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </div>
+          {/* share */}
+          <div
+            style={{
+              width: 70,
+              height: 70,
+              borderRadius: 70,
+              border: "1.5px solid #d6d8da",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <svg width={34} height={34} viewBox="0 0 24 24" fill="none" stroke="#878a8c" strokeWidth={2}>
+              <path d="M4 12v7a2 2 0 002 2h12a2 2 0 002-2v-7M16 6l-4-4-4 4M12 2v13" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </div>
         </div>
       </div>
     </Frame>

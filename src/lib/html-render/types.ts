@@ -98,24 +98,18 @@ export const notesContent = z.object({
     .max(9),
 });
 
+// The Reddit concept renders as a single mobile post-detail screen (blue app
+// header, subreddit row + Join, serif title, body, action bar). No comment
+// threads. post_body is the multi-paragraph story (blank line between
+// paragraphs); a short lowercase "EDIT:" final paragraph is encouraged.
 export const redditContent = z.object({
   subreddit: z.string().min(1).max(40),
   post_title: z.string().min(1).max(160),
   post_author: z.string().min(1).max(40),
   posted: z.string().min(1).max(30),
   upvotes: z.string().min(1).max(12),
-  post_body: z.string().max(400).optional(),
-  comments: z
-    .array(
-      z.object({
-        author: z.string().min(1).max(40),
-        posted: z.string().min(1).max(30),
-        upvotes: z.string().min(1).max(12),
-        text: z.string().min(1).max(360),
-      }),
-    )
-    .min(1)
-    .max(4),
+  comments_count: z.string().min(1).max(12),
+  post_body: z.string().min(1).max(900),
 });
 
 export const tweetContent = z.object({
