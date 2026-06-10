@@ -80,6 +80,10 @@ export const scrapeRequestSchema = z.object({
   project_id: z.string().uuid().optional(),
 });
 
+export const prefillRequestSchema = z.object({
+  url: z.string().url(),
+});
+
 const variantLabelEnum = z.enum([
   "faithful",
   "simplified",
