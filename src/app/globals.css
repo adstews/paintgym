@@ -224,13 +224,33 @@
   background-size: 56px 56px;
 }
 
-/* Hide scrollbars on the Netflix-style creative rows. */
+/* Hide scrollbars on the Netflix-style creative rows; snap so tiles land
+   cleanly on the left gutter instead of stopping mid-tile on flicks. */
 .rd-scroll {
   scrollbar-width: none;
   -ms-overflow-style: none;
+  scroll-snap-type: x proximity;
+  scroll-padding-left: 20px; /* matches px-5 row gutter */
+  overscroll-behavior-x: contain;
+}
+.rd-scroll > * {
+  scroll-snap-align: start;
 }
 .rd-scroll::-webkit-scrollbar {
   display: none;
+}
+/* 40rem matches Tailwind v4's sm: breakpoint exactly (it's rem-based, so px
+   values would desync when the user's browser font size isn't 16px). */
+@media (width >= 40rem) {
+  .rd-scroll { scroll-padding-left: 32px; } /* sm:px-8 gutter */
+}
+
+/* Mobile: calm the atmosphere. The blueprint grid + heavy grain + pulsing glow
+   read as visual noise at phone size — keep the warm lime wash, drop the rest. */
+@media (width < 40rem) {
+  .rd-grid-light { background-image: none; }
+  .rd-grain::before { opacity: 0.22; }
+  .rd-glow { animation: none; opacity: 0.4; }
 }
 
 @media (prefers-reduced-motion: reduce) {

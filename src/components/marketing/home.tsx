@@ -164,7 +164,7 @@ const LIME_INK = "#4d7c0f";
 function Kicker({ children }: { children: React.ReactNode }) {
   return (
     <span
-      className="font-tfmono text-[11px] uppercase tracking-[0.32em]"
+      className="font-tfmono text-[11px] uppercase tracking-[0.18em] sm:tracking-[0.32em]"
       style={{ color: LIME_INK }}
     >
       {children}
@@ -212,7 +212,9 @@ function ConceptTile({ tile, idx }: { tile: Tile; idx: number }) {
 
 export function MarketingHome() {
   return (
-    <div className="mktg min-h-screen w-full overflow-x-hidden bg-[#fafaf7] font-ui text-[#141414] antialiased selection:bg-pop selection:text-[#141414]">
+    // overflow-x-CLIP (not hidden): hidden turns this div into a scroll
+    // container, which silently kills the header's position:sticky.
+    <div className="mktg min-h-screen w-full overflow-x-clip bg-[#fafaf7] font-ui text-[#141414] antialiased selection:bg-pop selection:text-[#141414]">
       {/* ===== Nav ===== */}
       <header className="sticky top-0 z-50 border-b border-black/10 bg-[#fafaf7]/85 backdrop-blur-md">
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-5 sm:px-8">
@@ -256,7 +258,7 @@ export function MarketingHome() {
           style={{ background: "radial-gradient(closest-side, rgba(194,245,54,0.55), transparent)" }}
         />
 
-        <div className="relative z-10 mx-auto max-w-7xl px-5 pb-20 pt-20 sm:px-8 sm:pb-28 sm:pt-28">
+        <div className="relative z-10 mx-auto max-w-7xl px-5 pb-16 pt-12 sm:px-8 sm:pb-28 sm:pt-28">
           <div className="rd-fade-up max-w-4xl" style={{ animationDelay: "0ms" }}>
             <div className="mb-7 inline-flex max-w-full items-center gap-2 rounded-full border border-black/10 bg-white px-4 py-1.5 shadow-sm">
               <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: LIME_INK }} />
@@ -267,7 +269,7 @@ export function MarketingHome() {
           </div>
 
           <h1
-            className="rd-fade-up font-display text-[clamp(2.15rem,8.5vw,7rem)] font-extrabold uppercase leading-[0.92] tracking-[-0.02em] text-[#141414]"
+            className="rd-fade-up font-display text-4xl font-extrabold uppercase leading-[0.98] tracking-[-0.01em] text-[#141414] sm:text-[clamp(2.7rem,9vw,7rem)] sm:leading-[0.92] sm:tracking-[-0.02em]"
             style={{ animationDelay: "80ms" }}
           >
             Not Another
@@ -275,19 +277,19 @@ export function MarketingHome() {
             AI Ad{" "}
             <span className="relative inline-block">
               <span className="text-black/25">Platform</span>
-              <span className="absolute left-0 top-1/2 h-[6px] w-full -translate-y-1/2 bg-pop" />
+              <span className="absolute left-0 top-1/2 h-[0.06em] min-h-[3px] w-full -translate-y-1/2 rounded-full bg-pop sm:h-[6px] sm:min-h-0 sm:rounded-none" />
             </span>
           </h1>
 
           <p
-            className="rd-fade-up mt-7 max-w-2xl font-display text-2xl font-extrabold uppercase leading-[1.05] tracking-tight sm:text-3xl"
+            className="rd-fade-up mt-5 max-w-2xl font-display text-xl font-extrabold uppercase leading-[1.05] tracking-tight sm:mt-7 sm:text-3xl"
             style={{ animationDelay: "150ms", color: LIME_INK }}
           >
             Real ads. Ready to launch today.
           </p>
 
           <p
-            className="rd-fade-up mt-6 max-w-2xl text-base leading-relaxed text-black/65 sm:text-xl"
+            className="rd-fade-up mt-5 max-w-2xl text-base leading-relaxed text-black/65 sm:mt-6 sm:text-xl"
             style={{ animationDelay: "220ms" }}
           >
             Paintgym hands you a wall of finished, on-brand static ads — briefs
@@ -298,36 +300,37 @@ export function MarketingHome() {
           </p>
 
           <div
-            className="rd-fade-up mt-9 flex flex-col items-start gap-3 sm:flex-row sm:items-center"
+            className="rd-fade-up mt-8 flex flex-col items-stretch gap-3 sm:mt-9 sm:flex-row sm:items-center"
             style={{ animationDelay: "300ms" }}
           >
             <Link
               href="/signup"
-              className="group inline-flex items-center gap-2 rounded-xl bg-pop px-7 py-4 font-display text-base font-extrabold uppercase tracking-wide text-[#141414] shadow-[0_10px_30px_-8px_rgba(166,217,22,0.7)] ring-1 ring-[#a6d916] transition-transform hover:-translate-y-0.5"
+              className="group inline-flex items-center justify-center gap-2 rounded-xl bg-pop px-7 py-4 font-display text-base font-extrabold uppercase tracking-wide text-[#141414] shadow-[0_10px_30px_-8px_rgba(166,217,22,0.7)] ring-1 ring-[#a6d916] transition-transform hover:-translate-y-0.5 sm:justify-start"
             >
               Start a free set
               <span className="transition-transform group-hover:translate-x-1">→</span>
             </Link>
             <a
               href="#wall"
-              className="inline-flex items-center gap-2 rounded-xl border border-black/20 bg-white px-7 py-4 font-display text-base font-bold uppercase tracking-wide text-[#141414] transition-colors hover:border-black/40 hover:bg-black/[0.03]"
+              className="inline-flex items-center justify-center gap-2 rounded-xl border border-black/20 bg-white px-7 py-4 font-display text-base font-bold uppercase tracking-wide text-[#141414] transition-colors hover:border-black/40 hover:bg-black/[0.03] sm:justify-start"
             >
               See the work ↓
             </a>
           </div>
 
           <p
-            className="rd-fade-up mt-7 font-tfmono text-[12px] uppercase leading-relaxed tracking-[0.16em] text-black/45"
+            className="rd-fade-up mt-6 font-tfmono text-[11px] uppercase leading-relaxed tracking-[0.04em] text-black/60 sm:mt-7 sm:text-[12px] sm:tracking-[0.16em] sm:text-black/45"
             style={{ animationDelay: "380ms" }}
           >
             {"// Built on the exact concepts scaling real accounts right now — "}
-            <span style={{ color: LIME_INK }}>June 2026</span>. Small ecom,
-            8-figure ecom, medspas, and dozens of verticals.
+            <span style={{ color: LIME_INK }}>June 2026</span>. Small ecom,{" "}
+            <span className="whitespace-nowrap">8-figure</span> ecom, medspas,
+            and dozens of verticals.
           </p>
 
           {/* hero stat strip */}
           <div
-            className="rd-fade-up mt-12 grid max-w-2xl grid-cols-3 gap-px overflow-hidden rounded-2xl border border-black/10 bg-black/10 shadow-sm"
+            className="rd-fade-up mt-10 grid max-w-2xl grid-cols-3 gap-px overflow-hidden rounded-2xl border border-black/10 bg-black/10 shadow-sm sm:mt-12"
             style={{ animationDelay: "460ms" }}
           >
             {[
@@ -335,14 +338,14 @@ export function MarketingHome() {
               { k: "35", v: "proven concepts" },
               { k: "every ad", v: "agent QA'd" },
             ].map((s) => (
-              <div key={s.k} className="bg-white px-4 py-5 text-center sm:px-6">
+              <div key={s.k} className="bg-white px-2 py-4 text-center sm:px-6 sm:py-5">
                 <div
-                  className="font-display text-2xl font-extrabold sm:text-3xl"
+                  className="whitespace-nowrap font-display text-lg font-extrabold sm:text-3xl"
                   style={{ color: LIME_INK }}
                 >
                   {s.k}
                 </div>
-                <div className="mt-1 font-tfmono text-[10px] uppercase tracking-[0.14em] text-black/50">
+                <div className="mt-1 font-tfmono text-[10px] uppercase leading-snug tracking-[0.06em] text-black/60 sm:leading-normal sm:tracking-[0.14em] sm:text-black/50">
                   {s.v}
                 </div>
               </div>
@@ -370,16 +373,16 @@ export function MarketingHome() {
       </div>
 
       {/* ===== Ad wall gallery ===== */}
-      <section id="wall" className="relative border-b border-black/10 bg-[#fafaf7] py-20 sm:py-28">
+      <section id="wall" className="relative border-b border-black/10 bg-[#fafaf7] py-14 sm:py-28">
         <div className="mx-auto max-w-7xl px-5 sm:px-8">
-          <div className="mb-12 max-w-3xl">
+          <div className="mb-8 max-w-3xl sm:mb-12">
             <Kicker>The output</Kicker>
-            <h2 className="mt-4 font-display text-[clamp(2rem,6vw,4rem)] font-extrabold uppercase leading-[0.95] tracking-tight text-[#141414]">
+            <h2 className="mt-3 font-display text-[1.75rem] font-extrabold uppercase leading-[1] tracking-tight text-[#141414] sm:mt-4 sm:text-[clamp(2rem,6vw,4rem)] sm:leading-[0.95]">
               A wall of creative,
               <br />
               not a blank canvas
             </h2>
-            <p className="mt-5 text-lg leading-relaxed text-black/60">
+            <p className="mt-4 text-base leading-relaxed text-black/60 sm:mt-5 sm:text-lg">
               Paste one product link. Paintgym trains an entire wall of static
               ads across{" "}
               <span className="font-semibold text-[#141414]">35 proven concepts</span>{" "}
@@ -394,10 +397,10 @@ export function MarketingHome() {
           {CONCEPT_ROWS.map((row) => (
             <div key={row.label}>
               <div className="mx-auto mb-3 flex max-w-7xl items-baseline justify-between px-5 sm:px-8">
-                <h3 className="font-display text-lg font-extrabold uppercase tracking-tight text-[#141414]">
+                <h3 className="font-display text-base font-extrabold uppercase tracking-tight text-[#141414] sm:text-lg">
                   {row.label}
                 </h3>
-                <span className="font-tfmono text-[10px] uppercase tracking-[0.18em] text-black/40">
+                <span className="hidden font-tfmono text-[10px] uppercase tracking-[0.18em] text-black/40 sm:inline">
                   {row.tag}
                 </span>
               </div>
@@ -418,25 +421,25 @@ export function MarketingHome() {
       </section>
 
       {/* ===== Case studies / receipts ===== */}
-      <section className="relative border-b border-black/10 bg-white py-20 sm:py-28">
+      <section className="relative border-b border-black/10 bg-white py-14 sm:py-28">
         <div className="mx-auto max-w-7xl px-5 sm:px-8">
-          <div className="mb-12 flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
+          <div className="mb-8 flex flex-col gap-4 sm:mb-12 sm:flex-row sm:items-end sm:justify-between sm:gap-5">
             <div className="max-w-2xl">
               <Kicker>Receipts</Kicker>
-              <h2 className="mt-4 font-display text-[clamp(2rem,6vw,4rem)] font-extrabold uppercase leading-[0.95] tracking-tight text-[#141414]">
+              <h2 className="mt-3 font-display text-[1.75rem] font-extrabold uppercase leading-[1] tracking-tight text-[#141414] sm:mt-4 sm:text-[clamp(2rem,6vw,4rem)] sm:leading-[0.95]">
                 Same concepts.
                 <br />
                 Real money.
               </h2>
             </div>
-            <p className="max-w-sm text-base leading-relaxed text-black/60">
+            <p className="max-w-sm text-sm leading-relaxed text-black/60 sm:text-base">
               These are the brands running Paintgym creative in live accounts.
               Skeptical is the right instinct — so here&apos;s the work and the
               numbers behind it.
             </p>
           </div>
 
-          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5 lg:grid-cols-4">
             {CASES.map((c) => (
               <article
                 key={c.brand}
@@ -468,7 +471,7 @@ export function MarketingHome() {
                 <div className="flex flex-1 flex-col p-5">
                   <div className="flex items-end gap-2">
                     <span
-                      className="font-display text-4xl font-extrabold leading-none"
+                      className="font-display text-3xl font-extrabold leading-none sm:text-4xl"
                       style={{ color: LIME_INK }}
                     >
                       {c.stat}
@@ -488,19 +491,19 @@ export function MarketingHome() {
             ))}
           </div>
 
-          <p className="mt-6 font-tfmono text-[11px] uppercase tracking-[0.16em] text-black/35">
+          <p className="mt-6 font-tfmono text-[10px] uppercase tracking-[0.04em] text-black/55 sm:text-[11px] sm:tracking-[0.16em] sm:text-black/35">
             {"// Live creative + verified stats land here as accounts report."}
           </p>
         </div>
       </section>
 
       {/* ===== Trust band ===== */}
-      <section className="border-b border-black/10 bg-[#f3f3ee] py-10">
-        <div className="mx-auto flex max-w-7xl flex-row flex-wrap items-center justify-center gap-x-5 gap-y-3 px-5 text-center sm:gap-x-10 sm:gap-y-4 sm:px-8">
+      <section className="border-b border-black/10 bg-[#f3f3ee] py-8 sm:py-10">
+        <div className="mx-auto flex max-w-7xl flex-row flex-wrap items-center justify-center gap-x-5 gap-y-2.5 px-5 text-center sm:gap-x-10 sm:gap-y-4 sm:px-8">
           {VERTICALS.map((v) => (
             <span
               key={v}
-              className="font-display text-base font-extrabold uppercase tracking-tight text-black/35 transition-colors hover:text-black/70"
+              className="font-display text-sm font-extrabold uppercase tracking-tight text-black/35 transition-colors hover:text-black/70 sm:text-base"
             >
               {v}
             </span>
@@ -514,21 +517,21 @@ export function MarketingHome() {
           className="rd-glow pointer-events-none absolute -bottom-44 left-1/2 h-[480px] w-[800px] -translate-x-1/2 rounded-full blur-[140px]"
           style={{ background: "radial-gradient(closest-side, rgba(194,245,54,0.6), transparent)" }}
         />
-        <div className="relative z-10 mx-auto max-w-4xl px-5 py-24 text-center sm:px-8 sm:py-32">
+        <div className="relative z-10 mx-auto max-w-4xl px-5 py-16 text-center sm:px-8 sm:py-32">
           <Kicker>Stop renting tools</Kicker>
-          <h2 className="mt-5 font-display text-[clamp(2.4rem,8vw,5.5rem)] font-extrabold uppercase leading-[0.92] tracking-tight text-[#141414]">
+          <h2 className="mt-4 font-display text-[2rem] font-extrabold uppercase leading-[0.98] tracking-tight text-[#141414] sm:mt-5 sm:text-[clamp(2.4rem,8vw,5.5rem)] sm:leading-[0.92]">
             Get the ads.
             <br />
             <span style={{ color: LIME_INK }}>Go live today.</span>
           </h2>
-          <p className="mx-auto mt-6 max-w-xl text-lg leading-relaxed text-black/65">
+          <p className="mx-auto mt-5 max-w-xl text-base leading-relaxed text-black/65 sm:mt-6 sm:text-lg">
             Drop in a product link and walk away with a wall of finished ads in
             minutes. No card required to see your first set.
           </p>
-          <div className="mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row">
+          <div className="mt-8 flex flex-col items-stretch justify-center gap-3 sm:mt-9 sm:flex-row sm:items-center">
             <Link
               href="/signup"
-              className="group inline-flex items-center gap-2 rounded-xl bg-pop px-8 py-4 font-display text-lg font-extrabold uppercase tracking-wide text-[#141414] shadow-[0_14px_40px_-10px_rgba(166,217,22,0.8)] ring-1 ring-[#a6d916] transition-transform hover:-translate-y-0.5"
+              className="group inline-flex items-center justify-center gap-2 rounded-xl bg-pop px-8 py-4 font-display text-lg font-extrabold uppercase tracking-wide text-[#141414] shadow-[0_14px_40px_-10px_rgba(166,217,22,0.8)] ring-1 ring-[#a6d916] transition-transform hover:-translate-y-0.5"
             >
               Start a free set
               <span className="transition-transform group-hover:translate-x-1">→</span>

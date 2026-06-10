@@ -509,7 +509,11 @@ body{font-family:var(--ui);color:var(--ink);background:#cfcfc8;line-height:1.5;-
    =================================================================== */
 
 /* never let anything force the page to scroll sideways */
-html,body{max-width:100%;overflow-x:hidden;}
+/* overflow-x:CLIP, not hidden — hidden turns body into a scroll container,
+   which silently disables position:sticky for everything that scrolls with
+   the document (marketing header, blog TOC). clip clips the same without
+   creating a scroll container. */
+html,body{max-width:100%;overflow-x:clip;}
 
 .pg-shell-main{max-width:1180px;margin:0 auto;width:100%;padding:22px 18px 48px;}
 @media (max-width:640px){
