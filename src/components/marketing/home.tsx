@@ -212,7 +212,7 @@ function ConceptTile({ tile, idx }: { tile: Tile; idx: number }) {
 
 export function MarketingHome() {
   return (
-    <div className="min-h-screen w-full overflow-x-hidden bg-[#fafaf7] font-ui text-[#141414] antialiased selection:bg-pop selection:text-[#141414]">
+    <div className="mktg min-h-screen w-full overflow-x-hidden bg-[#fafaf7] font-ui text-[#141414] antialiased selection:bg-pop selection:text-[#141414]">
       {/* ===== Nav ===== */}
       <header className="sticky top-0 z-50 border-b border-black/10 bg-[#fafaf7]/85 backdrop-blur-md">
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-5 sm:px-8">
@@ -258,16 +258,16 @@ export function MarketingHome() {
 
         <div className="relative z-10 mx-auto max-w-7xl px-5 pb-20 pt-20 sm:px-8 sm:pb-28 sm:pt-28">
           <div className="rd-fade-up max-w-4xl" style={{ animationDelay: "0ms" }}>
-            <div className="mb-7 inline-flex items-center gap-2 rounded-full border border-black/10 bg-white px-4 py-1.5 shadow-sm">
-              <span className="h-2 w-2 rounded-full" style={{ backgroundColor: LIME_INK }} />
-              <span className="font-tfmono text-[11px] uppercase tracking-[0.24em] text-black/65">
+            <div className="mb-7 inline-flex max-w-full items-center gap-2 rounded-full border border-black/10 bg-white px-4 py-1.5 shadow-sm">
+              <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: LIME_INK }} />
+              <span className="font-tfmono text-[10px] uppercase tracking-[0.12em] text-black/65 sm:text-[11px] sm:tracking-[0.24em]">
                 Performance creative · not a platform
               </span>
             </div>
           </div>
 
           <h1
-            className="rd-fade-up font-display text-[clamp(2.7rem,9vw,7rem)] font-extrabold uppercase leading-[0.92] tracking-[-0.02em] text-[#141414]"
+            className="rd-fade-up font-display text-[clamp(2.15rem,8.5vw,7rem)] font-extrabold uppercase leading-[0.92] tracking-[-0.02em] text-[#141414]"
             style={{ animationDelay: "80ms" }}
           >
             Not Another
@@ -287,7 +287,7 @@ export function MarketingHome() {
           </p>
 
           <p
-            className="rd-fade-up mt-6 max-w-2xl text-lg leading-relaxed text-black/65 sm:text-xl"
+            className="rd-fade-up mt-6 max-w-2xl text-base leading-relaxed text-black/65 sm:text-xl"
             style={{ animationDelay: "220ms" }}
           >
             Paintgym hands you a wall of finished, on-brand static ads — briefs
@@ -496,7 +496,7 @@ export function MarketingHome() {
 
       {/* ===== Trust band ===== */}
       <section className="border-b border-black/10 bg-[#f3f3ee] py-10">
-        <div className="mx-auto flex max-w-7xl flex-col items-center justify-center gap-6 px-5 text-center sm:flex-row sm:flex-wrap sm:gap-x-10 sm:px-8">
+        <div className="mx-auto flex max-w-7xl flex-row flex-wrap items-center justify-center gap-x-5 gap-y-3 px-5 text-center sm:gap-x-10 sm:gap-y-4 sm:px-8">
           {VERTICALS.map((v) => (
             <span
               key={v}

@@ -12,7 +12,14 @@
   --headline:'Archivo',sans-serif; --ui:'Hanken Grotesk',system-ui,sans-serif;
   --mono:'Space Mono',monospace;
 }
-*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+/* Universal reset. box-sizing stays global. The margin/padding zeroing is
+   UNLAYERED, so it would beat Tailwind's @layer utilities (px-*, py-*, mt-* …).
+   The whole authed app is built on .pg-* classes (own padding) so that's fine,
+   but the public homepage (.mktg) is built entirely with Tailwind utilities —
+   exclude its subtree so those utilities actually apply. :where() keeps the
+   exclusion at zero specificity so non-marketing behavior is byte-identical. */
+*,*::before,*::after{box-sizing:border-box;}
+*:not(:where(.mktg,.mktg *)),*::before,*::after{margin:0;padding:0;}
 html{-webkit-text-size-adjust:100%;}
 body{font-family:var(--ui);color:var(--ink);background:#cfcfc8;line-height:1.5;-webkit-font-smoothing:antialiased;}
 
