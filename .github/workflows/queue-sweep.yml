@@ -1,0 +1,22 @@
+# Queue janitor: hits /api/queue/sweep so stranded generation work restarts
+# within ~10 minutes even if every worker chain died and nobody has the app
+# open. Complements the daily Vercel cron (vercel.json) — Hobby-plan Vercel
+# crons only run once a day, GitHub Actions fills the gap.
+# Requires the CRON_SECRET repo secret (same value as the Vercel env var).
+name: queue-sweep
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch: {}
+
+jobs:
+  sweep:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Kick stranded queues
+        run: |
+          curl -fsS -m 50 \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            "https://www.paintgym.com/api/queue/sweep" \
+            || echo "sweep failed (non-fatal)"
