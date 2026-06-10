@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { cancelQueueSchema } from "@/lib/validators/schemas";
+import { RECOVERY_BLOCKED } from "@/lib/types";
 
 export const runtime = "nodejs";
 
@@ -38,20 +39,10 @@ export async function POST(request: Request) {
 
   const admin = createAdminClient();
 
-  // Generation rows attached to pending jobs — captured before we cancel so we
-  // can flip their placeholders to failed.
-  const { data: pendingJobs } = await admin
-    .from("jobs")
-    .select("id, generation_id")
-    .eq("project_id", project_id)
-    .eq("status", "pending");
-  const pending = pendingJobs ?? [];
-  const genIds = pending
-    .map((j) => j.generation_id as string | null)
-    .filter((id): id is string => Boolean(id));
-
+  // Fail every not-yet-started job and capture its generation in one statement
+  // — a select-then-update pair would let a job claimed mid-cancel escape both.
   const cancelledAt = new Date().toISOString();
-  await admin
+  const { data: cancelledJobs } = await admin
     .from("jobs")
     .update({
       status: "failed",
@@ -59,15 +50,38 @@ export async function POST(request: Request) {
       completed_at: cancelledAt,
     })
     .eq("project_id", project_id)
-    .eq("status", "pending");
+    .eq("status", "pending")
+    .select("id, generation_id");
+  const pending = cancelledJobs ?? [];
+  const genIds = pending
+    .map((j) => j.generation_id as string | null)
+    .filter((id): id is string => Boolean(id));
 
   if (genIds.length > 0) {
+    // RECOVERY_BLOCKED keeps the settle sweep from resurrecting placeholders
+    // the user explicitly cancelled.
     await admin
       .from("generations")
-      .update({ status: "failed" })
+      .update({ status: "failed", recovery_attempts: RECOVERY_BLOCKED })
       .in("id", genIds)
       .eq("status", "generating");
   }
+
+  // Stop means stop: the server-side settle must not auto-retry ANY of this
+  // batch's failures afterwards — including rows that had already failed
+  // before the click and rows whose in-flight render fails later. Blanket-
+  // block everything currently recoverable. (Status is left untouched: a
+  // processing render that lands anyway still completes and is kept.)
+  await admin
+    .from("generations")
+    .update({ recovery_attempts: RECOVERY_BLOCKED })
+    .eq("project_id", project_id)
+    .lt("recovery_attempts", RECOVERY_BLOCKED)
+    .gte(
+      "created_at",
+      new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
+    )
+    .or("status.eq.failed,image_url.is.null");
 
   // Counts for the "X of Y images completed" message.
   const { count: completed } = await admin

@@ -267,8 +267,11 @@ export interface Generation {
   is_auto_rewrite: boolean;
   // The post-batch sweep auto-retries each failed/stuck generation exactly once;
   // this flag marks a row that has already been swept so it is never retried in
-  // a loop. A row that fails again after recovery stays failed (manual Retry).
+  // a loop. Superseded by recovery_attempts (kept for backward compatibility).
   recovery_attempted: boolean;
+  // How many times auto-recovery re-enqueued this row (max MAX_RECOVERY_ATTEMPTS;
+  // RECOVERY_BLOCKED means never auto-recover — user-cancelled placeholders).
+  recovery_attempts: number;
   rating: number | null;
   is_favorited: boolean;
   used_in_ad: boolean;
@@ -299,6 +302,13 @@ export const REGENERATION_CREDIT_COST = 0.5;
 // budget before it spends paid credits; the budget resets to this value each
 // time a full batch finishes generating (see /api/queue/finalize).
 export const REGEN_FREE_BUDGET = 4;
+
+// Auto-recovery: a failed/stuck generation is re-enqueued up to this many times
+// by the settle sweep before it stays failed with a manual Retry button.
+export const MAX_RECOVERY_ATTEMPTS = 2;
+// Sentinel for generations.recovery_attempts meaning "never auto-recover"
+// (set when the user cancels a batch so recovery can't resurrect it).
+export const RECOVERY_BLOCKED = 1000;
 
 export type CreditPackId = "starter" | "full_project" | "pro" | "agency";
 

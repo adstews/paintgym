@@ -197,8 +197,11 @@ async function processGenerate(
     .select("*")
     .single();
 
-  // Chain a QA review job. Review is best-effort: the image is usable regardless.
-  await admin.from("jobs").insert({
+  // Chain a QA review job. Review is best-effort: the image is usable
+  // regardless — so if the insert fails, fall back to a terminal 'minor'
+  // instead of leaving qa_status spinning on 'reviewing' forever (which would
+  // disable every button on the card).
+  const { error: reviewErr } = await admin.from("jobs").insert({
     project_id: job.project_id,
     generation_id: job.generation_id,
     concept_id: job.concept_id,
@@ -208,6 +211,16 @@ async function processGenerate(
     max_attempts: JOB_MAX_ATTEMPTS.review,
     payload: {},
   });
+  if (reviewErr) {
+    await admin
+      .from("generations")
+      .update({
+        qa_status: "minor",
+        qa_severity: "minor",
+        qa_issues: ["QA review could not be scheduled — image is usable as-is"],
+      })
+      .eq("id", job.generation_id);
+  }
 
   await completeJob(admin, job);
   return {
@@ -240,7 +253,7 @@ async function processReview(
   return outcome.generations;
 }
 
-async function countRemaining(
+export async function countRemaining(
   admin: AdminClient,
   projectId: string,
 ): Promise<{ pending: number; processing: number }> {
@@ -283,6 +296,27 @@ export async function processNextJob(projectId: string): Promise<ProcessResult> 
     const remaining = await countRemaining(admin, projectId);
     return {
       done: true,
+      generations: [],
+      remaining_pending: remaining.pending,
+      remaining_processing: remaining.processing,
+    };
+  }
+
+  // Defense-in-depth behind claim_next_job's attempts cap (migration 0023): a
+  // job claimed past its budget is terminally failed, never executed again.
+  if (job.attempts > job.max_attempts) {
+    await failJob(admin, job, "attempts exhausted");
+    if (job.generation_id) {
+      await admin
+        .from("generations")
+        .update({ status: "failed" })
+        .eq("id", job.generation_id)
+        .eq("status", "generating");
+    }
+    const remaining = await countRemaining(admin, projectId);
+    return {
+      done: false,
+      job: { id: job.id, type: job.type, status: "failed" },
       generations: [],
       remaining_pending: remaining.pending,
       remaining_processing: remaining.processing,

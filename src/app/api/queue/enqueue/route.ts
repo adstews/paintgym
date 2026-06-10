@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
+import { after } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { kickQueueWorker } from "@/lib/queue/drain";
 import { enqueueImagesSchema } from "@/lib/validators/schemas";
 import {
   getMissingRequiredFields,
@@ -259,6 +261,15 @@ export async function POST(request: Request) {
       created.push(gen as Generation);
     }
     index += 1;
+  }
+
+  // Kick the server-side worker chain so the batch processes even if the user
+  // closes the tab right after clicking Generate. The browser's own tick loop
+  // still runs while the page is open; the two share the queue via atomic
+  // claims.
+  if (created.length > 0) {
+    const origin = new URL(request.url).origin;
+    after(() => kickQueueWorker(origin, project_id));
   }
 
   return NextResponse.json({
