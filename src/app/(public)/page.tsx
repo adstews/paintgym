@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { TfLanding } from "@/components/tf/tf-landing";
+import { MarketingHome } from "@/components/marketing/home";
 import { JsonLd } from "@/components/marketing/json-ld";
 import {
   organizationSchema,
@@ -27,7 +27,7 @@ export default function LandingPage() {
   return (
     <>
       <JsonLd data={[organizationSchema(), softwareApplicationSchema()]} />
-      <TfLanding />
+      <MarketingHome />
     </>
   );
 }
