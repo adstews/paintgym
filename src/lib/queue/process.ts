@@ -101,9 +101,12 @@ async function processGenerate(
   if (renderType) {
     let imageDataUrl: string;
     try {
+      const productImageUrl =
+        (project.product_data as ProductData | null)?.images?.[0] ?? null;
       imageDataUrl = await renderConceptToDataUrl(
         renderType,
         job.payload?.render_content,
+        productImageUrl,
       );
     } catch (err) {
       const message = err instanceof Error ? err.message : "render_failed";

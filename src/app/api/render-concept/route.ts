@@ -22,6 +22,7 @@ export async function POST(request: Request) {
   const body = (await request.json().catch(() => null)) as {
     type?: string;
     content?: unknown;
+    product_image_url?: string | null;
   } | null;
   if (!body || typeof body.type !== "string") {
     return NextResponse.json({ error: "invalid_request" }, { status: 400 });
@@ -40,7 +41,11 @@ export async function POST(request: Request) {
   }
 
   try {
-    const image_url = await renderConceptToDataUrl(type, parsed.data);
+    const image_url = await renderConceptToDataUrl(
+      type,
+      parsed.data,
+      typeof body.product_image_url === "string" ? body.product_image_url : null,
+    );
     return NextResponse.json({ image_url });
   } catch (err) {
     return NextResponse.json(

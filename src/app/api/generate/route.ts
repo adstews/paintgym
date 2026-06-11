@@ -128,7 +128,13 @@ export async function POST(request: Request) {
         );
       }
       try {
-        const imageDataUrl = await renderConceptToDataUrl(htmlType, renderContent);
+        const productImageUrl =
+          (project.product_data as ProductData | null)?.images?.[0] ?? null;
+        const imageDataUrl = await renderConceptToDataUrl(
+          htmlType,
+          renderContent,
+          productImageUrl,
+        );
         const { data: updated, error: updErr } = await supabase
           .from("generations")
           .update({ status: "completed", image_url: imageDataUrl, qa_status: "passed" })

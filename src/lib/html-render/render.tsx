@@ -13,6 +13,7 @@ import {
 } from "./components";
 import { RENDER_SCHEMAS } from "./types";
 import type { HtmlRenderType, RenderContent } from "./types";
+import { loadPrimaryProductImage } from "../gemini/reference-images";
 import type { ReactElement } from "react";
 
 export const RENDER_WIDTH = 1080;
@@ -21,28 +22,31 @@ export const RENDER_HEIGHT = 1350;
 type RenderFn = (node: ReactElement) => string;
 
 // Build the inner markup for a render type from its (already validated) content.
+// `img` is the inlined product photo (data URL) or null; each component places it
+// natively and falls back to text-only when it's absent.
 function markupFor(
   type: HtmlRenderType,
   content: RenderContent,
   render: RenderFn,
+  img: string | null,
 ): string {
   switch (type) {
     case "imessage":
-      return render(<IMessage c={content as never} />);
+      return render(<IMessage c={content as never} img={img} />);
     case "notes":
-      return render(<Notes c={content as never} />);
+      return render(<Notes c={content as never} img={img} />);
     case "reddit":
-      return render(<Reddit c={content as never} />);
+      return render(<Reddit c={content as never} img={img} />);
     case "tweet":
-      return render(<Tweet c={content as never} />);
+      return render(<Tweet c={content as never} img={img} />);
     case "tiktok":
-      return render(<TikTok c={content as never} />);
+      return render(<TikTok c={content as never} img={img} />);
     case "instagram_story":
-      return render(<InstagramStory c={content as never} />);
+      return render(<InstagramStory c={content as never} img={img} />);
     case "claude":
-      return render(<ClaudeChat c={content as never} />);
+      return render(<ClaudeChat c={content as never} img={img} />);
     case "chatgpt":
-      return render(<ChatGptChat c={content as never} />);
+      return render(<ChatGptChat c={content as never} img={img} />);
   }
 }
 
@@ -110,12 +114,23 @@ async function launchBrowser(): Promise<Browser> {
 export async function renderConceptToDataUrl(
   type: HtmlRenderType,
   rawContent: unknown,
+  productImageUrl?: string | null,
 ): Promise<string> {
   const content = RENDER_SCHEMAS[type].parse(rawContent) as RenderContent;
+
+  // Inline the product photo as a data URL so it's guaranteed present at
+  // screenshot time (no network fetch racing the capture). A missing or
+  // unloadable image degrades to the original text-only render.
+  let img: string | null = null;
+  if (productImageUrl) {
+    const inline = await loadPrimaryProductImage([productImageUrl]);
+    if (inline) img = `data:${inline.mimeType};base64,${inline.data}`;
+  }
+
   // Dynamic import keeps Next's bundler from statically flagging react-dom/server
   // in the app route graph (it's used purely server-side to make static markup).
   const { renderToStaticMarkup } = await import("react-dom/server");
-  const html = documentFor(markupFor(type, content, renderToStaticMarkup));
+  const html = documentFor(markupFor(type, content, renderToStaticMarkup, img));
 
   const browser = await launchBrowser();
   try {

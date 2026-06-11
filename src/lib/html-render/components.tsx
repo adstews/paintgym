@@ -1,3 +1,7 @@
+// These components are rendered to static markup and screenshotted by puppeteer
+// (see render.tsx), never mounted in the Next app — so next/image's optimizer
+// can't run here and a raw <img> is the correct, only option.
+/* eslint-disable @next/next/no-img-element */
 import React from "react";
 import type {
   ChatContent,
@@ -157,7 +161,7 @@ function RichText({ text, gap }: { text: string; gap: number }) {
 // ===========================================================================
 // 1. iMessage
 // ===========================================================================
-export function IMessage({ c }: { c: ImessageContent }) {
+export function IMessage({ c, img }: { c: ImessageContent; img?: string | null }) {
   return (
     <Frame background="#ffffff">
       {/* nav bar */}
@@ -231,6 +235,23 @@ export function IMessage({ c }: { c: ImessageContent }) {
         >
           <span style={{ fontWeight: 600, color: "#6e6e73" }}>Today</span> 9:41 AM
         </div>
+        {/* Shared product photo, like a friend texting a picture of the find. */}
+        {img && (
+          <div style={{ display: "flex", justifyContent: "flex-start" }}>
+            <img
+              src={img}
+              alt=""
+              style={{
+                maxWidth: "62%",
+                maxHeight: 440,
+                objectFit: "cover",
+                borderRadius: 34,
+                borderBottomLeftRadius: 12,
+                display: "block",
+              }}
+            />
+          </div>
+        )}
         {c.messages.map((m, i) => {
           const me = m.from === "me";
           const lastMine =
@@ -327,7 +348,7 @@ export function IMessage({ c }: { c: ImessageContent }) {
 // ===========================================================================
 // 2. Apple Notes
 // ===========================================================================
-export function Notes({ c }: { c: NotesContent }) {
+export function Notes({ c, img }: { c: NotesContent; img?: string | null }) {
   return (
     <Frame background="#fffbe7">
       {/* header bar */}
@@ -389,6 +410,21 @@ export function Notes({ c }: { c: NotesContent }) {
         <div style={{ fontSize: 22, color: "#a99f73", margin: "16px 0 36px" }}>
           {c.date}
         </div>
+        {/* Saved product photo attached to the note. */}
+        {img && (
+          <img
+            src={img}
+            alt=""
+            style={{
+              width: 340,
+              height: 340,
+              objectFit: "cover",
+              borderRadius: 18,
+              display: "block",
+              marginBottom: 38,
+            }}
+          />
+        )}
         <div style={{ display: "flex", flexDirection: "column", gap: 26 }}>
           {c.lines.map((l, i) => (
             <div
@@ -433,7 +469,7 @@ function RedditVote({ dir }: { dir: "up" | "down" }) {
   );
 }
 
-export function Reddit({ c }: { c: RedditContent }) {
+export function Reddit({ c, img }: { c: RedditContent; img?: string | null }) {
   const paragraphs = c.post_body
     .split(/\n+/)
     .map((p) => p.trim())
@@ -563,6 +599,22 @@ export function Reddit({ c }: { c: RedditContent }) {
           {c.post_title}
         </div>
 
+        {/* image embedded in the post */}
+        {img && (
+          <img
+            src={img}
+            alt=""
+            style={{
+              width: "100%",
+              maxHeight: 520,
+              objectFit: "cover",
+              borderRadius: 16,
+              display: "block",
+              marginBottom: 30,
+            }}
+          />
+        )}
+
         {/* body paragraphs */}
         <div style={{ display: "flex", flexDirection: "column", gap: 26 }}>
           {paragraphs.map((p, i) => (
@@ -675,7 +727,7 @@ function Verified() {
   );
 }
 
-export function Tweet({ c }: { c: TweetContent }) {
+export function Tweet({ c, img }: { c: TweetContent; img?: string | null }) {
   const stat = (
     icon: React.ReactNode,
     value: string,
@@ -710,6 +762,23 @@ export function Tweet({ c }: { c: TweetContent }) {
         <div style={{ fontSize: 46, lineHeight: 1.35, color: "#0f1419", fontWeight: 400 }}>
           {c.text}
         </div>
+
+        {/* attached photo on the tweet */}
+        {img && (
+          <img
+            src={img}
+            alt=""
+            style={{
+              width: "100%",
+              maxHeight: 560,
+              objectFit: "cover",
+              borderRadius: 24,
+              border: "1px solid #cfd9de",
+              display: "block",
+              marginTop: 30,
+            }}
+          />
+        )}
 
         <div style={{ fontSize: 25, color: "#536471", margin: "34px 0 26px" }}>
           9:41 AM · {c.time}
@@ -755,7 +824,7 @@ export function Tweet({ c }: { c: TweetContent }) {
 // ===========================================================================
 // 5. TikTok comment section
 // ===========================================================================
-export function TikTok({ c }: { c: TiktokContent }) {
+export function TikTok({ c, img }: { c: TiktokContent; img?: string | null }) {
   const railIcon = (icon: React.ReactNode, label: string) => (
     <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8 }}>
       {icon}
@@ -764,8 +833,16 @@ export function TikTok({ c }: { c: TiktokContent }) {
   );
   return (
     <Frame background="linear-gradient(160deg,#2b2b34,#15151b 60%,#000)">
-      {/* video area: caption + right rail */}
-      <div style={{ height: 560, position: "relative" }}>
+      {/* video area: caption + right rail, over the product as the video frame */}
+      <div
+        style={{
+          height: 560,
+          position: "relative",
+          background: img
+            ? `linear-gradient(180deg, rgba(0,0,0,0.18), rgba(0,0,0,0.58)), url(${img}) center/cover no-repeat`
+            : "transparent",
+        }}
+      >
         <div
           style={{
             position: "absolute",
@@ -892,9 +969,20 @@ export function TikTok({ c }: { c: TiktokContent }) {
 // ===========================================================================
 // 6. Instagram Story
 // ===========================================================================
-export function InstagramStory({ c }: { c: InstagramStoryContent }) {
+export function InstagramStory({
+  c,
+  img,
+}: {
+  c: InstagramStoryContent;
+  img?: string | null;
+}) {
+  // The product photo IS the story; a soft scrim keeps the white overlay legible.
+  // Falls back to the signature IG gradient when there's no product image.
+  const background = img
+    ? `linear-gradient(180deg, rgba(0,0,0,0.28), rgba(0,0,0,0.12) 40%, rgba(0,0,0,0.5)), url(${img}) center/cover no-repeat`
+    : "linear-gradient(150deg,#833ab4,#fd1d1d 55%,#fcb045)";
   return (
-    <Frame background="linear-gradient(150deg,#833ab4,#fd1d1d 55%,#fcb045)">
+    <Frame background={background}>
       {/* progress bars */}
       <div style={{ display: "flex", gap: 8, padding: "26px 24px 0" }}>
         {[0, 1, 2].map((i) => (
@@ -1099,7 +1187,10 @@ function ClaudeLogo({ size }: { size: number }) {
   );
 }
 
-export function ClaudeChat({ c }: { c: ChatContent }) {
+export function ClaudeChat({ c, img }: { c: ChatContent; img?: string | null }) {
+  // The product photo rides along with the first thing the user sends ("what do
+  // you think of this?"), like a real image attachment.
+  const firstUserIdx = c.messages.findIndex((m) => m.role === "user");
   return (
     <Frame background="#f0eee6">
       {/* top bar */}
@@ -1153,6 +1244,20 @@ export function ClaudeChat({ c }: { c: ChatContent }) {
                   color: "#2b2a27",
                 }}
               >
+                {img && i === firstUserIdx && (
+                  <img
+                    src={img}
+                    alt=""
+                    style={{
+                      width: "100%",
+                      maxHeight: 380,
+                      objectFit: "cover",
+                      borderRadius: 14,
+                      display: "block",
+                      marginBottom: 18,
+                    }}
+                  />
+                )}
                 {m.text}
               </div>
             </div>
@@ -1224,7 +1329,8 @@ function ChatGptLogo({ size }: { size: number }) {
   );
 }
 
-export function ChatGptChat({ c }: { c: ChatContent }) {
+export function ChatGptChat({ c, img }: { c: ChatContent; img?: string | null }) {
+  const firstUserIdx = c.messages.findIndex((m) => m.role === "user");
   const action = (icon: React.ReactNode) => (
     <div style={{ color: "#8e8ea0", display: "flex", alignItems: "center" }}>{icon}</div>
   );
@@ -1264,6 +1370,20 @@ export function ChatGptChat({ c }: { c: ChatContent }) {
                   color: "#0d0d0d",
                 }}
               >
+                {img && i === firstUserIdx && (
+                  <img
+                    src={img}
+                    alt=""
+                    style={{
+                      width: "100%",
+                      maxHeight: 380,
+                      objectFit: "cover",
+                      borderRadius: 18,
+                      display: "block",
+                      marginBottom: 18,
+                    }}
+                  />
+                )}
                 {m.text}
               </div>
             </div>
