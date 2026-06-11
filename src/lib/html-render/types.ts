@@ -11,7 +11,10 @@ export type HtmlRenderType =
   | "tiktok"
   | "instagram_story"
   | "claude"
-  | "chatgpt";
+  | "chatgpt"
+  | "discussion"
+  | "inapp_proof"
+  | "social_mashup";
 
 // Normalized concept-name -> render type. Several aliases per type so small DB
 // naming drift ("Reddit" vs "Reddit Thread", "ChatGPT" vs "ChatGPT Chat") still
@@ -40,6 +43,21 @@ const NAME_ALIASES: Record<string, HtmlRenderType> = {
   chatgpt: "chatgpt",
   chatgptchat: "chatgpt",
   chatgptconversation: "chatgpt",
+  discussion: "discussion",
+  discussionthread: "discussion",
+  forumthread: "discussion",
+  facebookgroup: "discussion",
+  facebookgrouppost: "discussion",
+  communitythread: "discussion",
+  inappproof: "inapp_proof",
+  inappproofshot: "inapp_proof",
+  proofshot: "inapp_proof",
+  dashboardscreenshot: "inapp_proof",
+  inappdashboard: "inapp_proof",
+  socialmashup: "social_mashup",
+  socialproofmashup: "social_mashup",
+  proofmashup: "social_mashup",
+  socialproofcollage: "social_mashup",
 };
 
 function normalize(name: string): string {
@@ -63,6 +81,9 @@ export const HTML_RENDER_LABEL: Record<HtmlRenderType, string> = {
   instagram_story: "Instagram Story",
   claude: "Claude chat",
   chatgpt: "ChatGPT chat",
+  discussion: "community discussion thread",
+  inapp_proof: "in-app results screenshot",
+  social_mashup: "social proof collage",
 };
 
 // ---------------------------------------------------------------------------
@@ -181,6 +202,73 @@ const chatMessages = z
 export const claudeContent = z.object({ messages: chatMessages });
 export const chatgptContent = z.object({ messages: chatMessages });
 
+// A community discussion (Facebook Group / forum style): an OP question and a
+// few replies where the product surfaces as the genuine answer. The first reply
+// is rendered as the accepted/top answer.
+export const discussionContent = z.object({
+  group_name: z.string().min(1).max(60),
+  op_name: z.string().min(1).max(40),
+  op_time: z.string().min(1).max(20),
+  post_text: z.string().min(1).max(400),
+  replies: z
+    .array(
+      z.object({
+        name: z.string().min(1).max(40),
+        text: z.string().min(1).max(300),
+        likes: z.string().min(1).max(12),
+        time: z.string().min(1).max(20),
+      }),
+    )
+    .min(2)
+    .max(4),
+});
+
+// A believable in-app dashboard (sales / analytics / results tracker): one hero
+// metric with a positive trend, a simple bar chart, and a few supporting stats.
+// chart values are relative bar heights (0-100); the renderer scales them.
+export const inappProofContent = z.object({
+  app_name: z.string().min(1).max(30),
+  screen_label: z.string().min(1).max(50),
+  hero_value: z.string().min(1).max(20),
+  hero_label: z.string().min(1).max(50),
+  hero_delta: z.string().max(20).optional(),
+  chart: z.array(z.number().min(0).max(100)).min(4).max(12).optional(),
+  stats: z
+    .array(
+      z.object({
+        label: z.string().min(1).max(30),
+        value: z.string().min(1).max(20),
+      }),
+    )
+    .min(2)
+    .max(4),
+});
+
+// A collage of mini social-proof cards from different platforms, all praising
+// the product. Each card is styled lightly to its platform.
+export const socialMashupContent = z.object({
+  items: z
+    .array(
+      z.object({
+        platform: z.enum([
+          "tweet",
+          "tiktok",
+          "instagram",
+          "review",
+          "email",
+          "facebook",
+        ]),
+        author: z.string().min(1).max(40),
+        handle: z.string().max(40).optional(),
+        text: z.string().min(1).max(220),
+        stars: z.number().int().min(1).max(5).optional(),
+        likes: z.string().max(12).optional(),
+      }),
+    )
+    .min(3)
+    .max(5),
+});
+
 export const RENDER_SCHEMAS: Record<HtmlRenderType, z.ZodTypeAny> = {
   imessage: imessageContent,
   notes: notesContent,
@@ -190,6 +278,9 @@ export const RENDER_SCHEMAS: Record<HtmlRenderType, z.ZodTypeAny> = {
   instagram_story: instagramStoryContent,
   claude: claudeContent,
   chatgpt: chatgptContent,
+  discussion: discussionContent,
+  inapp_proof: inappProofContent,
+  social_mashup: socialMashupContent,
 };
 
 export type ImessageContent = z.infer<typeof imessageContent>;
@@ -199,6 +290,9 @@ export type TweetContent = z.infer<typeof tweetContent>;
 export type TiktokContent = z.infer<typeof tiktokContent>;
 export type InstagramStoryContent = z.infer<typeof instagramStoryContent>;
 export type ChatContent = z.infer<typeof claudeContent>;
+export type DiscussionContent = z.infer<typeof discussionContent>;
+export type InappProofContent = z.infer<typeof inappProofContent>;
+export type SocialMashupContent = z.infer<typeof socialMashupContent>;
 
 export type RenderContent =
   | ImessageContent
@@ -207,4 +301,7 @@ export type RenderContent =
   | TweetContent
   | TiktokContent
   | InstagramStoryContent
-  | ChatContent;
+  | ChatContent
+  | DiscussionContent
+  | InappProofContent
+  | SocialMashupContent;

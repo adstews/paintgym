@@ -5,12 +5,15 @@ import { hookInstruction } from "../hooks";
 import { HTML_RENDER_LABEL, RENDER_SCHEMAS } from "../html-render/types";
 import type {
   ChatContent,
+  DiscussionContent,
   HtmlRenderType,
   ImessageContent,
+  InappProofContent,
   InstagramStoryContent,
   NotesContent,
   RedditContent,
   RenderContent,
+  SocialMashupContent,
   TiktokContent,
   TweetContent,
 } from "../html-render/types";
@@ -30,6 +33,9 @@ const TYPE_GUIDANCE: Record<HtmlRenderType, string> = {
   instagram_story: `Write an Instagram Story reacting to the product: 1 to 3 short overlay text lines and one interactive sticker (a poll, a question box, or a rating) that fits the product. Casual, first-person, like a creator sharing a find.`,
   claude: `Write a short Claude conversation: a user asks for help with the problem the product solves, and Claude gives a clean, well-formatted answer that recommends the product and explains why. Use "- " bullet lines and **bold** for the key points. 2 messages (user, assistant), optionally a short follow-up.`,
   chatgpt: `Write a short ChatGPT conversation: a user asks which option to pick for their problem, and the assistant recommends the product with specific reasons. Use "- " bullet lines and **bold** sparingly. 2 messages (user, assistant), optionally a short follow-up.`,
+  discussion: `Write a community discussion thread (a Facebook Group or niche forum) where the product surfaces as the genuine answer. Give a believable group_name, an OP post asking about a relatable problem (no product mention yet), and 2 to 4 replies. The first reply names the product as the clear recommendation with one concrete reason; the others add agreement or a second-hand note. Realistic first names, like counts, and short relative times ("3h", "1d").`,
+  inapp_proof: `Write the on-screen data for a believable in-app dashboard (a sales, analytics, or results tracker like Shopify or Stripe) that proves the product works. Give the app_name, a screen_label (e.g. "Sales · Last 30 days"), one hero metric (hero_label + hero_value) with a positive hero_delta (e.g. "↑ 214%"), an optional chart of 6 to 8 ascending relative bar heights (numbers 0 to 100), and 3 supporting stats. Keep every number impressive but plausible, never round-and-fake.`,
+  social_mashup: `Write 3 to 5 mini social-proof cards from DIFFERENT platforms (pick from tweet, tiktok, instagram, review, email, facebook), each praising the product in a specific, native voice. Give each an author name, an optional handle, the short quote, a stars rating (1 to 5) for review cards, and an optional like count. Vary the platforms and the angle of praise.`,
 };
 
 function buildSystemPrompt(type: HtmlRenderType, hasImage: boolean): string {
@@ -77,6 +83,12 @@ function shapeHint(type: HtmlRenderType): string {
     case "claude":
     case "chatgpt":
       return `{"messages": [{"role": "user"|"assistant", "text": string}]}`;
+    case "discussion":
+      return `{"group_name": string, "op_name": string, "op_time": string (e.g. "3h"), "post_text": string, "replies": [{"name": string, "text": string, "likes": string, "time": string}]}`;
+    case "inapp_proof":
+      return `{"app_name": string, "screen_label": string, "hero_value": string, "hero_label": string, "hero_delta": string (optional, e.g. "↑ 214%"), "chart": [number] (optional, 6-8 ascending values 0-100), "stats": [{"label": string, "value": string}]}`;
+    case "social_mashup":
+      return `{"items": [{"platform": "tweet"|"tiktok"|"instagram"|"review"|"email"|"facebook", "author": string, "handle": string (optional), "text": string, "stars": number 1-5 (optional), "likes": string (optional)}]}`;
   }
 }
 
@@ -144,6 +156,29 @@ export function serializeRenderContent(
       return c.messages
         .map((m) => `${m.role === "user" ? "User" : "Assistant"}: ${m.text}`)
         .join("\n\n");
+    }
+    case "discussion": {
+      const c = content as DiscussionContent;
+      return `${c.group_name} · ${c.op_name} · ${c.op_time}\n${c.post_text}\n\nReplies:\n${c.replies
+        .map((r) => `${r.name} (${r.likes}): ${r.text}`)
+        .join("\n")}`;
+    }
+    case "inapp_proof": {
+      const c = content as InappProofContent;
+      return `${c.app_name} · ${c.screen_label}\n${c.hero_label}: ${c.hero_value}${
+        c.hero_delta ? ` (${c.hero_delta})` : ""
+      }\n${c.stats.map((s) => `${s.label}: ${s.value}`).join("\n")}`;
+    }
+    case "social_mashup": {
+      const c = content as SocialMashupContent;
+      return `Social proof:\n${c.items
+        .map(
+          (it) =>
+            `${it.platform} · ${it.author}${
+              it.stars ? ` (${it.stars}★)` : ""
+            }: ${it.text}`,
+        )
+        .join("\n")}`;
     }
   }
 }

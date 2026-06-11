@@ -4,10 +4,13 @@ import puppeteer, { type Browser } from "puppeteer-core";
 import {
   ChatGptChat,
   ClaudeChat,
+  Discussion,
   IMessage,
+  InappProof,
   InstagramStory,
   Notes,
   Reddit,
+  SocialMashup,
   TikTok,
   Tweet,
 } from "./components";
@@ -47,6 +50,12 @@ function markupFor(
       return render(<ClaudeChat c={content as never} img={img} />);
     case "chatgpt":
       return render(<ChatGptChat c={content as never} img={img} />);
+    case "discussion":
+      return render(<Discussion c={content as never} img={img} />);
+    case "inapp_proof":
+      return render(<InappProof c={content as never} img={img} />);
+    case "social_mashup":
+      return render(<SocialMashup c={content as never} img={img} />);
   }
 }
 

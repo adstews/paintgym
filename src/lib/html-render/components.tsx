@@ -5,10 +5,13 @@
 import React from "react";
 import type {
   ChatContent,
+  DiscussionContent,
   ImessageContent,
+  InappProofContent,
   InstagramStoryContent,
   NotesContent,
   RedditContent,
+  SocialMashupContent,
   TiktokContent,
   TweetContent,
 } from "./types";
@@ -1468,6 +1471,506 @@ export function ChatGptChat({ c, img }: { c: ChatContent; img?: string | null })
             </svg>
           </div>
         </div>
+      </div>
+    </Frame>
+  );
+}
+
+// ===========================================================================
+// 9. Discussion thread (Facebook Group / forum post + replies)
+// ===========================================================================
+const FB_BLUE = "#1877f2";
+
+export function Discussion({
+  c,
+  img,
+}: {
+  c: DiscussionContent;
+  img?: string | null;
+}) {
+  return (
+    <Frame background="#f0f2f5">
+      {/* group header */}
+      <div
+        style={{
+          background: "#fff",
+          display: "flex",
+          alignItems: "center",
+          gap: 18,
+          padding: "30px 36px 26px",
+          borderBottom: "1px solid #e4e6eb",
+          flex: "0 0 auto",
+        }}
+      >
+        <svg width={36} height={36} viewBox="0 0 24 24" fill="none" stroke="#1c1e21" strokeWidth={2.4}>
+          <path d="M15 6l-6 6 6 6" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+        <div
+          style={{
+            width: 66,
+            height: 66,
+            borderRadius: 16,
+            background: "linear-gradient(135deg,#1877f2,#0a59c9)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            flex: "0 0 auto",
+          }}
+        >
+          <svg width={38} height={38} viewBox="0 0 24 24" fill="#fff">
+            <circle cx="8" cy="9" r="3.2" />
+            <circle cx="16" cy="9" r="3.2" />
+            <path d="M2.5 19c.6-3.2 2.7-5 5.5-5s4.9 1.8 5.5 5zM10.5 19c.6-3.2 2.7-5 5.5-5s4.9 1.8 5.5 5z" />
+          </svg>
+        </div>
+        <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 4 }}>
+          <span style={{ fontSize: 30, fontWeight: 700, color: "#1c1e21" }}>
+            {c.group_name}
+          </span>
+          <span style={{ fontSize: 22, color: "#65676b" }}>Public group</span>
+        </div>
+      </div>
+
+      {/* OP post card */}
+      <div style={{ background: "#fff", padding: "28px 36px 24px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 18, marginBottom: 24 }}>
+          <Avatar seed={c.op_name} size={74} />
+          <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 4 }}>
+            <span style={{ fontSize: 28, fontWeight: 700, color: "#1c1e21" }}>
+              {c.op_name}
+            </span>
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <span style={{ fontSize: 21, color: "#65676b" }}>{c.op_time}</span>
+              <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="#65676b" strokeWidth={2}>
+                <circle cx="12" cy="12" r="9" />
+                <path d="M3 12h18M12 3c2.5 2.5 2.5 15 0 18M12 3c-2.5 2.5-2.5 15 0 18" />
+              </svg>
+            </div>
+          </div>
+        </div>
+        <div style={{ fontSize: 33, lineHeight: 1.45, color: "#1c1e21" }}>
+          {c.post_text}
+        </div>
+        {img && (
+          <img
+            src={img}
+            alt=""
+            style={{
+              width: "100%",
+              maxHeight: 420,
+              objectFit: "cover",
+              borderRadius: 14,
+              display: "block",
+              marginTop: 24,
+            }}
+          />
+        )}
+        {/* like/comment/share bar */}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-around",
+            marginTop: 26,
+            paddingTop: 18,
+            borderTop: "1px solid #e4e6eb",
+            color: "#65676b",
+            fontSize: 26,
+            fontWeight: 600,
+          }}
+        >
+          <span style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <svg width={30} height={30} viewBox="0 0 24 24" fill="none" stroke="#65676b" strokeWidth={2}>
+              <path d="M7 11v9H4a1 1 0 01-1-1v-7a1 1 0 011-1zM7 11l4-7a2 2 0 013 2l-1 5h5a2 2 0 012 2.3l-1.4 6A2 2 0 0117 20H7" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            Like
+          </span>
+          <span style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <svg width={30} height={30} viewBox="0 0 24 24" fill="none" stroke="#65676b" strokeWidth={2}>
+              <path d="M21 11.5a8.38 8.38 0 01-9 8.5 8.5 8.5 0 01-4-1L3 20l1.5-4.5A8.38 8.38 0 0112 3a8.5 8.5 0 019 8.5z" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            Comment
+          </span>
+          <span style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <svg width={30} height={30} viewBox="0 0 24 24" fill="none" stroke="#65676b" strokeWidth={2}>
+              <path d="M4 12v7a2 2 0 002 2h12a2 2 0 002-2v-7M16 6l-4-4-4 4M12 2v13" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            Share
+          </span>
+        </div>
+      </div>
+
+      {/* replies */}
+      <div style={{ flex: 1, padding: "26px 36px", display: "flex", flexDirection: "column", gap: 28 }}>
+        {c.replies.map((r, i) => (
+          <div key={i} style={{ display: "flex", gap: 18 }}>
+            <Avatar seed={r.name} size={64} />
+            <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 10 }}>
+              <div
+                style={{
+                  background: "#f0f2f5",
+                  borderRadius: 22,
+                  padding: "18px 26px",
+                  maxWidth: "100%",
+                }}
+              >
+                <div style={{ fontSize: 25, fontWeight: 700, color: "#1c1e21", marginBottom: 8 }}>
+                  {r.name}
+                </div>
+                <div style={{ fontSize: 29, lineHeight: 1.4, color: "#1c1e21" }}>
+                  {r.text}
+                </div>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 26, padding: "0 14px" }}>
+                <span style={{ fontSize: 22, fontWeight: 700, color: "#65676b" }}>Like</span>
+                <span style={{ fontSize: 22, fontWeight: 700, color: "#65676b" }}>Reply</span>
+                <span style={{ fontSize: 22, color: "#65676b" }}>{r.time}</span>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <div
+                    style={{
+                      width: 30,
+                      height: 30,
+                      borderRadius: 30,
+                      background: FB_BLUE,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                    }}
+                  >
+                    <svg width={18} height={18} viewBox="0 0 24 24" fill="#fff">
+                      <path d="M7 11l4-7a2 2 0 013 2l-1 5h5a2 2 0 012 2.3l-1.4 6A2 2 0 0117 21H7z" />
+                    </svg>
+                  </div>
+                  <span style={{ fontSize: 22, color: "#65676b" }}>{r.likes}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </Frame>
+  );
+}
+
+// ===========================================================================
+// 10. In-app proof shot (sales / analytics dashboard screenshot)
+// ===========================================================================
+const PROOF_GREEN = "#008060";
+
+export function InappProof({
+  c,
+  img,
+}: {
+  c: InappProofContent;
+  img?: string | null;
+}) {
+  // Default to a believable upward trend if the model didn't supply a chart.
+  const bars =
+    c.chart && c.chart.length >= 4
+      ? c.chart
+      : [28, 34, 30, 46, 52, 61, 70, 84];
+  const maxBar = Math.max(...bars, 1);
+  return (
+    <Frame background="#f6f6f7">
+      {/* app top bar */}
+      <div
+        style={{
+          background: "#fff",
+          display: "flex",
+          alignItems: "center",
+          gap: 16,
+          padding: "30px 40px",
+          borderBottom: "1px solid #e1e3e5",
+          flex: "0 0 auto",
+        }}
+      >
+        {img ? (
+          <img
+            src={img}
+            alt=""
+            style={{ width: 56, height: 56, borderRadius: 12, objectFit: "cover", flex: "0 0 auto" }}
+          />
+        ) : (
+          <div
+            style={{
+              width: 56,
+              height: 56,
+              borderRadius: 12,
+              background: PROOF_GREEN,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <svg width={32} height={32} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth={2.2}>
+              <path d="M4 19V5M4 19l5-6 4 3 7-9" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </div>
+        )}
+        <span style={{ fontSize: 32, fontWeight: 800, color: "#1a1a1a" }}>
+          {c.app_name}
+        </span>
+        <div style={{ flex: 1 }} />
+        <svg width={40} height={40} viewBox="0 0 24 24" fill="#9a9ea3">
+          <circle cx="5" cy="12" r="2" />
+          <circle cx="12" cy="12" r="2" />
+          <circle cx="19" cy="12" r="2" />
+        </svg>
+      </div>
+
+      <div style={{ flex: 1, padding: "40px 44px", display: "flex", flexDirection: "column", gap: 32 }}>
+        <span style={{ fontSize: 27, fontWeight: 600, color: "#6d7175" }}>
+          {c.screen_label}
+        </span>
+
+        {/* hero metric card */}
+        <div
+          style={{
+            background: "#fff",
+            borderRadius: 24,
+            border: "1px solid #e1e3e5",
+            padding: "40px 44px",
+            boxShadow: "0 2px 10px rgba(0,0,0,0.04)",
+          }}
+        >
+          <div style={{ fontSize: 28, color: "#6d7175", marginBottom: 14 }}>
+            {c.hero_label}
+          </div>
+          <div style={{ display: "flex", alignItems: "flex-end", gap: 22, marginBottom: 36 }}>
+            <span style={{ fontSize: 92, fontWeight: 800, color: "#1a1a1a", lineHeight: 1, letterSpacing: "-0.02em" }}>
+              {c.hero_value}
+            </span>
+            {c.hero_delta && (
+              <span
+                style={{
+                  fontSize: 30,
+                  fontWeight: 700,
+                  color: PROOF_GREEN,
+                  background: "rgba(0,128,96,0.12)",
+                  borderRadius: 999,
+                  padding: "8px 20px",
+                  marginBottom: 12,
+                }}
+              >
+                {c.hero_delta}
+              </span>
+            )}
+          </div>
+          {/* bar chart */}
+          <div style={{ display: "flex", alignItems: "flex-end", gap: 14, height: 240 }}>
+            {bars.map((b, i) => (
+              <div
+                key={i}
+                style={{
+                  flex: 1,
+                  height: `${Math.max(6, (b / maxBar) * 100)}%`,
+                  background:
+                    i === bars.length - 1
+                      ? PROOF_GREEN
+                      : "rgba(0,128,96,0.25)",
+                  borderRadius: 8,
+                }}
+              />
+            ))}
+          </div>
+        </div>
+
+        {/* supporting stat tiles */}
+        <div style={{ display: "flex", gap: 22 }}>
+          {c.stats.map((s, i) => (
+            <div
+              key={i}
+              style={{
+                flex: 1,
+                background: "#fff",
+                borderRadius: 20,
+                border: "1px solid #e1e3e5",
+                padding: "28px 26px",
+                display: "flex",
+                flexDirection: "column",
+                gap: 10,
+              }}
+            >
+              <span style={{ fontSize: 42, fontWeight: 800, color: "#1a1a1a", letterSpacing: "-0.01em" }}>
+                {s.value}
+              </span>
+              <span style={{ fontSize: 23, color: "#6d7175", lineHeight: 1.3 }}>
+                {s.label}
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </Frame>
+  );
+}
+
+// ===========================================================================
+// 11. Social proof mashup (collage of mini cross-platform praise cards)
+// ===========================================================================
+const PLATFORM_META: Record<
+  SocialMashupContent["items"][number]["platform"],
+  { label: string; color: string; icon: React.ReactNode }
+> = {
+  tweet: {
+    label: "X",
+    color: "#0f1419",
+    icon: (
+      <svg width={26} height={26} viewBox="0 0 24 24" fill="#fff">
+        <path d="M18.9 2H22l-7 8 8.2 12h-6.4l-5-7.3L6 22H2.9l7.5-8.6L2 2h6.6l4.6 6.7zM17.8 20h1.7L8 4H6.2z" />
+      </svg>
+    ),
+  },
+  tiktok: {
+    label: "TikTok",
+    color: "#000000",
+    icon: (
+      <svg width={26} height={26} viewBox="0 0 24 24" fill="#fff">
+        <path d="M16 3c.3 2.2 1.6 3.7 3.8 4v3c-1.4 0-2.7-.4-3.8-1.1V15a5.5 5.5 0 11-5.5-5.5c.3 0 .6 0 .9.1v3.1a2.5 2.5 0 102.1 2.5V3z" />
+      </svg>
+    ),
+  },
+  instagram: {
+    label: "Instagram",
+    color: "#d6249f",
+    icon: (
+      <svg width={26} height={26} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth={2}>
+        <rect x="3" y="3" width="18" height="18" rx="5" />
+        <circle cx="12" cy="12" r="4" />
+        <circle cx="17.5" cy="6.5" r="1.2" fill="#fff" stroke="none" />
+      </svg>
+    ),
+  },
+  review: {
+    label: "Verified review",
+    color: "#f5a623",
+    icon: (
+      <svg width={26} height={26} viewBox="0 0 24 24" fill="#fff">
+        <path d="M12 2l2.9 6.3 6.9.7-5.1 4.6 1.4 6.7L12 17.8 5.9 20.3l1.4-6.7L2.2 9l6.9-.7z" />
+      </svg>
+    ),
+  },
+  email: {
+    label: "Email",
+    color: "#4285f4",
+    icon: (
+      <svg width={26} height={26} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth={2}>
+        <rect x="3" y="5" width="18" height="14" rx="2" />
+        <path d="M3 7l9 6 9-6" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    ),
+  },
+  facebook: {
+    label: "Facebook",
+    color: "#1877f2",
+    icon: (
+      <svg width={26} height={26} viewBox="0 0 24 24" fill="#fff">
+        <path d="M14 9V7c0-1 .5-1.5 1.7-1.5H17V2.2C16.6 2.1 15.5 2 14.3 2 11.7 2 10 3.6 10 6.3V9H7v3.5h3V22h4v-9.5h3l.5-3.5z" />
+      </svg>
+    ),
+  },
+};
+
+function Stars({ n }: { n: number }) {
+  return (
+    <div style={{ display: "flex", gap: 4 }}>
+      {[0, 1, 2, 3, 4].map((i) => (
+        <svg key={i} width={26} height={26} viewBox="0 0 24 24" fill={i < n ? "#f5a623" : "#dcdfe3"}>
+          <path d="M12 2l2.9 6.3 6.9.7-5.1 4.6 1.4 6.7L12 17.8 5.9 20.3l1.4-6.7L2.2 9l6.9-.7z" />
+        </svg>
+      ))}
+    </div>
+  );
+}
+
+export function SocialMashup({
+  c,
+  img,
+}: {
+  c: SocialMashupContent;
+  img?: string | null;
+}) {
+  return (
+    <Frame background="#eef0f3">
+      {/* header */}
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 18,
+          padding: "40px 44px 30px",
+          flex: "0 0 auto",
+        }}
+      >
+        {img && (
+          <img
+            src={img}
+            alt=""
+            style={{ width: 70, height: 70, borderRadius: 16, objectFit: "cover", flex: "0 0 auto" }}
+          />
+        )}
+        <span style={{ fontSize: 38, fontWeight: 800, color: "#15181c", letterSpacing: "-0.01em" }}>
+          What people are saying
+        </span>
+      </div>
+
+      {/* cards */}
+      <div style={{ flex: 1, padding: "0 44px 44px", display: "flex", flexDirection: "column", gap: 24 }}>
+        {c.items.map((it, i) => {
+          const meta = PLATFORM_META[it.platform];
+          return (
+            <div
+              key={i}
+              style={{
+                background: "#fff",
+                borderRadius: 24,
+                padding: "30px 34px",
+                boxShadow: "0 4px 18px rgba(15,24,32,0.07)",
+                borderTop: `5px solid ${meta.color}`,
+                display: "flex",
+                flexDirection: "column",
+                gap: 16,
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+                <div
+                  style={{
+                    width: 52,
+                    height: 52,
+                    borderRadius: 14,
+                    background: meta.color,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    flex: "0 0 auto",
+                  }}
+                >
+                  {meta.icon}
+                </div>
+                <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 2 }}>
+                  <span style={{ fontSize: 27, fontWeight: 700, color: "#15181c" }}>
+                    {it.author}
+                  </span>
+                  <span style={{ fontSize: 21, color: "#6b7177" }}>
+                    {it.handle ? it.handle : meta.label}
+                  </span>
+                </div>
+                {it.stars && <Stars n={it.stars} />}
+              </div>
+              <div style={{ fontSize: 30, lineHeight: 1.4, color: "#1c2025" }}>
+                {it.text}
+              </div>
+              {it.likes && (
+                <div style={{ display: "flex", alignItems: "center", gap: 10, color: "#6b7177" }}>
+                  <svg width={26} height={26} viewBox="0 0 24 24" fill="#f91880">
+                    <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
+                  </svg>
+                  <span style={{ fontSize: 22 }}>{it.likes}</span>
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
     </Frame>
   );
