@@ -642,6 +642,54 @@ html,body{max-width:100%;overflow-x:clip;}
   .pg-review-bottom > *{flex:1;}
 }
 
+/* ---------- Tinder-style swipe review (item: swipe-to-rate deck) ---------- */
+.pg-swipe{position:fixed;inset:0;z-index:120;background:rgba(12,12,12,.97);display:flex;flex-direction:column;
+  padding:max(12px,env(safe-area-inset-top)) 12px max(14px,env(safe-area-inset-bottom));gap:10px;color:#fff;
+  touch-action:none;-webkit-user-select:none;user-select:none;}
+.pg-swipe-top{flex:0 0 auto;display:flex;align-items:center;justify-content:space-between;gap:12px;}
+.pg-swipe-top .counter{font-family:var(--mono);font-size:13px;font-weight:700;letter-spacing:.04em;}
+.pg-swipe-close{width:42px;height:42px;display:flex;align-items:center;justify-content:center;
+  border:1.5px solid rgba(255,255,255,.35);background:transparent;color:#fff;border-radius:8px;cursor:pointer;}
+.pg-swipe-close:active{transform:translate(1px,1px);}
+.pg-swipe-progress{flex:0 0 auto;height:5px;border-radius:3px;background:rgba(255,255,255,.16);overflow:hidden;}
+.pg-swipe-progress span{display:block;height:100%;background:var(--pop);border-radius:3px;transition:width .3s ease;}
+.pg-swipe-stage{flex:1;position:relative;display:flex;align-items:center;justify-content:center;overflow:hidden;}
+.pg-swipe-card{position:absolute;width:100%;max-width:440px;max-height:100%;background:var(--paper);
+  border:1.5px solid var(--ink);border-radius:12px;overflow:hidden;box-shadow:6px 6px 0 rgba(0,0,0,.35);
+  display:flex;flex-direction:column;will-change:transform;}
+.pg-swipe-card.is-top{cursor:grab;}
+.pg-swipe-card.is-top:active{cursor:grabbing;}
+.pg-swipe-img{position:relative;width:100%;aspect-ratio:4/5;background:#000;flex:1;min-height:0;}
+.pg-swipe-empty{display:flex;height:100%;width:100%;align-items:center;justify-content:center;
+  color:#888;font-family:var(--mono);font-size:12px;}
+.pg-swipe-meta{flex:0 0 auto;display:flex;align-items:center;justify-content:space-between;gap:10px;
+  padding:10px 12px;background:var(--paper);color:var(--ink);border-top:1.5px solid var(--ink);}
+.pg-swipe-meta .name{font-family:var(--headline);font-weight:800;font-size:14px;letter-spacing:-.01em;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.pg-swipe-qa{flex:0 0 auto;font-family:var(--mono);font-size:10px;font-weight:700;letter-spacing:.04em;
+  text-transform:uppercase;padding:3px 7px;border-radius:5px;border:1.25px solid var(--ink);}
+.pg-swipe-qa.is-pass{background:#d8f5d8;color:#1c5b1c;}
+.pg-swipe-qa.is-warn{background:#fdf0cf;color:#7a5a00;}
+.pg-swipe-qa.is-fail{background:#fbdcdc;color:#8a1f1f;}
+.pg-swipe-qa.is-neutral{background:#eee;color:#555;}
+.pg-swipe-badge{position:absolute;top:18px;z-index:5;opacity:0;pointer-events:none;
+  font-family:var(--headline);font-weight:900;font-size:30px;letter-spacing:.02em;text-transform:uppercase;
+  padding:4px 14px;border:4px solid currentColor;border-radius:10px;background:rgba(255,255,255,.08);}
+.pg-swipe-badge.like{left:18px;color:#22c55e;transform:rotate(-12deg);}
+.pg-swipe-badge.nope{right:18px;color:#ef4444;transform:rotate(12deg);}
+.pg-swipe-badge.skip{left:50%;top:auto;bottom:24px;transform:translateX(-50%);color:#facc15;}
+.pg-swipe-controls{flex:0 0 auto;display:flex;align-items:center;justify-content:center;gap:22px;padding-top:4px;}
+.pg-swipe-btn{width:58px;height:58px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+  background:var(--paper);border:2px solid var(--ink);box-shadow:3px 3px 0 rgba(0,0,0,.35);cursor:pointer;}
+.pg-swipe-btn:active{transform:translate(2px,2px);box-shadow:1px 1px 0 rgba(0,0,0,.35);}
+.pg-swipe-btn.nope{color:#ef4444;}
+.pg-swipe-btn.skip{width:48px;height:48px;color:#facc15;transform:rotate(-90deg);}
+.pg-swipe-btn.skip:active{transform:rotate(-90deg) translate(0,2px);}
+.pg-swipe-btn.like{color:#22c55e;}
+.pg-swipe-done{display:flex;flex-direction:column;align-items:center;gap:12px;color:#fff;text-align:center;}
+.pg-swipe-done .h{font-family:var(--headline);font-weight:800;font-size:22px;}
+.pg-swipe-done .sub{font-family:var(--mono);font-size:12px;opacity:.8;letter-spacing:.03em;}
+
 
 /* ============================================================
    VIDEO STUDIO  (/video) · self-contained section styles

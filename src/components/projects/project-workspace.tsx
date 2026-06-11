@@ -13,6 +13,7 @@ import { Icon, Badge } from "@/components/tf/ui";
 import { GenerationCard } from "@/components/gallery/generation-card";
 import { CategoryRow } from "@/components/gallery/category-row";
 import { ReviewMode, type ReviewItem } from "@/components/gallery/review-mode";
+import { SwipeReview } from "@/components/gallery/swipe-review";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { ProductDetailsForm } from "./product-details-form";
 import { BriefCard } from "./brief-card";
@@ -212,6 +213,7 @@ export function ProjectWorkspace({
   );
   // Tinder-style review overlay (item 13).
   const [reviewOpen, setReviewOpen] = useState(false);
+  const [swipeOpen, setSwipeOpen] = useState(false);
   // Hook bank: the proven opening the user picked before writing briefs (null =
   // let Claude choose).
   const [selectedHookId, setSelectedHookId] = useState<string | null>(null);
@@ -1684,6 +1686,19 @@ export function ProjectWorkspace({
                   Review ({galleryReviewItems.length})
                 </button>
               )}
+              {galleryReviewItems.length > 0 && (
+                <button
+                  type="button"
+                  className="pg-btn pg-btn--outline pg-btn--sm"
+                  onClick={() => {
+                    // Swipe deck renders full images, so prefetch the lazy bytes.
+                    ensureImages(galleryReviewItems.map((it) => it.generation.id));
+                    setSwipeOpen(true);
+                  }}
+                >
+                  Swipe ({galleryReviewItems.length})
+                </button>
+              )}
               <button
                 type="button"
                 className="pg-btn pg-btn--outline pg-btn--sm"
@@ -1886,6 +1901,14 @@ export function ProjectWorkspace({
           onRatingChange={applyRatingUpdate}
           onRefined={applyRefinedGeneration}
           onRegenerate={generateImageForVariant}
+        />
+      )}
+
+      {swipeOpen && (
+        <SwipeReview
+          items={galleryReviewItems}
+          onClose={() => setSwipeOpen(false)}
+          onRatingChange={applyRatingUpdate}
         />
       )}
 
