@@ -163,7 +163,7 @@ export function UrlScraperTool() {
       </section>
 
       <div className="pg-land-cta">
-        <h3>Now generate 35 ad creatives from this data</h3>
+        <h3>Now generate 49 ad creatives from this data</h3>
         <div className="pg-cta-row">
           <Link href="/signup" className="pg-btn pg-btn--pop pg-btn--md">
             Try Paintgym free

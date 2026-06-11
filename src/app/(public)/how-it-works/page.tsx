@@ -8,7 +8,7 @@ import { pageMetadata } from "@/lib/seo/site";
 export const metadata: Metadata = pageMetadata({
   title: "How It Works",
   description:
-    "See how Paintgym turns one product link into 35 finished ad creatives: scrape your product, write briefs with Claude, render with Gemini or GPT, review with a QA agent, then download.",
+    "See how Paintgym turns one product link into 49 finished ad creatives: scrape your product, write briefs with Claude, render with Gemini or GPT, review with a QA agent, then download.",
   path: "/how-it-works",
   keywords: [
     "how Paintgym works",
@@ -27,16 +27,16 @@ const STEPS = [
   {
     n: 2,
     h: "Claude writes custom briefs",
-    p: "A Claude model reads your product and writes a tailored creative brief for each of 35 proven ad concepts. Every brief names your real benefits and never invents a claim, a price, or a testimonial.",
+    p: "A Claude model reads your product and writes a tailored creative brief for each of 49 proven ad concepts. Every brief names your real benefits and never invents a claim, a price, or a testimonial.",
     link: { href: "/tools/brief-preview", label: "Preview a real brief" },
   },
   {
     n: 3,
     h: "Choose your image model",
-    p: "Render with Gemini (Nano Banana Pro) or a GPT image model, or run both side by side to compare. Eight screenshot concepts, like iMessage and Reddit threads, render as real HTML and cost nothing.",
+    p: "Render with Gemini (Nano Banana Pro) or a GPT image model, or run both side by side to compare. Eleven screenshot concepts, like iMessage and Reddit threads, render as real HTML and cost nothing.",
     link: {
       href: "/blog/35-static-ad-concepts-that-convert-on-meta",
-      label: "See all 35 concepts",
+      label: "See all 49 concepts",
     },
   },
   {
@@ -108,7 +108,7 @@ export default function HowItWorksPage() {
       </section>
 
       <div className="pg-statband">
-        <div className="big">35</div>
+        <div className="big">49</div>
         <p>
           proven ad concepts written and rendered from a single product URL, with
           two image models and a quality-control pass on every one.

@@ -35,14 +35,14 @@ export function Landing({ onStart, onSkip }: { onStart: (u: string) => void; onS
       </div>
 
       <div className="pg-hero">
-        <div className="kick">35 frameworks · 4:5 ads · in minutes</div>
+        <div className="kick">49 frameworks · 4:5 ads · in minutes</div>
         <h1>
           BUILD
           <br />
           AD <span className="lime">VOLUME</span>
         </h1>
         <p className="sub">
-          Paste a product link. Paintgym trains a whole wall of ad concepts across 35 proven
+          Paste a product link. Paintgym trains a whole wall of ad concepts across 49 proven
           frameworks. Rate, refine, ship your PRs.
         </p>
 
@@ -91,7 +91,7 @@ export function Landing({ onStart, onSkip }: { onStart: (u: string) => void; onS
             <span className="num">02</span>
             <div>
               <h4>Train</h4>
-              <p>Generate a wall of concepts across 35 frameworks &amp; formats.</p>
+              <p>Generate a wall of concepts across 49 frameworks &amp; formats.</p>
             </div>
           </div>
           <div className="pg-step">
@@ -106,7 +106,7 @@ export function Landing({ onStart, onSkip }: { onStart: (u: string) => void; onS
 
       <div className="pg-section">
         <div className="pg-section-k">
-          <b>35 frameworks</b> · the full rack
+          <b>49 frameworks</b> · the full rack
         </div>
         <div className="pg-fwwall">
           {hotFw.map((f, i) => (

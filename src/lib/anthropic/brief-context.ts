@@ -19,7 +19,7 @@ export const AGGRESSIVENESS_GUIDANCE: Record<ConcreteAggressiveness, string> = {
 };
 
 // Resolve a stored aggressiveness setting to a concrete level. "mix" picks a
-// random level (so a 35-brief batch lands ~1/3 in each); the retired "more"
+// random level (so a 49-brief batch lands ~1/3 in each); the retired "more"
 // level maps to "maximum".
 export function resolveAggressiveness(
   level: Aggressiveness | string,

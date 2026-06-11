@@ -86,7 +86,7 @@ export function MarketingShell({
                         }}
                       >
                         AI ad creatives in minutes. One product link becomes a
-                        wall of static ads across 35 proven concepts.
+                        wall of static ads across 49 proven concepts.
                       </p>
                     </div>
                     <div style={{ display: "flex", gap: 40, flexWrap: "wrap" }}>

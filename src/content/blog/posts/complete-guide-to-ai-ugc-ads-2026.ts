@@ -100,5 +100,5 @@ Then back the whole thing with static. Run your hero concepts, your proof concep
 
 The production constraint that defined UGC for a decade is mostly gone. What is left is the part that always mattered: knowing your buyer, picking the right angle, and earning the first three seconds. Get those right and the tools will keep up with you.
 
-Ready to build the static half of your testing layer. [Start free with Paintgym](/signup), or read the [35-concept guide](/blog/35-static-ad-concepts-that-convert-on-meta) to plan your first batch.`,
+Ready to build the static half of your testing layer. [Start free with Paintgym](/signup), or read the [49-concept guide](/blog/35-static-ad-concepts-that-convert-on-meta) to plan your first batch.`,
 };

@@ -17,7 +17,7 @@ export const CREDIT_PACKS: Pack[] = [
     c: 50,
     p: 39,
     blurb: "Test the waters",
-    feats: ["50 ad credits", "All 35 frameworks", "4:5 high-res export"],
+    feats: ["50 ad credits", "All 49 frameworks", "4:5 high-res export"],
   },
   {
     n: "Plus",

@@ -186,7 +186,7 @@ export function BriefPreviewTool() {
       </section>
 
       <div className="pg-land-cta">
-        <h3>Generate all 35 briefs and images</h3>
+        <h3>Generate all 49 briefs and images</h3>
         <div className="pg-cta-row">
           <Link href="/signup" className="pg-btn pg-btn--pop pg-btn--md">
             Try Paintgym free

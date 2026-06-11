@@ -176,7 +176,7 @@ export function ConceptPickerTool() {
       )}
 
       <div className="pg-land-cta">
-        <h3>Generate all 35 concepts for your product</h3>
+        <h3>Generate all 49 concepts for your product</h3>
         <div className="pg-cta-row">
           <Link href="/signup" className="pg-btn pg-btn--pop pg-btn--md">
             Try Paintgym free
@@ -185,7 +185,7 @@ export function ConceptPickerTool() {
             href="/blog/35-static-ad-concepts-that-convert-on-meta"
             className="pg-btn pg-btn--outline pg-btn--md"
           >
-            See all 35
+            See all 49
           </Link>
         </div>
       </div>

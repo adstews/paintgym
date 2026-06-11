@@ -2,17 +2,17 @@ import type { BlogPost } from "../types";
 
 export const post: BlogPost = {
   slug: "35-static-ad-concepts-that-convert-on-meta",
-  title: "35 Static Ad Concepts That Convert on Meta",
+  title: "49 Static Ad Concepts That Convert on Meta",
   description:
-    "The definitive guide to 35 proven static ad frameworks for Meta and Instagram: what each one is, why it works, and the niches it fits best.",
+    "The definitive guide to 49 proven static ad frameworks for Meta and Instagram: what each one is, why it works, and the niches it fits best.",
   author: "Paintgym Team",
   publishedAt: "2026-06-05",
-  metaTitle: "35 Static Ad Concepts That Convert on Meta (2026 Guide)",
+  metaTitle: "49 Static Ad Concepts That Convert on Meta (2026 Guide)",
   metaDescription:
-    "A complete guide to 35 static ad frameworks that convert on Meta and Instagram. Hero, comparison, before and after, social proof, screenshot, and direct-response concepts explained.",
+    "A complete guide to 49 static ad frameworks that convert on Meta and Instagram. Hero, comparison, before and after, social proof, screenshot, and direct-response concepts explained.",
   content: `Most brands run the same three ads forever. They find one that works, scale it, watch it fatigue, and then scramble. The fix is not a better single ad. It is a system of concepts you can rotate through, because each framework speaks to a different buyer at a different stage.
 
-This is the full library of 35 static frameworks we build ads around. For each one you get what it is, why it works, and the niches it fits best. Use it as a checklist. If you have never tried half of these, you have a backlog of tests waiting.
+This is the full library of 49 static frameworks we build ads around. For each one you get what it is, why it works, and the niches it fits best. Use it as a checklist. If you have never tried half of these, you have a backlog of tests waiting.
 
 You can also skip the manual work. The [concept picker](/tools/concept-picker) recommends the five frameworks most likely to fit your product in about a minute.
 
@@ -188,11 +188,75 @@ A Claude AI chat where the assistant explains why the product is a smart pick. P
 
 A ChatGPT conversation where the assistant recommends the product. Same trust shortcut as a friend's text, but from the tool millions now treat as their researcher. Best for problem-solution products people would ask an assistant about.
 
+## More hero, product, and proof frameworks
+
+A second wave of frameworks that lead with the product or stack proof in fresh ways.
+
+### 36. Checkerboard Grid
+
+A 2x2 grid showing four product uses, angles, or benefits in one frame. The four panels read together as one complete story, so a single ad covers several reasons to buy without feeling like a list. Best for versatile products and anything with several use cases.
+
+### 37. Product-in-Motion Hero
+
+A dynamic hero shot with implied motion: a splash, a pour, an action freeze-frame. The movement creates visual drama that stops the scroll, giving a plain product shot the energy of a video in one frame. Best for food and drink, beauty, and anything that looks good in action.
+
+### 38. POV Shot
+
+A first-person shot of a hand holding or using the product, as if through the viewer's own eyes. Seeing it from your point of view makes ownership feel immediate and tangible, closing the gap between looking and having. Best for handheld products and everyday-use items.
+
+### 39. Three-Stat Scoreboard
+
+Three bold stats laid out like a scoreboard. Three numbers together build a cumulative case no single stat can, and the scoreboard framing reads as confident and final. Best for brands with several strong results or figures to point to.
+
+### 40. Educational Explainer
+
+A clean infographic-style static that teaches something genuinely useful with the product woven in. Leading with value earns attention and trust before the pitch, so the product lands as the helpful answer instead of an interruption. Best for considered purchases and category education.
+
+### 41. Behind the Scenes
+
+A look at how the product is made, packed, or sourced. Showing the craft builds trust through transparency and justifies a premium by making the work visible. Best for premium and craft brands and quality-led positioning.
+
+### 42. Listicle
+
+A numbered list as the whole ad, with a punchy headline and short reasons to buy. The list promises a quick, scannable read, so the eye commits to it in the feed and absorbs several selling points at once. Best for multi-benefit products and editorial-minded audiences.
+
+## More native and screenshot frameworks
+
+These feel organic rather than paid. The last three render as pixel-perfect HTML screenshots, so like the other screenshot formats they cost nothing to generate and never hallucinate a quote or a number.
+
+### 43. Anti-Ad
+
+A deliberately unpolished, no-design creative that reads like an honest founder note. Rejecting design is the pattern interrupt: a raw, ugly ad reads as a real person talking, so the guard drops and the message gets a hearing. Best for founder-led brands and audiences tired of polished ads.
+
+### 44. Starter Pack Grid
+
+The "starter pack" meme format applied to your ideal customer, with the product among the essentials. Tying the product to an identity people recognize makes it instantly relatable and shareable, so it spreads like a meme while it still sells. Best for lifestyle and persona-driven brands.
+
+### 45. Street Interview
+
+A still frame from a person-on-the-street reaction with a bold pull-quote overlay. A candid, unscripted reaction reads as a real opinion caught on camera, which converts harder than a staged testimonial. Best for reaction-worthy products and social-first brands.
+
+### 46. Cultural Reference
+
+Ties the product to a trending cultural moment, show, or meme format, without any copyrighted material. Borrowing a moment the audience already has in mind buys instant relevance, and the product becomes the payoff to a hook they recognize. Best for culturally fluent brands and timely launches.
+
+### 47. Discussion Thread
+
+A community discussion thread, Facebook Group or forum style, where the product comes up as the answer. A recommendation inside a real-looking thread reads as earned word of mouth, not an ad, so it carries a stranger's trust. Best for research-heavy categories. Renders free as HTML.
+
+### 48. In-App Proof Shot
+
+A screenshot of real-looking in-app data, a dashboard or results tracker, proving the product works. A number on a screen reads as a recorded fact rather than a claim, so a believable dashboard makes the result feel measured instead of marketed. Best for apps, tools, and measurable results. Renders free as HTML.
+
+### 49. Social Proof Mashup
+
+A collage of mini screenshots, a tweet, a review, a comment, and an email, all praising the product. Praise from many platforms at once reads as a chorus rather than one cherry-picked quote, which is much harder to dismiss. Best for brands with proof scattered across channels. Renders free as HTML.
+
 ## How to actually use this list
 
-Do not run all 35 at once. Pick a spread that covers different jobs: one or two hero ads for the cold top of funnel, a couple of proof concepts for the middle, and a direct-response concept like the guarantee or objection handler for retargeting. Test five to eight angles, kill the losers in a week, and reinvest in the two or three that move.
+Do not run all 49 at once. Pick a spread that covers different jobs: one or two hero ads for the cold top of funnel, a couple of proof concepts for the middle, and a direct-response concept like the guarantee or objection handler for retargeting. Test five to eight angles, kill the losers in a week, and reinvest in the two or three that move.
 
 The reason a concept library beats a single great ad is that audiences fatigue and segments differ. The buyer who ignores your bold claim might stop on a Reddit thread. The skeptic who bounced off your hero shot converts on the money-back guarantee. Volume across angles is how you find those pockets.
 
-Writing 35 distinct briefs by hand is the slow part, and that is the part we automated. Paintgym takes one product URL, writes a custom brief for every concept above, and renders them with two image models and a built-in review step. Walk through the [full flow here](/how-it-works), or [start free](/signup) and see your own product across all 35.`,
+Writing 49 distinct briefs by hand is the slow part, and that is the part we automated. Paintgym takes one product URL, writes a custom brief for every concept above, and renders them with two image models and a built-in review step. Walk through the [full flow here](/how-it-works), or [start free](/signup) and see your own product across all 49.`,
 };

@@ -8,7 +8,7 @@ import { pageMetadata } from "@/lib/seo/site";
 export const metadata: Metadata = pageMetadata({
   title: "FAQ",
   description:
-    "Answers to common questions about Paintgym: how it generates ad images, the 35 concepts, pricing, image models, the QA review, credits, regeneration, and formats.",
+    "Answers to common questions about Paintgym: how it generates ad images, the 49 concepts, pricing, image models, the QA review, credits, regeneration, and formats.",
   path: "/faq",
   keywords: ["Paintgym FAQ", "AI ad generator questions", "how Paintgym works"],
 });
@@ -16,15 +16,15 @@ export const metadata: Metadata = pageMetadata({
 const FAQS: { q: string; a: string }[] = [
   {
     q: "What is Paintgym?",
-    a: "Paintgym is an AI ad creative generator for paid social. You paste a product link, and it writes custom creative briefs for 35 proven ad concepts, then renders finished static ads with built-in quality control. It is built to give DTC brands and performance marketers ad volume across many angles, not just one polished hero.",
+    a: "Paintgym is an AI ad creative generator for paid social. You paste a product link, and it writes custom creative briefs for 49 proven ad concepts, then renders finished static ads with built-in quality control. It is built to give DTC brands and performance marketers ad volume across many angles, not just one polished hero.",
   },
   {
     q: "How does Paintgym generate ad images?",
-    a: "First a Claude model reads your product data and writes a detailed image-generation brief for each concept: the composition, the on-image copy, the layout, and the color palette. That brief is then sent to an image model that renders the ad. A separate review agent checks the result before it reaches you. Eight of the concepts skip image generation entirely and render as pixel-perfect HTML screenshots.",
+    a: "First a Claude model reads your product data and writes a detailed image-generation brief for each concept: the composition, the on-image copy, the layout, and the color palette. That brief is then sent to an image model that renders the ad. A separate review agent checks the result before it reaches you. Eleven of the concepts skip image generation entirely and render as pixel-perfect HTML screenshots.",
   },
   {
-    q: "What are the 35 ad concept frameworks?",
-    a: "They are 35 distinct static ad structures, each suited to a different buyer and stage: hero shots, three-benefit layouts, before and after, comparison charts, social proof walls, founder notes, bold typographic claims, and native screenshot formats like iMessage, Reddit threads, and a Notes app list. Each one has a reason it works and niches it fits. You can read the full breakdown in our guide to 35 static ad concepts.",
+    q: "What are the 49 ad concept frameworks?",
+    a: "They are 49 distinct static ad structures, each suited to a different buyer and stage: hero shots, three-benefit layouts, before and after, comparison charts, social proof walls, founder notes, bold typographic claims, and native screenshot formats like iMessage, Reddit threads, and a Notes app list. Each one has a reason it works and niches it fits. You can read the full breakdown in our guide to 49 static ad concepts.",
   },
   {
     q: "How much does Paintgym cost?",
@@ -44,7 +44,7 @@ const FAQS: { q: string; a: string }[] = [
   },
   {
     q: "How do credits work?",
-    a: "One credit generates one image. Writing briefs costs nothing, and the eight HTML screenshot concepts render free. Refining or making a new version of an ad also uses one credit. You buy a pack once, top up whenever, and the credits do not expire.",
+    a: "One credit generates one image. Writing briefs costs nothing, and the eleven HTML screenshot concepts render free. Refining or making a new version of an ad also uses one credit. You buy a pack once, top up whenever, and the credits do not expire.",
   },
   {
     q: "Can I regenerate images?",

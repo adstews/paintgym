@@ -9,7 +9,7 @@ export const TWITTER_HANDLE = "@paintgym";
 
 export const DEFAULT_DESCRIPTION =
   "Paintgym turns one product link into a wall of paid-social ad creative. " +
-  "Claude writes custom briefs for 35 proven ad concepts, then Gemini or GPT image models render them with built-in quality control.";
+  "Claude writes custom briefs for 49 proven ad concepts, then Gemini or GPT image models render them with built-in quality control.";
 
 /** Resolve a path to an absolute URL on the canonical host. */
 export function absUrl(path = "/"): string {

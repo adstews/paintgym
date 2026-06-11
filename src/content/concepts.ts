@@ -1,8 +1,9 @@
-// The 35 static ad frameworks Paintgym ships with. The first 24 mirror the
-// concepts seeded in the database (17 base + 7 screenshot/HTML formats); the
-// remaining 11 are additional proven static frameworks that round out the
-// library. Used by the public concept guide, the concept-picker tool, and the
-// "35 frameworks" marketing copy.
+// The 49 static ad frameworks Paintgym ships with, mirroring the default
+// concepts seeded in the database. Used by the public concept guide (the
+// /blog concept post), the concept-picker tool, and the "49 frameworks"
+// marketing copy. The final 14 round out the original 35 (added via migration
+// 0024); three of them — Discussion Thread, In-App Proof, Social Proof Mashup —
+// render as zero-cost HTML screenshots like the other screenshot formats.
 
 export type ConceptGoal = "awareness" | "conversion" | "retargeting";
 
@@ -437,6 +438,177 @@ export const CONCEPTS: AdConcept[] = [
     bestFor: "Brands with real press or retail distribution to show off.",
     goals: ["awareness", "conversion"],
     traits: ["proof", "premium"],
+  },
+  {
+    slug: "anti-ad",
+    name: "Anti-Ad",
+    category: "Low-fi",
+    description:
+      "A deliberately unpolished, no-design creative that reads like an honest founder note.",
+    whyItWorks:
+      "Rejecting design is the pattern interrupt. A raw, ugly ad reads as a real person talking instead of a campaign, so the guard drops and the message gets a hearing.",
+    bestFor: "Founder-led brands, candid angles, audiences tired of polished ads.",
+    goals: ["awareness", "conversion"],
+    traits: ["low-fi", "ugc", "story"],
+  },
+  {
+    slug: "checkerboard-grid",
+    name: "Checkerboard Grid",
+    category: "Hero",
+    description:
+      "A 2x2 grid showing four product uses, angles, or benefits in one frame.",
+    whyItWorks:
+      "Four panels read together as one complete story, so a single ad covers several reasons to buy without feeling like a list.",
+    bestFor: "Versatile products, multi-benefit items, anything with several use cases.",
+    goals: ["awareness", "conversion"],
+    traits: ["clean", "value"],
+  },
+  {
+    slug: "discussion-thread",
+    name: "Discussion Thread",
+    category: "Screenshot",
+    description:
+      "A community discussion thread, Facebook Group or forum style, where the product comes up as the answer.",
+    whyItWorks:
+      "A recommendation inside a real-looking community thread reads as earned word of mouth, not an ad, so the endorsement carries a stranger's trust.",
+    bestFor: "Research-heavy categories and problems people ask their community about.",
+    goals: ["conversion", "retargeting"],
+    traits: ["ugc", "proof", "native"],
+    screenshot: true,
+  },
+  {
+    slug: "starter-pack-grid",
+    name: "Starter Pack Grid",
+    category: "Native",
+    description:
+      "The 'starter pack' meme format applied to your ideal customer, with the product among the essentials.",
+    whyItWorks:
+      "Tying the product to an identity people recognize makes it instantly relatable and shareable, so the ad spreads like a meme while it still sells.",
+    bestFor: "Lifestyle brands, persona-driven products, younger social audiences.",
+    goals: ["awareness"],
+    traits: ["humor", "native"],
+  },
+  {
+    slug: "street-interview",
+    name: "Street Interview",
+    category: "Native",
+    description:
+      "A still frame from a person-on-the-street reaction with a bold pull-quote overlay.",
+    whyItWorks:
+      "A candid, unscripted reaction reads as a real opinion caught on camera, which converts harder than a staged testimonial.",
+    bestFor: "Reaction-worthy products, broad consumer goods, social-first brands.",
+    goals: ["awareness", "conversion"],
+    traits: ["ugc", "proof", "native"],
+  },
+  {
+    slug: "in-app-proof",
+    name: "In-App Proof Shot",
+    category: "Screenshot",
+    description:
+      "A screenshot of real-looking in-app data — a dashboard, analytics, or results tracker — proving the product works.",
+    whyItWorks:
+      "A number on a screen reads as a recorded fact rather than a claim, so a believable dashboard makes the result feel measured instead of marketed.",
+    bestFor: "Apps, tools, and products with a measurable result to show.",
+    goals: ["conversion", "retargeting"],
+    traits: ["proof", "native"],
+    screenshot: true,
+  },
+  {
+    slug: "three-stat-scoreboard",
+    name: "Three-Stat Scoreboard",
+    category: "Proof",
+    description:
+      "Three bold stats laid out like a scoreboard, stacking multiple proof points into one case.",
+    whyItWorks:
+      "Three numbers together build a cumulative case no single stat can, and the scoreboard framing reads as confident and final.",
+    bestFor: "Brands with several strong results or figures to point to.",
+    goals: ["awareness", "conversion"],
+    traits: ["proof", "clean"],
+  },
+  {
+    slug: "listicle",
+    name: "Listicle",
+    category: "Typographic",
+    description:
+      "A numbered list as the whole ad, with a punchy headline and short reasons to buy.",
+    whyItWorks:
+      "A numbered list promises a quick, scannable read, so the eye commits to it in the feed and absorbs several selling points at once.",
+    bestFor: "Multi-benefit products and audiences that respond to editorial content.",
+    goals: ["awareness", "conversion"],
+    traits: ["value", "clean"],
+  },
+  {
+    slug: "social-proof-mashup",
+    name: "Social Proof Mashup",
+    category: "Screenshot",
+    description:
+      "A collage of mini screenshots — a tweet, a review, a comment, an email — all praising the product.",
+    whyItWorks:
+      "Praise from many platforms at once reads as a chorus rather than a single cherry-picked quote, which is much harder to dismiss.",
+    bestFor: "Brands with proof scattered across reviews, social, and email.",
+    goals: ["conversion", "retargeting"],
+    traits: ["ugc", "proof", "native"],
+    screenshot: true,
+  },
+  {
+    slug: "educational-explainer",
+    name: "Educational Explainer",
+    category: "Authority",
+    description:
+      "A clean infographic-style static that teaches something useful with the product woven in.",
+    whyItWorks:
+      "Leading with genuine value earns attention and trust before the pitch, so the product lands as the helpful answer instead of an interruption.",
+    bestFor: "Considered purchases, technical products, and category education.",
+    goals: ["awareness", "conversion"],
+    traits: ["clean", "value", "premium"],
+  },
+  {
+    slug: "product-in-motion",
+    name: "Product-in-Motion Hero",
+    category: "Product",
+    description:
+      "A dynamic hero shot with implied motion — a splash, a pour, or an action freeze-frame.",
+    whyItWorks:
+      "Implied movement creates visual drama that stops the scroll, giving a plain product shot the energy of a video in a single frame.",
+    bestFor: "Food and drink, beauty, and any product that looks good in action.",
+    goals: ["awareness"],
+    traits: ["premium", "clean"],
+  },
+  {
+    slug: "pov-shot",
+    name: "POV Shot",
+    category: "Product",
+    description:
+      "A first-person shot of a hand holding or using the product, as if through the viewer's own eyes.",
+    whyItWorks:
+      "Seeing the product from your own point of view makes ownership feel immediate and tangible, closing the gap between looking and having.",
+    bestFor: "Handheld products, everyday-use items, lifestyle brands.",
+    goals: ["awareness", "conversion"],
+    traits: ["ugc", "clean"],
+  },
+  {
+    slug: "behind-the-scenes",
+    name: "Behind the Scenes",
+    category: "Authority",
+    description:
+      "A look at how the product is made, packed, or sourced.",
+    whyItWorks:
+      "Showing the craft behind the product builds trust through transparency and justifies a premium by making the work visible.",
+    bestFor: "Premium and craft brands, sourcing stories, quality-led positioning.",
+    goals: ["awareness", "conversion"],
+    traits: ["premium", "story", "proof"],
+  },
+  {
+    slug: "cultural-reference",
+    name: "Cultural Reference",
+    category: "Native",
+    description:
+      "Ties the product to a trending cultural moment, show, or meme format, with no copyrighted material.",
+    whyItWorks:
+      "Borrowing a moment the audience is already thinking about buys instant relevance, and the product becomes the payoff to a hook they recognize.",
+    bestFor: "Culturally fluent brands, timely launches, younger audiences.",
+    goals: ["awareness"],
+    traits: ["humor", "native"],
   },
 ];
 

@@ -4,7 +4,7 @@ export const post: BlogPost = {
   slug: "how-to-create-ad-creatives-with-ai-in-30-minutes",
   title: "How to Create Ad Creatives with AI in 30 Minutes",
   description:
-    "A step-by-step tutorial that takes you from a product URL to 35 finished static ads, with tips on concepts, hooks, and reviewing the output.",
+    "A step-by-step tutorial that takes you from a product URL to 49 finished static ads, with tips on concepts, hooks, and reviewing the output.",
   author: "Paintgym Team",
   publishedAt: "2026-06-04",
   metaTitle: "How to Create Ad Creatives with AI in 30 Minutes (Tutorial)",
@@ -24,7 +24,7 @@ Two tips here. First, point it at a clean product page, not a homepage. A produc
 
 ## Step 2: Pick your concepts (5 minutes)
 
-You do not want all 35 frameworks for every product. You want the handful that match your offer and your buyer.
+You do not want all 49 frameworks for every product. You want the handful that match your offer and your buyer.
 
 If you are not sure which to run, the [concept picker](/tools/concept-picker) answers five quick questions and recommends the five frameworks most likely to fit. Otherwise, choose a deliberate spread:
 
@@ -32,7 +32,7 @@ If you are not sure which to run, the [concept picker](/tools/concept-picker) an
 - One or two proof concepts for the middle of the funnel, like Social Proof or a Reddit thread screenshot.
 - One direct-response concept for retargeting, like the money-back guarantee or an objection handler.
 
-The full menu and the logic behind each one is in our [guide to all 35 concepts](/blog/35-static-ad-concepts-that-convert-on-meta). For a first run, eight concepts is a good number. It is enough spread to learn something and few enough to review properly.
+The full menu and the logic behind each one is in our [guide to all 49 concepts](/blog/35-static-ad-concepts-that-convert-on-meta). For a first run, eight concepts is a good number. It is enough spread to learn something and few enough to review properly.
 
 ## Step 3: Add a hook (2 minutes)
 
@@ -56,7 +56,7 @@ Paintgym renders with two image models: Gemini, also called Nano Banana Pro, and
 
 If you cannot decide, run both. Paintgym can generate the same concept with each model side by side, which is the fastest way to learn which one wins for your product. After a project or two you will have a feel for your default.
 
-Note that the eight screenshot concepts, like iMessage and the Notes app, do not use an image model at all. They render as real HTML and get screenshotted, so they cost nothing in credits and the text and price are always exactly right.
+Note that the eleven screenshot concepts, like iMessage and the Notes app, do not use an image model at all. They render as real HTML and get screenshotted, so they cost nothing in credits and the text and price are always exactly right.
 
 ## Step 6: Generate (5 minutes, mostly waiting)
 
@@ -72,7 +72,7 @@ Now you have your wall. Go through it with a cold eye and ask three questions of
 
 First, would this stop me in the feed. If the answer is no, it does not matter how on-brand it is. Second, is every word legible and correct. Third, does it actually feature my product, not a generic stand-in. Rate the strong ones and refine the close-but-not-quite ones. Refining feeds your note back into the model and produces a new version, so a small fix like "make the headline bigger" or "use the navy from my brand" is one click.
 
-A useful habit: pick your two favorites per concept and export those. You are not trying to ship all 35. You are trying to find the three or four that beat your control.
+A useful habit: pick your two favorites per concept and export those. You are not trying to ship all 49. You are trying to find the three or four that beat your control.
 
 ## Step 8: Export and launch (2 minutes)
 

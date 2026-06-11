@@ -56,7 +56,7 @@ AI creative reaches the high end of that 85 to 110 percent range under specific 
 
 First, it needs real product data. A model writing a brief off a thin product page produces a thin ad. Feed it the real price, the real benefits, the actual reviews, and the genuine proof points. Tools that scrape your product page get you most of the way; you fill the gaps.
 
-Second, it needs a concept system, not one template. A single layout with swapped text produces ads that look like ads, which is exactly what underperforms. Performance comes from rotating through distinct frameworks: a bold claim for one buyer, a comparison chart for another, a Reddit-thread screenshot for a third. Our [guide to 35 static concepts](/blog/35-static-ad-concepts-that-convert-on-meta) covers the frameworks that hold up.
+Second, it needs a concept system, not one template. A single layout with swapped text produces ads that look like ads, which is exactly what underperforms. Performance comes from rotating through distinct frameworks: a bold claim for one buyer, a comparison chart for another, a Reddit-thread screenshot for a third. Our [guide to 49 static concepts](/blog/35-static-ad-concepts-that-convert-on-meta) covers the frameworks that hold up.
 
 Third, it needs quality control. The fastest way to kill the cost advantage is to launch ads with garbled text or the wrong product, because those tank your account metrics and waste spend. A review step that catches the obvious failures before launch is what keeps the cheap ads from being expensive mistakes. Paintgym runs a separate model over every render for exactly this reason.
 

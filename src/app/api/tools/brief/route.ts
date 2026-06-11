@@ -31,7 +31,7 @@ export async function POST(request: Request) {
       {
         error: "rate_limited",
         message:
-          "You have used your free brief for today. Sign up to write briefs for all 35 concepts.",
+          "You have used your free brief for today. Sign up to write briefs for all 49 concepts.",
       },
       { status: 429 },
     );

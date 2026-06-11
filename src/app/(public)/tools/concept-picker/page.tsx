@@ -8,7 +8,7 @@ import { ConceptPickerTool } from "@/components/marketing/tools/concept-picker";
 export const metadata: Metadata = pageMetadata({
   title: "Free Ad Concept Picker",
   description:
-    "Answer five quick questions and get the five static ad concepts most likely to convert for your product. Free, no login, from a library of 35 frameworks.",
+    "Answer five quick questions and get the five static ad concepts most likely to convert for your product. Free, no login, from a library of 49 frameworks.",
   path: "/tools/concept-picker",
   keywords: [
     "ad concept picker",
@@ -42,7 +42,7 @@ export default function ConceptPickerPage() {
         </h1>
         <p className="sub">
           Five questions, five concepts. Find the static ad frameworks most
-          likely to work for your product, drawn from the full library of 35.
+          likely to work for your product, drawn from the full library of 49.
         </p>
       </header>
       <ConceptPickerTool />

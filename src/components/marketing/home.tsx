@@ -34,6 +34,10 @@ const CONCEPT_ROWS: { label: string; tag: string; tiles: Tile[] }[] = [
       { name: "Tweet Drop", fmt: "4:5 · STATIC", from: "#e9f6ff", to: "#d4edff" },
       { name: "Texting Receipt", fmt: "4:5 · STATIC", from: "#eef2f6", to: "#dbe5ee" },
       { name: "FaceTime", fmt: "4:5 · STATIC", from: "#e6f4ec", to: "#d0ebdb" },
+      { name: "Discussion Thread", fmt: "4:5 · STATIC", from: "#eaf0fb", to: "#d6e3f6" },
+      { name: "Anti-Ad", fmt: "4:5 · STATIC", from: "#f3f1ec", to: "#e4e0d4" },
+      { name: "Starter Pack", fmt: "4:5 · STATIC", from: "#fdeedd", to: "#fbdcbb" },
+      { name: "Cultural Reference", fmt: "4:5 · STATIC", from: "#f1ebfb", to: "#e0d2f5" },
     ],
   },
   {
@@ -47,6 +51,10 @@ const CONCEPT_ROWS: { label: string; tag: string; tiles: Tile[] }[] = [
       { name: "Star-Rating Wall", fmt: "4:5 · STATIC", from: "#fff2cf", to: "#ffe49f" },
       { name: "Founder Note", fmt: "4:5 · STATIC", from: "#f5efe6", to: "#e9dcc8" },
       { name: "UGC Selfie", fmt: "4:5 · STATIC", from: "#ffe9f2", to: "#ffd2e2" },
+      { name: "Street Interview", fmt: "4:5 · STATIC", from: "#eaf5f0", to: "#d3ebdf" },
+      { name: "In-App Proof", fmt: "4:5 · STATIC", from: "#e9f2fb", to: "#d2e6f7" },
+      { name: "Social Proof Mashup", fmt: "4:5 · STATIC", from: "#fff0e8", to: "#ffdcc9" },
+      { name: "Three-Stat Scoreboard", fmt: "4:5 · STATIC", from: "#fef3d2", to: "#fbe39e" },
     ],
   },
   {
@@ -60,6 +68,8 @@ const CONCEPT_ROWS: { label: string; tag: string; tiles: Tile[] }[] = [
       { name: "Guarantee Seal", fmt: "4:5 · STATIC", from: "#e6f3f7", to: "#d0e7f0" },
       { name: "Discount Stamp", fmt: "4:5 · STATIC", from: "#fff0dd", to: "#ffdfb6" },
       { name: "Big Promise", fmt: "4:5 · STATIC", from: "#eef5dc", to: "#dcebb6" },
+      { name: "Listicle", fmt: "4:5 · STATIC", from: "#eef6da", to: "#dcecb2" },
+      { name: "Educational Explainer", fmt: "4:5 · STATIC", from: "#e7f4f6", to: "#d0e8ed" },
     ],
   },
   {
@@ -73,6 +83,10 @@ const CONCEPT_ROWS: { label: string; tag: string; tiles: Tile[] }[] = [
       { name: "Packaging Hero", fmt: "4:5 · STATIC", from: "#e9f1fa", to: "#d3e3f3" },
       { name: "Comparison Chart", fmt: "4:5 · STATIC", from: "#f0f0f2", to: "#e0e0e6" },
       { name: "Lifestyle Hero", fmt: "4:5 · STATIC", from: "#fdebf0", to: "#f6d2de" },
+      { name: "Product-in-Motion", fmt: "4:5 · STATIC", from: "#e9f3fb", to: "#d2e6f6" },
+      { name: "POV Shot", fmt: "4:5 · STATIC", from: "#f7efe4", to: "#ecdcc6" },
+      { name: "Behind-the-Scenes", fmt: "4:5 · STATIC", from: "#f1f0ec", to: "#e1ded3" },
+      { name: "Checkerboard", fmt: "4:5 · STATIC", from: "#f2eef8", to: "#e2d6f1" },
     ],
   },
 ];
@@ -149,7 +163,7 @@ const MARQUEE = [
   "REAL ADS",
   "NOT PROMPTS",
   "LIVE IN 20 MIN",
-  "35 PROVEN CONCEPTS",
+  "49 PROVEN CONCEPTS",
   "QA ON EVERY AD",
   "BUILT TO SCALE",
 ];
@@ -335,7 +349,7 @@ export function MarketingHome() {
           >
             {[
               { k: "< 20 min", v: "from link to live" },
-              { k: "35", v: "proven concepts" },
+              { k: "49", v: "proven concepts" },
               { k: "every ad", v: "agent QA'd" },
             ].map((s) => (
               <div key={s.k} className="bg-white px-2 py-4 text-center sm:px-6 sm:py-5">
@@ -385,7 +399,7 @@ export function MarketingHome() {
             <p className="mt-4 text-base leading-relaxed text-black/60 sm:mt-5 sm:text-lg">
               Paste one product link. Paintgym trains an entire wall of static
               ads across{" "}
-              <span className="font-semibold text-[#141414]">35 proven concepts</span>{" "}
+              <span className="font-semibold text-[#141414]">49 proven concepts</span>{" "}
               — the messaging hooks, proof formats, and bold-claim layouts that
               are actually scaling accounts today. Pick your winners. Ship.
             </p>

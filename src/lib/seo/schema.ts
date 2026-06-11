@@ -27,7 +27,7 @@ export function softwareApplicationSchema() {
     operatingSystem: "Web",
     url: SITE_URL,
     description:
-      "AI ad creative generator. Paste a product link and Paintgym writes custom briefs for 35 proven ad concepts, then renders them with Gemini or GPT image models and a built-in quality-control review.",
+      "AI ad creative generator. Paste a product link and Paintgym writes custom briefs for 49 proven ad concepts, then renders them with Gemini or GPT image models and a built-in quality-control review.",
     offers: {
       "@type": "Offer",
       price: "39",

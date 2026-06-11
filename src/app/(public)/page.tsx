@@ -11,7 +11,7 @@ export const metadata: Metadata = pageMetadata({
   title: "Paintgym — AI Ad Creatives in Minutes",
   titleAbsolute: true,
   description:
-    "Paste one product link and Paintgym builds a wall of static ad creative across 35 proven concepts. Claude writes the briefs, Gemini and GPT render the images, and a QA agent reviews every one.",
+    "Paste one product link and Paintgym builds a wall of static ad creative across 49 proven concepts. Claude writes the briefs, Gemini and GPT render the images, and a QA agent reviews every one.",
   path: "/",
   keywords: [
     "AI ad creative",

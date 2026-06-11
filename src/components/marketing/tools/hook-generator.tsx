@@ -99,7 +99,7 @@ export function HookGeneratorTool() {
       <section className="pg-section">
         <EmailCapture
           source="hook-generator"
-          heading="Get all 20 hooks plus the 35 ad concepts"
+          heading="Get all 20 hooks plus the 49 ad concepts"
           sub="We will email the full hook bank and the complete concept library."
           cta="Send the bank"
           payload={{ category }}
