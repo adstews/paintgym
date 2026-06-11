@@ -63,8 +63,8 @@ const VISIBLE_TABS = [
   { value: "product", label: "Product" },
   { value: "concepts", label: "Concepts" },
   { value: "briefs", label: "Briefs" },
-  { value: "gemini-gallery", label: "Gemini Gallery" },
-  { value: "gpt-gallery", label: "GPT Gallery" },
+  { value: "gemini-gallery", label: "Gallery" },
+  { value: "gpt-gallery", label: "GPT" },
 ] as const;
 const ALL_TAB_VALUES = [
   "product",
@@ -1451,7 +1451,7 @@ export function ProjectWorkspace({
         </div>
 
         {activeTab === "product" && (
-          <div className="pt-4">
+          <div className="pt-7 sm:pt-6">
             <ProductDetailsForm
               project={project}
               onProjectChange={setProject}

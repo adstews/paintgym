@@ -305,7 +305,7 @@ body{font-family:var(--ui);color:var(--ink);background:#cfcfc8;line-height:1.5;-
 .pg-scrape-row.pending{opacity:.4;}
 .pg-scrape-row .mini-ring{width:16px;height:16px;border:2px solid var(--line);border-top-color:var(--ink);border-radius:50%;animation:pg-spin .8s linear infinite;}
 
-.pg-form-card{border:1.5px solid var(--ink);border-radius:4px;background:#fff;padding:20px;margin-top:20px;}
+.pg-form-card{border:1.5px solid var(--ink);border-radius:4px;background:#fff;padding:22px;margin-top:24px;}
 .pg-form-row{margin-bottom:18px;}
 .pg-form-row:last-child{margin-bottom:0;}
 .pg-grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
@@ -551,6 +551,11 @@ html,body{max-width:100%;overflow-x:clip;}
 /* ---- generic mobile stacking + touch targets (item 5) ---- */
 @media (max-width:640px){
   .pg-grid2{grid-template-columns:1fr;}
+  /* roomier product form on phones (header/save/fields were cramped) */
+  .pg-h2{font-size:21px;}
+  .pg-form-head{margin-bottom:4px;}
+  .pg-form-card{padding:18px;margin-top:22px;}
+  .pg-form-row{margin-bottom:20px;}
   /* generous tap targets */
   .pg-btn--sm{padding:11px 14px;min-height:44px;}
   .pg-btn--md{min-height:48px;}

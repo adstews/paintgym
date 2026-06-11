@@ -130,16 +130,18 @@ export function ProductDetailsForm({
     <div>
       <section>
         <div
+          className="pg-form-head"
           style={{
             display: "flex",
-            alignItems: "flex-start",
+            alignItems: "center",
             justifyContent: "space-between",
-            gap: 12,
+            gap: 16,
+            flexWrap: "wrap",
           }}
         >
           <div>
             <h2 className="pg-h2">Product details</h2>
-            <p className="pg-muted" style={{ fontSize: 12.5, marginTop: 6 }}>
+            <p className="pg-muted" style={{ fontSize: 12.5, marginTop: 8 }}>
               The more specific you are, the better Claude can write the briefs.
             </p>
           </div>
