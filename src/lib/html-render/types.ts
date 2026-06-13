@@ -130,7 +130,9 @@ export const redditContent = z.object({
   posted: z.string().min(1).max(30),
   upvotes: z.string().min(1).max(12),
   comments_count: z.string().min(1).max(12),
-  post_body: z.string().min(1).max(900),
+  // 3 to 5 paragraphs plus a trailing "EDIT:" line (see TYPE_GUIDANCE.reddit)
+  // routinely runs past 900 chars; the old cap silently failed valid posts.
+  post_body: z.string().min(1).max(1800),
 });
 
 export const tweetContent = z.object({

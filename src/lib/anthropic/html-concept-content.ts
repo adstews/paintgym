@@ -28,7 +28,7 @@ const TYPE_GUIDANCE: Record<HtmlRenderType, string> = {
   imessage: `Write a believable two-person text thread where one friend recommends the product to another who has the matching problem. 4 to 6 messages, alternating naturally, "them" sends first. The recommendation should name the product and one concrete reason it works. contact_name is the friend's first name.`,
   notes: `Write an Apple Notes note as if a real customer jotted down why the product is worth it. A short title, a believable date, and 4 to 7 short lines (most as bullets) that read like honest personal notes, not ad copy.`,
   reddit: `Write a single first-person Reddit post (no comments) where the product surfaces as the genuine answer. Give a realistic subreddit and username, a compelling question-style title that hints at a relatable problem, and a post_body of 3 to 5 short paragraphs (separate paragraphs with a blank line). The body should tell a believable personal story that arrives at the product as the answer, and end with a short lowercase "EDIT:" paragraph that nudges the reader to act. Make upvotes and comments_count look real ("892", "1.2k", "247").`,
-  tweet: `Write one tweet from a believable account praising the product in a specific, non-corporate way. Realistic display name, handle, and engagement counts (replies/retweets/likes, optional views like "84.2K").`,
+  tweet: `Write one tweet from a believable account praising the product in a specific, non-corporate way. Realistic display name, handle, a short timestamp (e.g. "3h", "1d", "Mar 14"), and engagement counts (replies/retweets/likes, optional views like "84.2K").`,
   tiktok: `Write a TikTok comment section over a video about the product. A short caption, and 3 to 4 comments that hype the product the way real commenters do (specific, casual). Realistic usernames and like counts.`,
   instagram_story: `Write an Instagram Story reacting to the product: 1 to 3 short overlay text lines and one interactive sticker (a poll, a question box, or a rating) that fits the product. Casual, first-person, like a creator sharing a find.`,
   claude: `Write a short Claude conversation: a user asks for help with the problem the product solves, and Claude gives a clean, well-formatted answer that recommends the product and explains why. Use "- " bullet lines and **bold** for the key points. 2 messages (user, assistant), optionally a short follow-up.`,
@@ -240,32 +240,67 @@ export async function generateHtmlConceptContent({
       ]
     : userText;
 
-  const response = await client.messages.create({
-    model: BRIEF_MODEL,
-    max_tokens: 2000,
-    system: buildSystemPrompt(type, useImage),
-    messages: [{ role: "user", content }],
-  });
+  // Self-correcting loop: on a JSON or schema miss, hand the model its own
+  // output plus the exact failure and let it fix that field. A single strict
+  // schema slip (a too-long Reddit body, a missing tweet timestamp, too few
+  // mashup cards) used to drop the concept from the batch with a generic
+  // "did not match the expected schema" and no clue which field was wrong.
+  const messages: { role: "user" | "assistant"; content: typeof content }[] = [
+    { role: "user", content },
+  ];
+  let lastError = "";
 
-  const text = response.content
-    .map((b) => (b.type === "text" ? b.text : ""))
-    .join("");
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(extractJsonObject(text));
-  } catch {
-    throw new Error("HTML concept response was not valid JSON");
-  }
-  const validated = responseSchema.safeParse(parsed);
-  if (!validated.success) {
-    throw new Error("HTML concept response did not match the expected schema");
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const response = await client.messages.create({
+      model: BRIEF_MODEL,
+      max_tokens: 2000,
+      system: buildSystemPrompt(type, useImage),
+      messages,
+    });
+
+    const text = response.content
+      .map((b) => (b.type === "text" ? b.text : ""))
+      .join("");
+
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(extractJsonObject(text));
+    } catch {
+      lastError = "the response was not valid JSON";
+      messages.push(
+        { role: "assistant", content: text },
+        {
+          role: "user",
+          content: `That was not valid JSON. Respond with ONLY the JSON object, no prose or markdown fence, in the shape {"summary": "...", "key_points": ["...","...","..."], "content": ${shapeHint(type)}}.`,
+        },
+      );
+      continue;
+    }
+
+    const validated = responseSchema.safeParse(parsed);
+    if (validated.success) {
+      const renderContent = validated.data.content as RenderContent;
+      return {
+        brief_text: serializeRenderContent(type, renderContent),
+        summary: validated.data.summary,
+        key_points: validated.data.key_points.slice(0, 3),
+        render_content: renderContent,
+      };
+    }
+
+    lastError = validated.error.issues
+      .map((iss) => `${iss.path.join(".") || "(root)"}: ${iss.message}`)
+      .join("; ");
+    messages.push(
+      { role: "assistant", content: text },
+      {
+        role: "user",
+        content: `Your JSON failed validation:\n${lastError}\nFix exactly those problems and return the corrected JSON object only. The "content" object must match: ${shapeHint(type)}`,
+      },
+    );
   }
 
-  const renderContent = validated.data.content as RenderContent;
-  return {
-    brief_text: serializeRenderContent(type, renderContent),
-    summary: validated.data.summary,
-    key_points: validated.data.key_points.slice(0, 3),
-    render_content: renderContent,
-  };
+  throw new Error(
+    `HTML concept response did not match the expected schema (${lastError})`,
+  );
 }
