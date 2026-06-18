@@ -1,6 +1,12 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { collectReferenceImages } from "@/lib/gemini/reference-images";
-import { generateWithModel, singleModel, modelPreference } from "@/lib/image-gen/router";
+import {
+  generateWithModel,
+  otherModel,
+  singleModel,
+  modelPreference,
+} from "@/lib/image-gen/router";
+import { isTransientImageError } from "@/lib/image-gen/transient";
 import { renderConceptToDataUrl } from "@/lib/html-render/render";
 import type { HtmlRenderType } from "@/lib/html-render/types";
 import { reviewGeneration } from "@/lib/qa/review-generation";
@@ -37,9 +43,14 @@ export interface ProcessResult {
 }
 
 // Capped exponential backoff. attempts has already been incremented by
-// claim_next_job, so the first failure (attempts=1) waits ~4s.
+// claim_next_job, so the reachable requeue waits are 8 / 16 / 32 / 45s. The cap
+// stays UNDER the 60s drain claim window (drain.ts CLAIM_WINDOW_MS) on purpose:
+// a backoff longer than the window guarantees a pending job spans into a fresh
+// worker invocation that can only busy-spin until the gate opens. Spread enough
+// to ride out a transient Gemini "high demand" (503) spike across attempts
+// before the final-attempt failover (see processGenerate).
 function backoffSeconds(attempts: number): number {
-  return Math.min(60, 4 * 2 ** Math.max(0, attempts - 1));
+  return Math.min(45, 8 * 2 ** Math.max(0, attempts - 1));
 }
 
 async function requeue(
@@ -160,22 +171,56 @@ async function processGenerate(
     (job.payload?.model as ImageModel | undefined) ??
     singleModel(modelPreference(style));
 
+  const renderOpts = { prompt, platform: style.platform, referenceImages };
   let imageDataUrl: string;
   try {
-    const out = await generateWithModel(model, {
-      prompt,
-      platform: style.platform,
-      referenceImages,
-    });
+    const out = await generateWithModel(model, renderOpts);
     imageDataUrl = out.imageDataUrl;
   } catch (err) {
     const message = err instanceof Error ? err.message : "generation_failed";
+
+    // Attempts left: retry the SAME model with backoff. Short overload blips
+    // usually clear within a try or two.
     if (job.attempts < job.max_attempts) {
       await requeue(admin, job, message);
-    } else {
-      await failJob(admin, job, message);
-      await admin.from("generations").update({ status: "failed" }).eq("id", job.generation_id);
+      return { generations: [] };
     }
+
+    // Budget exhausted on an OVERLOAD (503/504/rate-limit/timeout/...) and this
+    // job hasn't failed over yet: hand the render to the OTHER backend. Gemini
+    // and gpt-image-1 are independent capacity pools, so one provider's "high
+    // demand" spike rarely hits the other.
+    //
+    // Re-pend the SAME job (the unique index allows only one live generate job
+    // per generation) with the model switched, attempts reset for a clean
+    // budget, and a failover_used flag so it can't bounce back. This runs the
+    // fallback on a FRESH tick rather than stacking a second full render in this
+    // one — two model renders in a single tick could blow the worker's 300s
+    // budget and get killed mid-render.
+    const alreadyFailedOver = job.payload?.failover_used === true;
+    if (isTransientImageError(err) && !alreadyFailedOver) {
+      const fallback = otherModel(model);
+      await admin
+        .from("jobs")
+        .update({
+          status: "pending",
+          started_at: null,
+          attempts: 0,
+          error: `${model} overloaded (${message}); failing over to ${fallback}`,
+          next_run_at: new Date(Date.now() + 1_500).toISOString(),
+          payload: { ...(job.payload ?? {}), model: fallback, failover_used: true },
+        })
+        .eq("id", job.id);
+      return { generations: [] };
+    }
+
+    // No budget left and either it's not an overload or we already failed over
+    // once — give up; the settle sweep may still auto-recover the row.
+    await failJob(admin, job, message);
+    await admin
+      .from("generations")
+      .update({ status: "failed" })
+      .eq("id", job.generation_id);
     return { generations: [] };
   }
 

@@ -29,6 +29,11 @@ const HEARTBEAT_MS = 270_000;
 // When nothing is claimable, wait this long before re-checking (a backoff gate
 // may open, or an in-flight generate may enqueue a review job).
 const IDLE_RECHECK_MS = 2_000;
+// When the ONLY remaining work is pending jobs sitting on a backoff gate
+// (nothing in flight to react to), wait a longer beat before re-checking so the
+// three drain workers don't tight-spin the claim RPC for the whole window while
+// a 30-45s gate is closed. We still claim promptly once a gate opens.
+const GATED_RECHECK_MS = 8_000;
 // Give up waiting when nothing is claimable and nothing is pending for this
 // many consecutive checks — any still-processing jobs belong to another
 // invocation, which will settle the batch itself.
@@ -111,11 +116,17 @@ export async function drainProject(
       // Nothing claimable right now.
       if (r.remaining_pending === 0 && r.remaining_processing === 0) return;
       if (r.remaining_pending === 0) {
-        // Only in-flight work elsewhere — bail after a grace period.
+        // Only in-flight work elsewhere — bail after a grace period, polling
+        // often so a freshly-enqueued review job is picked up promptly.
         idleChecks += 1;
         if (idleChecks >= MAX_IDLE_CHECKS) return;
+        await sleep(IDLE_RECHECK_MS);
+        continue;
       }
-      await sleep(IDLE_RECHECK_MS);
+      // Pending jobs remain but none are claimable: they're all on a backoff
+      // gate (next_run_at in the future). Wait a longer beat than the in-flight
+      // poll instead of tight-spinning the claim RPC until a gate opens.
+      await sleep(GATED_RECHECK_MS);
     }
   }
 

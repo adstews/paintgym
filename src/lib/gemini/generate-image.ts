@@ -1,5 +1,6 @@
 import { getGeminiClient, IMAGE_MODEL } from "./client";
 import { applyHardRules } from "./hard-rules";
+import { isTransientImageError } from "../image-gen/transient";
 import { platformDimensions } from "../types";
 import type { Platform } from "../types";
 
@@ -27,31 +28,6 @@ const REFERENCE_ANCHOR =
 // single attempt so a stalled request fails fast instead of hanging the whole route.
 const CALL_TIMEOUT_MS = 75_000;
 const MAX_ATTEMPTS = 3;
-
-// Transient backend conditions that are worth retrying: overload, rate limits,
-// timeouts, and the occasional empty (text-only / safety-deflected) response.
-function isRetryable(err: unknown): boolean {
-  const msg = (err instanceof Error ? err.message : String(err)).toLowerCase();
-  return (
-    msg.includes("no image data") ||
-    msg.includes("503") ||
-    msg.includes("502") ||
-    msg.includes("500") ||
-    msg.includes("overloaded") ||
-    msg.includes("unavailable") ||
-    msg.includes("429") ||
-    msg.includes("resource_exhausted") ||
-    msg.includes("rate limit") ||
-    msg.includes("quota") ||
-    msg.includes("timeout") ||
-    msg.includes("timed out") ||
-    msg.includes("deadline") ||
-    msg.includes("aborted") ||
-    msg.includes("econnreset") ||
-    msg.includes("fetch failed") ||
-    msg.includes("network")
-  );
-}
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -119,7 +95,7 @@ export async function generateImage({
       throw new Error("Gemini returned no image data");
     } catch (err) {
       lastErr = err;
-      if (attempt < MAX_ATTEMPTS && isRetryable(err)) {
+      if (attempt < MAX_ATTEMPTS && isTransientImageError(err)) {
         // Exponential backoff with jitter to ride out overload/rate-limit blips.
         const backoff = 1200 * 2 ** (attempt - 1) + Math.floor(Math.random() * 600);
         await sleep(backoff);

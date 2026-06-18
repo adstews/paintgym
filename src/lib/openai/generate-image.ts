@@ -3,6 +3,7 @@ import { getOpenAIClient, OPENAI_IMAGE_MODEL } from "./client";
 // The hard rules are model-agnostic — both generators append the exact same
 // rules so OpenAI and Gemini are held to the same fidelity bar.
 import { applyHardRules } from "../gemini/hard-rules";
+import { isTransientImageError } from "../image-gen/transient";
 import { platformDimensions } from "../types";
 import type { Platform } from "../types";
 // Mirror the Gemini generator's interface so the router can call either one
@@ -37,30 +38,6 @@ function openaiSize(
   if (d.width > d.height) return "1536x1024";
   if (d.height > d.width) return "1024x1536";
   return "1024x1024";
-}
-
-// Same transient-failure classification as the Gemini generator: overload, rate
-// limits, timeouts, and the occasional empty response are all worth retrying.
-function isRetryable(err: unknown): boolean {
-  const msg = (err instanceof Error ? err.message : String(err)).toLowerCase();
-  return (
-    msg.includes("no image data") ||
-    msg.includes("503") ||
-    msg.includes("502") ||
-    msg.includes("500") ||
-    msg.includes("overloaded") ||
-    msg.includes("unavailable") ||
-    msg.includes("429") ||
-    msg.includes("rate limit") ||
-    msg.includes("quota") ||
-    msg.includes("timeout") ||
-    msg.includes("timed out") ||
-    msg.includes("deadline") ||
-    msg.includes("aborted") ||
-    msg.includes("econnreset") ||
-    msg.includes("fetch failed") ||
-    msg.includes("network")
-  );
 }
 
 function sleep(ms: number): Promise<void> {
@@ -125,7 +102,7 @@ export async function generateImageOpenAI({
       throw new Error("OpenAI returned no image data");
     } catch (err) {
       lastErr = err;
-      if (attempt < MAX_ATTEMPTS && isRetryable(err)) {
+      if (attempt < MAX_ATTEMPTS && isTransientImageError(err)) {
         const backoff =
           1200 * 2 ** (attempt - 1) + Math.floor(Math.random() * 600);
         await sleep(backoff);

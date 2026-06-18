@@ -64,3 +64,10 @@ export function generateWithModel(
 ): Promise<GenerateImageResult> {
   return model === "openai" ? generateImageOpenAI(opts) : generateGemini(opts);
 }
+
+// The other image backend — used for last-resort failover when the chosen model
+// is overloaded. Gemini and gpt-image-1 are independent capacity pools, so one
+// provider's "high demand" spike almost never coincides with the other's.
+export function otherModel(model: ImageModel): ImageModel {
+  return model === "openai" ? "gemini" : "openai";
+}
