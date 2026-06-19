@@ -25,7 +25,10 @@ export interface Job {
 // (see generate-image.ts), so these cover harder failures. Reviews are
 // best-effort and the image is usable even if QA never succeeds.
 export const JOB_MAX_ATTEMPTS: Record<JobType, number> = {
-  generate: 3,
+  // 5 (was 3) so a generate job rides out a short Gemini "high demand" (503)
+  // spike across several spaced retries before the worker fails it over to the
+  // other image model on the final attempt. See src/lib/queue/process.ts.
+  generate: 5,
   review: 2,
   rewrite: 2,
 };

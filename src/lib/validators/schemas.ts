@@ -123,7 +123,12 @@ export const stripeCheckoutSchema = z.object({
 
 export const generateBriefsSchema = z.object({
   project_id: z.string().uuid(),
-  concept_ids: z.array(z.string().uuid()).min(1).max(50),
+  // Cap is generous on purpose: the brief write sends EVERY concept in the
+  // library in one call (Gemini set on first write, the "Generate via GPT"
+  // button for the openai set). The default library has already grown 35 -> 49
+  // -> 56, so a tight cap (was 50) silently 400s the whole request the moment
+  // the library crosses it. Keep this comfortably above any realistic count.
+  concept_ids: z.array(z.string().uuid()).min(1).max(200),
   // Which model these briefs are for. "openai" writes a fresh, deliberately
   // different set (contrasted against the existing Gemini briefs).
   model_target: z.enum(["gemini", "openai"]).optional().default("gemini"),
@@ -157,7 +162,10 @@ export const enqueueImagesSchema = z.object({
       }),
     )
     .min(1)
-    .max(200),
+    // Headroom over the concept library × variants (56 concepts × 3 = 168 today,
+    // and growing). These are tiny {concept_id, variant} pairs that only create
+    // rows, so a high cap is cheap and avoids a stale-ceiling 400 mid-launch.
+    .max(600),
 });
 
 export const processQueueSchema = z.object({
